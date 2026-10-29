@@ -16,11 +16,19 @@ import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.InputConstants;
 import org.lwjgl.glfw.GLFW;
 
+import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 public final class ClickGuiScreen extends Screen {
+    private enum Page {
+        MODULES,
+        CONFIGS,
+        KEYBINDS
+    }
+
     private static final int ACCENT = 0xFF8878FF;
     private static final int PANEL = 0xFF080C19;
     private static final int SIDEBAR = 0xFF0B1020;
@@ -31,6 +39,12 @@ public final class ClickGuiScreen extends Screen {
     private final ClientConfig config;
     private final Set<String> expanded = new HashSet<>();
     private EditBox search;
+    private EditBox profileName;
+    private List<String> profiles = List.of();
+    private String selectedProfile;
+    private String profileStatus = "Profiles are stored on this computer.";
+    private boolean profileStatusError;
+    private Page page = Page.MODULES;
     private String selectedCategory = "All";
     private String bindingModuleId;
     private boolean showEnabledOnly;
@@ -43,6 +57,9 @@ public final class ClickGuiScreen extends Screen {
     private int contentWidth;
     private int searchContainerX;
     private int searchContainerWidth;
+    private int profileSaveX;
+    private int profileLoadX;
+    private int profileDeleteX;
     private double scrollOffset;
     private double targetScrollOffset;
     private long lastFrameNanos;
@@ -73,7 +90,19 @@ public final class ClickGuiScreen extends Screen {
             targetScrollOffset = 0.0;
             scrollOffset = 0.0;
         });
+        search.setVisible(page != Page.CONFIGS);
         addRenderableWidget(search);
+
+        int profileInputWidth = Math.min(214, Math.max(80, contentWidth - 224));
+        profileSaveX = contentX + profileInputWidth + 8;
+        profileLoadX = profileSaveX + 70;
+        profileDeleteX = profileLoadX + 70;
+        profileName = new EditBox(font, contentX, viewportTop() + 15, profileInputWidth, 22, Component.literal("Profile name"));
+        profileName.setHint(Component.literal("Profile name"));
+        profileName.setMaxLength(32);
+        profileName.setVisible(page == Page.CONFIGS);
+        addRenderableWidget(profileName);
+        refreshProfiles();
     }
 
     @Override
@@ -96,7 +125,11 @@ public final class ClickGuiScreen extends Screen {
         graphics.fill(contentX - 10, panelY + 8, contentX - 9, panelY + panelHeight - 8, BORDER);
         renderHeader(graphics);
         renderSidebar(graphics, mouseX, mouseY);
-        renderModules(graphics, mouseX, mouseY);
+        switch (page) {
+            case MODULES -> renderModules(graphics, mouseX, mouseY);
+            case CONFIGS -> renderConfigs(graphics, mouseX, mouseY);
+            case KEYBINDS -> renderKeybinds(graphics, mouseX, mouseY);
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -109,23 +142,35 @@ public final class ClickGuiScreen extends Screen {
         String status = bindingModuleId == null ? "JILATON  ·  PVP MODULES" : "PRESS KEY  ·  ESC CANCEL  ·  DEL CLEAR";
         graphics.drawString(font, status, panelX + 20, panelY + panelHeight - 25, bindingModuleId == null ? 0xFF707A91 : ACCENT);
 
-        String title = selectedCategory.equals("All") ? "All Modules"
-                : selectedCategory.equals("Visuals") ? "Visual Modules" : selectedCategory + " Modules";
+        String title = switch (page) {
+            case MODULES -> selectedCategory.equals("All") ? "All Modules"
+                    : selectedCategory.equals("Visuals") ? "Visual Modules" : selectedCategory + " Modules";
+            case CONFIGS -> "Config Profiles";
+            case KEYBINDS -> "Keybinds";
+        };
         graphics.drawString(font, title, contentX, panelY + 20, 0xFFF2F4FC);
         int count = 0;
         int active = 0;
         String query = search.getValue().trim().toLowerCase(Locale.ROOT);
         for (ClientModule module : modules.all()) {
-            if (matches(module, query) && categoryMatches(module) && (!showEnabledOnly || module.enabled())) {
+            if (matches(module, query) && (page != Page.MODULES || categoryMatches(module))
+                    && (!showEnabledOnly || page != Page.MODULES || module.enabled())) {
                 count++;
                 if (module.enabled()) active++;
             }
         }
-        graphics.drawString(font, count + " modules  ·  " + active + " enabled", contentX, panelY + 38, 0xFF8791A9);
+        String subtitle = switch (page) {
+            case MODULES -> count + " modules  ·  " + active + " enabled";
+            case CONFIGS -> profiles.size() + (profiles.size() == 1 ? " saved profile" : " saved profiles");
+            case KEYBINDS -> active + " modules enabled  ·  click a row to edit its key";
+        };
+        graphics.drawString(font, subtitle, contentX, panelY + 38, 0xFF8791A9);
 
-        fillRounded(graphics, searchContainerX, panelY + 16, searchContainerWidth, 26, 6, 0xFF0D1425);
-        graphics.fill(searchContainerX + 9, panelY + 24, searchContainerX + 15, panelY + 30, 0xFF8D96AD);
-        graphics.fill(searchContainerX + 13, panelY + 29, searchContainerX + 17, panelY + 31, 0xFF8D96AD);
+        if (page != Page.CONFIGS) {
+            fillRounded(graphics, searchContainerX, panelY + 16, searchContainerWidth, 26, 6, 0xFF0D1425);
+            graphics.fill(searchContainerX + 9, panelY + 24, searchContainerX + 15, panelY + 30, 0xFF8D96AD);
+            graphics.fill(searchContainerX + 13, panelY + 29, searchContainerX + 17, panelY + 31, 0xFF8D96AD);
+        }
     }
 
     private void renderSidebar(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -138,7 +183,7 @@ public final class ClickGuiScreen extends Screen {
         int rowY = panelY + 92;
         for (String category : categories) {
             int rowX = panelX + 12;
-            boolean selected = selectedCategory.equals(category);
+            boolean selected = page == Page.MODULES && selectedCategory.equals(category);
             int rowWidth = dividerX - rowX - 12;
             int moduleCount = category.equals("All") ? modules.all().size() : (int) modules.all().stream()
                     .filter(module -> module.category().displayName().equals(category)).count();
@@ -156,8 +201,35 @@ public final class ClickGuiScreen extends Screen {
             rowY += 28;
         }
 
+        graphics.drawString(font, "GENERAL", panelX + 19, panelY + 246, 0xFF737F98);
+        renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 266, dividerX);
+        renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 294, dividerX);
+
         graphics.drawString(font, "RIGHT SHIFT", panelX + 19, panelY + panelHeight - 46, 0xFF8993AA);
         graphics.drawString(font, "TOGGLE MENU", panelX + 19, panelY + panelHeight - 32, 0xFF626D84);
+    }
+
+    private void renderSidebarLink(GuiGraphics graphics, int mouseX, int mouseY, String label, Page target, int y, int dividerX) {
+        int x = panelX + 12;
+        int width = dividerX - x - 12;
+        boolean selected = page == target;
+        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y - 6 && mouseY <= y + 18;
+        if (selected) {
+            fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF201D3D);
+            graphics.fill(x, y - 2, x + 2, y + 14, ACCENT);
+        } else if (hovered) {
+            fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF131A2B);
+        }
+        graphics.drawString(font, label, x + 12, y, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
+    }
+
+    private void setPage(Page nextPage) {
+        page = nextPage;
+        search.setVisible(page != Page.CONFIGS);
+        profileName.setVisible(page == Page.CONFIGS);
+        setFocused(null);
+        scrollOffset = 0.0;
+        targetScrollOffset = 0.0;
     }
 
     private void renderModules(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -249,6 +321,163 @@ public final class ClickGuiScreen extends Screen {
         }
     }
 
+    private void renderConfigs(GuiGraphics graphics, int mouseX, int mouseY) {
+        int top = viewportTop();
+        int inputY = top + 15;
+        drawActionButton(graphics, "SAVE", profileSaveX, inputY, 64, ACCENT, mouseX, mouseY);
+        drawActionButton(graphics, "LOAD", profileLoadX, inputY, 64, selectedProfile == null ? 0xFF20283A : 0xFF34305C, mouseX, mouseY);
+        drawActionButton(graphics, "DELETE", profileDeleteX, inputY, 72, selectedProfile == null ? 0xFF20283A : 0xFF3A2634, mouseX, mouseY);
+        graphics.drawString(font, profileStatus, contentX, inputY + 31, profileStatusError ? 0xFFFF858D : 0xFF8993AA);
+
+        int listTop = top + 63;
+        int rowY = listTop - (int) Math.round(scrollOffset);
+        graphics.enableScissor(contentX, listTop, contentX + contentWidth, viewportBottom());
+        if (profiles.isEmpty()) {
+            graphics.drawString(font, "No profiles yet. Enter a name and save the current setup.", contentX + 2, listTop + 16, 0xFF8993AA);
+        } else {
+            for (String profile : profiles) {
+                boolean selected = profile.equals(selectedProfile);
+                boolean hovered = mouseX >= contentX && mouseX <= contentX + contentWidth
+                        && mouseY >= rowY && mouseY <= rowY + 34;
+                fillRounded(graphics, contentX, rowY, contentWidth - 4, 34, 6,
+                        selected ? 0xFF211E3B : hovered ? CARD_HOVER : CARD);
+                graphics.drawString(font, profile, contentX + 13, rowY + 12, selected ? 0xFFE6E1FF : 0xFFE0E5F2);
+                graphics.drawString(font, selected ? "SELECTED" : "PROFILE", contentX + contentWidth - 72, rowY + 12,
+                        selected ? 0xFFB4A9FF : 0xFF77839C);
+                rowY += 42;
+            }
+        }
+        graphics.disableScissor();
+        drawScrollbar(graphics, listTop, viewportBottom(), profiles.size() * 42 - 8);
+    }
+
+    private void renderKeybinds(GuiGraphics graphics, int mouseX, int mouseY) {
+        int top = viewportTop();
+        int rowY = top - (int) Math.round(scrollOffset);
+        String query = search.getValue().trim().toLowerCase(Locale.ROOT);
+        graphics.enableScissor(contentX, top, contentX + contentWidth, viewportBottom());
+        int visible = 0;
+        for (ClientModule module : modules.all()) {
+            if (!matches(module, query)) {
+                continue;
+            }
+            visible++;
+            boolean hovered = mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= rowY && mouseY <= rowY + 44;
+            fillRounded(graphics, contentX, rowY, contentWidth - 4, 44, 6, hovered ? CARD_HOVER : CARD);
+            graphics.drawString(font, module.name(), contentX + 13, rowY + 8, 0xFFE9EDF7);
+            graphics.drawString(font, module.category().displayName(), contentX + 13, rowY + 25, 0xFF7F8AA2);
+            fillRounded(graphics, contentX + contentWidth - 122, rowY + 10, 108, 24, 6,
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? 0xFF393260 : 0xFF1A2236);
+            String binding = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS A KEY" : keyName(module.keyCode());
+            int bindingWidth = font.width(binding);
+            graphics.drawString(font, binding, contentX + contentWidth - 122 + (108 - bindingWidth) / 2,
+                    rowY + 18, 0xFFD1D6E4);
+            rowY += 52;
+        }
+        if (visible == 0) {
+            graphics.drawString(font, "No modules match this search.", contentX + 2, top + 18, 0xFF8993AA);
+        }
+        graphics.disableScissor();
+        drawScrollbar(graphics, top, viewportBottom(), visible * 52 - 8);
+    }
+
+    private void drawActionButton(GuiGraphics graphics, String label, int x, int y, int width, int color, int mouseX, int mouseY) {
+        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + 22;
+        fillRounded(graphics, x, y, width, 22, 6, hovered ? lighten(color) : color);
+        graphics.drawString(font, label, x + (width - font.width(label)) / 2, y + 7, 0xFFF2F3FB);
+    }
+
+    private static int lighten(int color) {
+        int red = Math.min(255, ((color >> 16) & 0xFF) + 14);
+        int green = Math.min(255, ((color >> 8) & 0xFF) + 14);
+        int blue = Math.min(255, (color & 0xFF) + 14);
+        return (color & 0xFF000000) | (red << 16) | (green << 8) | blue;
+    }
+
+    private void drawScrollbar(GuiGraphics graphics, int top, int bottom, int contentHeight) {
+        int viewportHeight = bottom - top;
+        if (contentHeight <= viewportHeight || contentHeight <= 0) {
+            return;
+        }
+        int trackX = contentX + contentWidth - 2;
+        int thumbHeight = Math.max(22, (int) ((long) viewportHeight * viewportHeight / contentHeight));
+        int thumbTravel = viewportHeight - thumbHeight;
+        int scrollRange = contentHeight - viewportHeight;
+        int thumbY = top + (scrollRange <= 0 ? 0 : (int) Math.round(thumbTravel * scrollOffset / scrollRange));
+        graphics.fill(trackX, top, trackX + 2, bottom, BORDER);
+        fillRounded(graphics, trackX - 1, thumbY, 4, thumbHeight, 2, ACCENT);
+    }
+
+    private void refreshProfiles() {
+        try {
+            profiles = config.listProfiles();
+            if (selectedProfile != null && !profiles.contains(selectedProfile)) {
+                selectedProfile = null;
+            }
+        } catch (IOException exception) {
+            profiles = List.of();
+            profileStatus = "Could not read profiles: " + exception.getMessage();
+            profileStatusError = true;
+        }
+    }
+
+    private void saveProfile() {
+        String name = profileName.getValue().trim();
+        try {
+            config.saveProfile(name, modules);
+            selectedProfile = name;
+            profileStatus = "Saved profile “" + name + "”.";
+            profileStatusError = false;
+            refreshProfiles();
+        } catch (IllegalArgumentException | IOException exception) {
+            profileStatus = exception instanceof IllegalArgumentException
+                    ? "Use 1–32 letters, numbers, underscores, or hyphens."
+                    : "Could not save profile: " + exception.getMessage();
+            profileStatusError = true;
+        }
+    }
+
+    private void loadProfile() {
+        if (selectedProfile == null) {
+            return;
+        }
+        try {
+            if (config.loadProfile(selectedProfile, modules)) {
+                config.save(modules);
+                profileStatus = "Loaded profile “" + selectedProfile + "”.";
+                profileStatusError = false;
+            } else {
+                profileStatus = "That profile no longer exists.";
+                profileStatusError = true;
+                refreshProfiles();
+            }
+        } catch (IOException exception) {
+            profileStatus = "Could not load profile: " + exception.getMessage();
+            profileStatusError = true;
+        }
+    }
+
+    private void deleteProfile() {
+        if (selectedProfile == null) {
+            return;
+        }
+        try {
+            if (config.deleteProfile(selectedProfile)) {
+                profileStatus = "Deleted profile “" + selectedProfile + "”.";
+                profileStatusError = false;
+                selectedProfile = null;
+                refreshProfiles();
+            } else {
+                profileStatus = "That profile no longer exists.";
+                profileStatusError = true;
+                refreshProfiles();
+            }
+        } catch (IOException exception) {
+            profileStatus = "Could not delete profile: " + exception.getMessage();
+            profileStatusError = true;
+        }
+    }
+
     private void renderSetting(GuiGraphics graphics, Setting setting, int x, int y, int width, int mouseX) {
         graphics.drawString(font, setting.label(), x, y + 3, 0xFFD1D0DA);
         if (setting instanceof BooleanSetting booleanSetting) {
@@ -323,12 +552,69 @@ public final class ClickGuiScreen extends Screen {
         int rowY = panelY + 92;
         for (String category : categories) {
             if (mouseX >= panelX + 12 && mouseX <= dividerX - 12 && mouseY >= rowY - 6 && mouseY <= rowY + 18) {
+                setPage(Page.MODULES);
                 selectedCategory = category;
-                targetScrollOffset = 0.0;
-                scrollOffset = 0.0;
                 return true;
             }
             rowY += 28;
+        }
+
+        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
+                && mouseY >= panelY + 260 && mouseY <= panelY + 284) {
+            setPage(Page.CONFIGS);
+            refreshProfiles();
+            return true;
+        }
+        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
+                && mouseY >= panelY + 288 && mouseY <= panelY + 312) {
+            setPage(Page.KEYBINDS);
+            return true;
+        }
+
+        if (page == Page.CONFIGS) {
+            int inputY = viewportTop() + 15;
+            if (mouseY >= inputY && mouseY <= inputY + 22) {
+                if (mouseX >= profileSaveX && mouseX <= profileSaveX + 64) {
+                    saveProfile();
+                    return true;
+                }
+                if (mouseX >= profileLoadX && mouseX <= profileLoadX + 64) {
+                    loadProfile();
+                    return true;
+                }
+                if (mouseX >= profileDeleteX && mouseX <= profileDeleteX + 72) {
+                    deleteProfile();
+                    return true;
+                }
+            }
+            int profileRowY = viewportTop() + 63 - (int) Math.round(scrollOffset);
+            for (String profile : profiles) {
+                if (mouseX >= contentX && mouseX <= contentX + contentWidth - 4
+                        && mouseY >= profileRowY && mouseY <= profileRowY + 34) {
+                    selectedProfile = profile;
+                    profileName.setValue(profile);
+                    return true;
+                }
+                profileRowY += 42;
+            }
+            return false;
+        }
+
+        if (page == Page.KEYBINDS) {
+            String query = search.getValue().trim().toLowerCase(Locale.ROOT);
+            int bindingRowY = viewportTop() - (int) Math.round(scrollOffset);
+            for (ClientModule module : modules.all()) {
+                if (!matches(module, query)) {
+                    continue;
+                }
+                if (mouseX >= contentX && mouseX <= contentX + contentWidth - 4
+                        && mouseY >= bindingRowY && mouseY <= bindingRowY + 44) {
+                    bindingModuleId = module.id();
+                    return true;
+                }
+                bindingRowY += 52;
+            }
+            return false;
         }
 
         int toolbarY = panelY + 65;
@@ -422,7 +708,7 @@ public final class ClickGuiScreen extends Screen {
         if (super.mouseDragged(event, dragX, dragY)) {
             return true;
         }
-        if (event.button() != 0) {
+        if (page != Page.MODULES || event.button() != 0) {
             return false;
         }
         if (event.x() < contentX || event.x() > contentX + contentWidth
@@ -504,7 +790,21 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private int maximumScroll() {
-        return maxScroll(totalContentHeight(), viewportBottom() - viewportTop());
+        int viewportHeight = viewportBottom() - viewportTop();
+        int contentHeight = switch (page) {
+            case MODULES -> totalContentHeight();
+            case CONFIGS -> profiles.size() * 42 - 8;
+            case KEYBINDS -> keybindContentHeight();
+        };
+        if (page == Page.CONFIGS) {
+            viewportHeight -= 63;
+        }
+        return maxScroll(contentHeight, viewportHeight);
+    }
+
+    private int keybindContentHeight() {
+        String query = search.getValue().trim().toLowerCase(Locale.ROOT);
+        return (int) modules.all().stream().filter(module -> matches(module, query)).count() * 52 - 8;
     }
 
     private int totalContentHeight() {
