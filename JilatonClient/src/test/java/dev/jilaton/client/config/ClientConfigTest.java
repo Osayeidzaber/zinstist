@@ -22,6 +22,16 @@ class ClientConfigTest {
     Path temporaryDirectory;
 
     @Test
+    void missingConfigStartsModulesWithTheirDeclaredDefaults() {
+        ModuleManager modules = new ModuleManager();
+
+        new ClientConfig(temporaryDirectory).load(modules);
+
+        assertTrue(modules.get("friends").enabled());
+        assertFalse(modules.get("kill_aura").enabled());
+    }
+
+    @Test
     void roundTripsModuleSettingsAndKeyBindings() throws Exception {
         ModuleManager source = new ModuleManager();
         ClientModule aimAssist = source.get("aim_assist");
@@ -32,13 +42,46 @@ class ClientConfigTest {
         ClientModule autoClicker = source.get("auto_clicker");
         BooleanSetting playersOnly = setting(autoClicker, "players_only", BooleanSetting.class);
         playersOnly.setValue(false);
+        setting(autoClicker, "right_click_enabled", BooleanSetting.class).setValue(true);
+        setting(autoClicker, "right_click_cps", NumberSetting.class).setValue(12.0);
+        setting(autoClicker, "right_click_block_only", BooleanSetting.class).setValue(true);
         autoClicker.setKeyCode(67);
 
         ClientModule autoGapple = source.get("auto_gapple");
         setting(autoGapple, "health_threshold", NumberSetting.class).setValue(7.5);
         setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
+        setting(autoGapple, "consider_absorption", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_pot"), "speed", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_pot"), "water_breathing", BooleanSetting.class).setValue(true);
+        setting(source.get("auto_pot"), "refresh_window", NumberSetting.class).setValue(12.0);
+        setting(source.get("no_fall"), "use_safe_distance", BooleanSetting.class).setValue(false);
+        setting(source.get("no_fall"), "fall_distance", NumberSetting.class).setValue(4.5);
+        setting(source.get("no_fall"), "reset_fall_distance", BooleanSetting.class).setValue(false);
+        setting(source.get("safe_walk"), "edge_distance", NumberSetting.class).setValue(0.45);
+        setting(source.get("safe_walk"), "keep_ticks", NumberSetting.class).setValue(3.0);
+        setting(source.get("no_slow"), "item_use_scale", NumberSetting.class).setValue(0.65);
+        setting(source.get("no_slow"), "consume_scale", NumberSetting.class).setValue(0.4);
+        setting(source.get("no_slow"), "block_scale", NumberSetting.class).setValue(1.6);
+        setting(source.get("inventory_move"), "behavior", ChoiceSetting.class).setValue("Normal");
+        setting(source.get("inventory_move"), "passthrough_sneak", BooleanSetting.class).setValue(true);
+        setting(source.get("bow_aim"), "range", NumberSetting.class).setValue(48.0);
+        setting(source.get("bow_aim"), "high_arc", BooleanSetting.class).setValue(true);
+        setting(source.get("auto_weapon"), "preference", ChoiceSetting.class).setValue("Axe");
+        setting(source.get("auto_weapon"), "mace_smash", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_weapon"), "switch_back_delay", NumberSetting.class).setValue(4.0);
+        setting(source.get("no_miss_cooldown"), "remove_attack_cooldown", BooleanSetting.class).setValue(false);
+        setting(source.get("no_miss_cooldown"), "cancel_attack_on_miss", BooleanSetting.class).setValue(true);
         setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
         setting(source.get("swing_animations"), "mode", ChoiceSetting.class).setValue("Power");
+        setting(source.get("kill_aura"), "players", BooleanSetting.class).setValue(false);
+        setting(source.get("kill_aura"), "hostiles", BooleanSetting.class).setValue(true);
+        setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
+        setting(source.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).setValue(true);
+        setting(source.get("auto_totem"), "refill_delay", NumberSetting.class).setValue(7.0);
+        setting(source.get("crystal_aura"), "face_place", BooleanSetting.class).setValue(false);
+        setting(source.get("crystal_aura"), "face_place_health", NumberSetting.class).setValue(13.5);
+        setting(source.get("crystal_aura"), "face_place_damage", NumberSetting.class).setValue(3.0);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -55,11 +98,44 @@ class ClientConfigTest {
         assertEquals(5.1, setting(restored.get("aim_assist"), "range", NumberSetting.class).value(), 0.000001);
         assertEquals(65, restored.get("aim_assist").keyCode());
         assertFalse(setting(restored.get("auto_clicker"), "players_only", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("auto_clicker"), "right_click_enabled", BooleanSetting.class).value());
+        assertEquals(12.0, setting(restored.get("auto_clicker"), "right_click_cps", NumberSetting.class).value());
+        assertTrue(setting(restored.get("auto_clicker"), "right_click_block_only", BooleanSetting.class).value());
         assertEquals(67, restored.get("auto_clicker").keyCode());
         assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
+        assertFalse(setting(restored.get("auto_gapple"), "consider_absorption", BooleanSetting.class).value());
+        assertFalse(setting(restored.get("auto_pot"), "speed", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("auto_pot"), "water_breathing", BooleanSetting.class).value());
+        assertEquals(12.0, setting(restored.get("auto_pot"), "refresh_window", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("no_fall"), "use_safe_distance", BooleanSetting.class).value());
+        assertEquals(4.5, setting(restored.get("no_fall"), "fall_distance", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("no_fall"), "reset_fall_distance", BooleanSetting.class).value());
+        assertEquals(0.45, setting(restored.get("safe_walk"), "edge_distance", NumberSetting.class).value(), 0.000001);
+        assertEquals(3.0, setting(restored.get("safe_walk"), "keep_ticks", NumberSetting.class).value(), 0.000001);
+        assertEquals(0.65, setting(restored.get("no_slow"), "item_use_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals(0.4, setting(restored.get("no_slow"), "consume_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals(1.6, setting(restored.get("no_slow"), "block_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals("Normal", setting(restored.get("inventory_move"), "behavior", ChoiceSetting.class).value());
+        assertTrue(setting(restored.get("inventory_move"), "passthrough_sneak", BooleanSetting.class).value());
+        assertEquals(48.0, setting(restored.get("bow_aim"), "range", NumberSetting.class).value(), 0.000001);
+        assertTrue(setting(restored.get("bow_aim"), "high_arc", BooleanSetting.class).value());
+        assertEquals("Axe", setting(restored.get("auto_weapon"), "preference", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("auto_weapon"), "mace_smash", BooleanSetting.class).value());
+        assertEquals(4.0, setting(restored.get("auto_weapon"), "switch_back_delay", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("no_miss_cooldown"), "remove_attack_cooldown", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("no_miss_cooldown"), "cancel_attack_on_miss", BooleanSetting.class).value());
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("Power", setting(restored.get("swing_animations"), "mode", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "players", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("kill_aura"), "hostiles", BooleanSetting.class).value());
+        assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).value());
+        assertEquals(7.0, setting(restored.get("auto_totem"), "refill_delay", NumberSetting.class).value());
+        assertFalse(setting(restored.get("crystal_aura"), "face_place", BooleanSetting.class).value());
+        assertEquals(13.5, setting(restored.get("crystal_aura"), "face_place_health", NumberSetting.class).value());
+        assertEquals(3.0, setting(restored.get("crystal_aura"), "face_place_damage", NumberSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
         assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));
