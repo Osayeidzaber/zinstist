@@ -6,6 +6,7 @@ import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AutoAnchorModule;
 import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.AutoWeaponModule;
+import dev.jilaton.client.module.impl.BowAimModule;
 import dev.jilaton.client.module.impl.AnchorAuraModule;
 import dev.jilaton.client.module.impl.WTapModule;
 import dev.jilaton.client.module.impl.SwingAnimationsModule;
@@ -83,6 +84,17 @@ class ModuleManagerTest {
         assertEquals(ModuleCategory.COMBAT, autoWeapon.category());
         assertFalse(autoWeapon.enabled());
         assertEquals(7, autoWeapon.settings().size());
+    }
+
+    @Test
+    void bowAimIsRegisteredWithProjectileAndTargetControls() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule bowAim = manager.get("bow_aim");
+
+        assertTrue(bowAim instanceof BowAimModule);
+        assertEquals(ModuleCategory.COMBAT, bowAim.category());
+        assertFalse(bowAim.enabled());
+        assertEquals(9, bowAim.settings().size());
     }
 
     @Test

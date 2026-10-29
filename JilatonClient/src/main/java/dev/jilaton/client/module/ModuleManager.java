@@ -10,6 +10,7 @@ import dev.jilaton.client.module.impl.AutoGappleModule;
 import dev.jilaton.client.module.impl.AutoPotModule;
 import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.AutoWeaponModule;
+import dev.jilaton.client.module.impl.BowAimModule;
 import dev.jilaton.client.module.impl.CrystalAuraModule;
 import dev.jilaton.client.module.impl.CriticalsModule;
 import dev.jilaton.client.module.impl.FullbrightModule;
@@ -51,6 +52,7 @@ public final class ModuleManager {
         register(new FriendsModule());
         register(new TeamsModule());
         register(new AimAssistModule());
+        register(new BowAimModule());
         register(new KillAuraModule());
         register(new HitboxModule());
         register(new ReachModule());

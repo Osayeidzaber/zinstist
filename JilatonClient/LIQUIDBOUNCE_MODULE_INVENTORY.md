@@ -27,7 +27,7 @@ Found **232** module entry class files across 8 categories.
 | `combat/ModuleTimerRange` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/aimbot/ModuleAutoBow` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/aimbot/ModuleDroneControl` | — | Not integrated; dependencies, settings, and behavior not yet audited |
-| `combat/aimbot/ModuleProjectileAimbot` | — | Not integrated; dependencies, settings, and behavior not yet audited |
+| `combat/aimbot/ModuleProjectileAimbot` | `BowAim (partial)` | REA verified the compiled module and its `SituationalProjectileAngleCalculator`, `TrajectoryInfo`, and `PolynomialProjectileAngleCalculator` dependencies by path and archive hash. `javap` shows target selection, a situational angle calculation, then a rotation-manager submission. Jilaton adapts this with vanilla bow draw power, a drag/gravity intercept solver, optional target velocity lead/high arc, gradual visible rotation, and shared friend/team/anti-bot filters. This does not port LiquidBounce's generalized projectile types, target selector modes, rotation arbitration/correction group, or full hitbox verification. Math, registry, and config tests pass; in-game aiming remains unverified |
 | `combat/autoarmor/ModuleAutoArmor` | `AutoArmor (partial)` | Partial adaptation; source behavior and dependencies need further audit |
 | `combat/backtrack/ModuleBacktrack` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/criticals/ModuleCriticals` | `Criticals (partial)` | Partial adaptation; source behavior and dependencies need further audit |
