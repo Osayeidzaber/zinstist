@@ -146,8 +146,10 @@ public final class ClickGuiScreen extends Screen {
         graphics.drawString(font, "J", panelX + 24, panelY + 22, accent);
         graphics.drawString(font, "JILATON", panelX + 46, panelY + 18, 0xFFF1F3FC);
         graphics.drawString(font, "CLIENT  /  0.1", panelX + 46, panelY + 32, 0xFF7F879B);
-        String status = bindingModuleId == null ? "JILATON  ·  PVP MODULES" : "PRESS KEY  ·  ESC CANCEL  ·  DEL CLEAR";
-        graphics.drawString(font, status, panelX + 20, panelY + panelHeight - 25, bindingModuleId == null ? 0xFF707A91 : accent);
+        if (!compactSidebar()) {
+            String status = bindingModuleId == null ? "JILATON  ·  PVP MODULES" : "PRESS KEY  ·  ESC CANCEL  ·  DEL CLEAR";
+            graphics.drawString(font, status, panelX + 20, panelY + panelHeight - 25, bindingModuleId == null ? 0xFF707A91 : accent);
+        }
 
         String title = switch (page) {
             case MODULES -> selectedCategory.equals("All") ? "All Modules"
@@ -185,23 +187,29 @@ public final class ClickGuiScreen extends Screen {
     private void renderSidebar(GuiGraphics graphics, int mouseX, int mouseY) {
         int sidebarWidth = contentX - panelX - 20;
         int dividerX = panelX + sidebarWidth;
-        graphics.fill(dividerX, panelY + 62, dividerX + 1, panelY + panelHeight - 18, BORDER);
-        graphics.drawString(font, "MODULES", panelX + 19, panelY + 73, 0xFF737F98);
+        boolean compact = compactSidebar();
+        graphics.fill(dividerX, panelY + (compact ? 44 : 62), dividerX + 1,
+                panelY + panelHeight - (compact ? 8 : 18), BORDER);
+        graphics.drawString(font, "MODULES", panelX + 19, panelY + (compact ? 48 : 73), 0xFF737F98);
 
         String[] categories = {"All", "Combat", "Movement", "Visuals", "Client"};
-        int rowY = panelY + 92;
+        int rowY = categoryRowStart();
+        int rowSpacing = categoryRowSpacing();
+        int rowInset = compact ? 3 : 6;
+        int rowHeight = compact ? 18 : 24;
         for (String category : categories) {
             int rowX = panelX + 12;
             boolean selected = page == Page.MODULES && selectedCategory.equals(category);
             int rowWidth = dividerX - rowX - 12;
             int moduleCount = category.equals("All") ? modules.all().size() : (int) modules.all().stream()
                     .filter(module -> module.category().displayName().equals(category)).count();
-            boolean hovered = mouseX >= rowX && mouseX <= rowX + rowWidth && mouseY >= rowY - 5 && mouseY <= rowY + 15;
+            boolean hovered = mouseX >= rowX && mouseX <= rowX + rowWidth
+                    && mouseY >= rowY - rowInset && mouseY <= rowY - rowInset + rowHeight;
             if (selected) {
-                fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, accentSurface());
-                graphics.fill(rowX, rowY - 2, rowX + 2, rowY + 14, accent);
+                fillRounded(graphics, rowX, rowY - rowInset, rowWidth, rowHeight, 6, accentSurface());
+                graphics.fill(rowX, rowY - 2, rowX + 2, rowY + (compact ? 12 : 14), accent);
             } else if (hovered) {
-                fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, 0xFF131A2B);
+                fillRounded(graphics, rowX, rowY - rowInset, rowWidth, rowHeight, 6, 0xFF131A2B);
             }
             int iconColor = selected ? accent : hovered ? 0xFFB9C2D8 : 0xFF78839B;
             drawSidebarIcon(graphics, category, rowX + 10, rowY + 2, iconColor);
@@ -209,32 +217,69 @@ public final class ClickGuiScreen extends Screen {
             String countText = Integer.toString(moduleCount);
             graphics.drawString(font, countText, rowX + rowWidth - font.width(countText) - 10, rowY,
                     selected ? 0xFFCBC5FF : 0xFF6F7890);
-            rowY += 28;
+            rowY += rowSpacing;
         }
 
-        graphics.drawString(font, "GENERAL", panelX + 19, panelY + 246, 0xFF737F98);
-        renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, panelY + 266, dividerX);
-        renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 294, dividerX);
-        renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 322, dividerX);
+        if (compact) {
+            renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, sidebarLinkY(Page.THEME), dividerX, true);
+            renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, sidebarLinkY(Page.CONFIGS), dividerX, true);
+            renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, sidebarLinkY(Page.KEYBINDS), dividerX, true);
+        } else {
+            graphics.drawString(font, "GENERAL", panelX + 19, panelY + 246, 0xFF737F98);
+            renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, panelY + 266, dividerX, false);
+            renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 294, dividerX, false);
+            renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 322, dividerX, false);
 
-        graphics.drawString(font, "RIGHT SHIFT", panelX + 19, panelY + panelHeight - 46, 0xFF8993AA);
-        graphics.drawString(font, "TOGGLE MENU", panelX + 19, panelY + panelHeight - 32, 0xFF626D84);
+            graphics.drawString(font, "RIGHT SHIFT", panelX + 19, panelY + panelHeight - 46, 0xFF8993AA);
+            graphics.drawString(font, "TOGGLE MENU", panelX + 19, panelY + panelHeight - 32, 0xFF626D84);
+        }
     }
 
-    private void renderSidebarLink(GuiGraphics graphics, int mouseX, int mouseY, String label, Page target, int y, int dividerX) {
+    private void renderSidebarLink(GuiGraphics graphics, int mouseX, int mouseY, String label, Page target, int y, int dividerX, boolean compact) {
         int x = panelX + 12;
         int width = dividerX - x - 12;
+        int inset = compact ? 3 : 6;
+        int height = compact ? 18 : 24;
         boolean selected = page == target;
-        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y - 6 && mouseY <= y + 18;
+        boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y - inset && mouseY <= y - inset + height;
         if (selected) {
-            fillRounded(graphics, x, y - 6, width, 24, 6, accentSurface());
-            graphics.fill(x, y - 2, x + 2, y + 14, accent);
+            fillRounded(graphics, x, y - inset, width, height, 6, accentSurface());
+            graphics.fill(x, y - 2, x + 2, y + (compact ? 12 : 14), accent);
         } else if (hovered) {
-            fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF131A2B);
+            fillRounded(graphics, x, y - inset, width, height, 6, 0xFF131A2B);
         }
         drawSidebarIcon(graphics, label, x + 10, y + 2,
                 selected ? accent : hovered ? 0xFFB9C2D8 : 0xFF78839B);
         graphics.drawString(font, label, x + 29, y, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
+    }
+
+    private boolean compactSidebar() {
+        return panelHeight < 360;
+    }
+
+    private int categoryRowStart() {
+        return panelY + (compactSidebar() ? 63 : 92);
+    }
+
+    private int categoryRowSpacing() {
+        return compactSidebar() ? 16 : 28;
+    }
+
+    private int sidebarLinkY(Page target) {
+        if (!compactSidebar()) {
+            return panelY + switch (target) {
+                case THEME -> 266;
+                case CONFIGS -> 294;
+                case KEYBINDS -> 322;
+                default -> throw new IllegalArgumentException("Not a sidebar page: " + target);
+            };
+        }
+        return panelY + panelHeight - 60 + switch (target) {
+            case THEME -> 0;
+            case CONFIGS -> 18;
+            case KEYBINDS -> 36;
+            default -> throw new IllegalArgumentException("Not a sidebar page: " + target);
+        };
     }
 
     private static void drawSidebarIcon(GuiGraphics graphics, String name, int x, int y, int color) {
@@ -783,32 +828,33 @@ public final class ClickGuiScreen extends Screen {
             return true;
         }
         int dividerX = contentX - 20;
+        boolean compact = compactSidebar();
+        int rowInset = compact ? 3 : 6;
+        int rowHeight = compact ? 18 : 24;
         String[] categories = {"All", "Combat", "Movement", "Visuals", "Client"};
-        int rowY = panelY + 92;
+        int rowY = categoryRowStart();
         for (String category : categories) {
-            if (mouseX >= panelX + 12 && mouseX <= dividerX - 12 && mouseY >= rowY - 6 && mouseY <= rowY + 18) {
+            if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
+                    && mouseY >= rowY - rowInset && mouseY <= rowY - rowInset + rowHeight) {
                 setPage(Page.MODULES);
                 selectedCategory = category;
                 return true;
             }
-            rowY += 28;
+            rowY += categoryRowSpacing();
         }
 
-        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
-                && mouseY >= panelY + 260 && mouseY <= panelY + 284) {
-            setPage(Page.THEME);
-            return true;
-        }
-        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
-                && mouseY >= panelY + 288 && mouseY <= panelY + 312) {
-            setPage(Page.CONFIGS);
-            refreshProfiles();
-            return true;
-        }
-        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
-                && mouseY >= panelY + 316 && mouseY <= panelY + 340) {
-            setPage(Page.KEYBINDS);
-            return true;
+        int sidebarInset = compact ? 3 : 6;
+        int sidebarHeight = compact ? 18 : 24;
+        for (Page target : new Page[]{Page.THEME, Page.CONFIGS, Page.KEYBINDS}) {
+            int linkY = sidebarLinkY(target);
+            if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
+                    && mouseY >= linkY - sidebarInset && mouseY <= linkY - sidebarInset + sidebarHeight) {
+                setPage(target);
+                if (target == Page.CONFIGS) {
+                    refreshProfiles();
+                }
+                return true;
+            }
         }
 
         if (page == Page.THEME) {
