@@ -1,5 +1,6 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.setting.BooleanSetting;
@@ -16,6 +17,12 @@ public final class SprintModule extends ClientModule {
     @Override
     protected void onTick(Minecraft client) {
         if (client.player == null || client.options == null) {
+            return;
+        }
+
+        ClientModule tapModule = JilatonClient.moduleManager().get("wtap");
+        if (tapModule instanceof WTapModule wTap && wTap.enabled() && wTap.isTapActive(client)) {
+            client.player.setSprinting(false);
             return;
         }
 
