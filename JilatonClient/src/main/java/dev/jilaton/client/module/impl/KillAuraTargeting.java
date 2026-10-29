@@ -17,4 +17,9 @@ final class KillAuraTargeting {
             default -> throw new IllegalArgumentException("Unknown KillAura priority: " + priority);
         };
     }
+
+    static boolean shouldSkipShield(boolean enabled, boolean shieldBlocks, boolean axeEquipped,
+                                    boolean autoWeaponCanSelectAxe) {
+        return enabled && shieldBlocks && !axeEquipped && !autoWeaponCanSelectAxe;
+    }
 }

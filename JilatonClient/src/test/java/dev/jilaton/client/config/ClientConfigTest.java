@@ -76,6 +76,7 @@ class ClientConfigTest {
         setting(source.get("kill_aura"), "players", BooleanSetting.class).setValue(false);
         setting(source.get("kill_aura"), "hostiles", BooleanSetting.class).setValue(true);
         setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
+        setting(source.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).setValue(false);
         setting(source.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).setValue(true);
         setting(source.get("auto_totem"), "refill_delay", NumberSetting.class).setValue(7.0);
         setting(source.get("crystal_aura"), "face_place", BooleanSetting.class).setValue(false);
@@ -129,6 +130,7 @@ class ClientConfigTest {
         assertFalse(setting(restored.get("kill_aura"), "players", BooleanSetting.class).value());
         assertTrue(setting(restored.get("kill_aura"), "hostiles", BooleanSetting.class).value());
         assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).value());
         assertTrue(setting(restored.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).value());
         assertEquals(7.0, setting(restored.get("auto_totem"), "refill_delay", NumberSetting.class).value());
         assertFalse(setting(restored.get("crystal_aura"), "face_place", BooleanSetting.class).value());

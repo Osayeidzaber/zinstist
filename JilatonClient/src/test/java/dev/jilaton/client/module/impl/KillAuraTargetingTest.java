@@ -26,4 +26,13 @@ class KillAuraTargetingTest {
         assertThrows(IllegalArgumentException.class,
                 () -> KillAuraTargeting.rank("random", 1.0, 1.0, 1.0));
     }
+
+    @Test
+    void skipsAnAttackBlockedByAShieldOnlyWhenNoAxeCanBeUsed() {
+        assertEquals(true, KillAuraTargeting.shouldSkipShield(true, true, false, false));
+        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, true, true, false));
+        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, true, false, true));
+        assertEquals(false, KillAuraTargeting.shouldSkipShield(false, true, false, false));
+        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, false, false, false));
+    }
 }

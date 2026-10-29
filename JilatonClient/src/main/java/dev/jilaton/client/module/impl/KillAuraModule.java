@@ -29,6 +29,7 @@ public final class KillAuraModule extends ClientModule {
     private final BooleanSetting players;
     private final BooleanSetting hostiles;
     private final BooleanSetting requireAttackKey;
+    private final BooleanSetting avoidWastedShieldAttacks;
     private final BooleanSetting showTargetIndicator;
     private final ChoiceSetting priority;
     private LivingEntity currentTarget;
@@ -49,6 +50,8 @@ public final class KillAuraModule extends ClientModule {
                 List.of(KillAuraTargeting.DISTANCE, KillAuraTargeting.HEALTH, KillAuraTargeting.ANGLE),
                 KillAuraTargeting.ANGLE));
         requireAttackKey = addSetting(new BooleanSetting("require_attack_key", "Require attack key", false));
+        avoidWastedShieldAttacks = addSetting(new BooleanSetting("avoid_wasted_shield_attacks",
+                "Skip shield-blocked attacks without an axe", true));
         showTargetIndicator = addSetting(new BooleanSetting("show_target_indicator", "Show target ring", true));
     }
 
@@ -187,12 +190,39 @@ public final class KillAuraModule extends ClientModule {
 
     private boolean wanted(Minecraft client, Player player, LivingEntity candidate) {
         if (candidate instanceof Player other) {
-            return players.value() && PlayerTargetFilters.allowsPlayer(client, player, other);
+            if (!players.value() || !PlayerTargetFilters.allowsPlayer(client, player, other)) {
+                return false;
+            }
+            if (!avoidWastedShieldAttacks.value() || !other.isBlocking()
+                    || !shieldFacesAttacker(player, other)) {
+                return true;
+            }
+            boolean axeEquipped = player.getMainHandItem().is(net.minecraft.tags.ItemTags.AXES);
+            if (axeEquipped) {
+                return true;
+            }
+            ClientModule weaponModule = JilatonClient.moduleManager().get("auto_weapon");
+            boolean autoWeaponCanSelectAxe = weaponModule instanceof AutoWeaponModule autoWeapon
+                    && autoWeapon.canSelectShieldBreaker(client, player);
+            return !KillAuraTargeting.shouldSkipShield(true, true, false, autoWeaponCanSelectAxe);
         }
         if (!hostiles.value() || !(candidate instanceof Monster monster) || player.isAlliedTo(candidate)) {
             return false;
         }
         return !(monster instanceof NeutralMob) || monster.isAggressive();
+    }
+
+    private static boolean shieldFacesAttacker(Player attacker, Player target) {
+        double towardX = attacker.getX() - target.getX();
+        double towardZ = attacker.getZ() - target.getZ();
+        double length = Math.hypot(towardX, towardZ);
+        if (length < 1.0E-6) {
+            return false;
+        }
+        double yaw = Math.toRadians(target.getYHeadRot());
+        double facingX = -Math.sin(yaw);
+        double facingZ = Math.cos(yaw);
+        return (facingX * towardX + facingZ * towardZ) / length > 0.0;
     }
 
     private static Vec3 aimPoint(Minecraft client, Player player, Vec3 eye, AABB box) {

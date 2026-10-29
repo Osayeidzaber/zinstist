@@ -123,6 +123,12 @@ public final class AutoWeaponModule extends ClientModule {
         attacker.getInventory().setSelectedSlot(candidate);
     }
 
+    /** True if this module can select a hotbar axe for the imminent shield-breaking attack. */
+    public boolean canSelectShieldBreaker(Minecraft client, Player attacker) {
+        return enabled() && shieldBreak.value() && client.player == attacker && client.level != null
+                && !hasConflictingHotbarReservation(client) && findWeapon(attacker, "Axe", client) >= 0;
+    }
+
     private boolean hasConflictingHotbarReservation(Minecraft client) {
         ClientModule pot = JilatonClient.moduleManager().get("auto_pot");
         if (pot instanceof AutoPotModule autoPot && autoPot.enabled() && autoPot.blocksAutomaticFoodUse(client)) {
