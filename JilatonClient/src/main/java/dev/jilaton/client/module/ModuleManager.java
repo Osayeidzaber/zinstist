@@ -3,6 +3,7 @@ package dev.jilaton.client.module;
 import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AimAssistModule;
+import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.TriggerbotModule;
 import dev.jilaton.client.module.impl.SprintModule;
 import net.minecraft.client.Minecraft;
@@ -18,6 +19,7 @@ public final class ModuleManager {
         register(new AimAssistModule());
         register(new TriggerbotModule());
         register(new AutoClickerModule());
+        register(new AutoTotemModule());
         register(new SprintModule());
         register(new FullbrightModule());
     }
