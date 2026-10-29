@@ -12,6 +12,7 @@ import dev.jilaton.client.module.impl.TargetStrafeModule;
 import dev.jilaton.client.module.impl.HitboxModule;
 import dev.jilaton.client.module.impl.KillAuraModule;
 import dev.jilaton.client.module.impl.NoFallModule;
+import dev.jilaton.client.module.impl.SafeWalkModule;
 import dev.jilaton.client.module.impl.ReachModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.setting.ChoiceSetting;
@@ -47,6 +48,16 @@ class ModuleManagerTest {
         assertEquals(ModuleCategory.MOVEMENT, manager.get("no_fall").category());
         assertFalse(manager.get("no_fall").enabled());
         assertEquals(3, manager.get("no_fall").settings().size());
+    }
+
+    @Test
+    void safeWalkIsRegisteredAsAnOptInMovementModule() {
+        ModuleManager manager = new ModuleManager();
+
+        assertTrue(manager.get("safe_walk") instanceof SafeWalkModule);
+        assertEquals(ModuleCategory.MOVEMENT, manager.get("safe_walk").category());
+        assertFalse(manager.get("safe_walk").enabled());
+        assertEquals(2, manager.get("safe_walk").settings().size());
     }
 
     @Test

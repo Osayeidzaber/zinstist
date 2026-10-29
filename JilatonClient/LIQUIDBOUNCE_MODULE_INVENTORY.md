@@ -131,7 +131,7 @@ Found **232** module entry class files across 8 categories.
 | `movement/ModuleNoPose` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/ModuleNoPush` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/ModuleParkour` | `Parkour (partial)` | Partial adaptation; source behavior and dependencies need further audit |
-| `movement/ModuleSafeWalk` | — | Not integrated; dependencies, settings, and behavior not yet audited |
+| `movement/ModuleSafeWalk` | `SafeWalk OnEdge (partial)` | REA inventory and `javap` inspection found two modes: direct PlayerSafeWalkEvent Safe mode and OnEdge's movement-input/edge-distance logic with keep/sneak/jump settings. Jilaton implements an edge-footprint support check that injects vanilla sneak via MovementInputEvent and coordinates with Parkour; the full SafeWalkEvent pipeline, simulated next-tick position, and jump-on-edge behavior are not ported. |
 | `movement/ModuleSneak` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/ModuleSprint` | `Sprint (partial)` | Partial adaptation; source behavior and dependencies need further audit |
 | `movement/ModuleStrafe` | — | Not integrated; dependencies, settings, and behavior not yet audited |

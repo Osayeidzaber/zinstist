@@ -20,6 +20,7 @@ import dev.jilaton.client.module.impl.NoBobModule;
 import dev.jilaton.client.module.impl.NoFallModule;
 import dev.jilaton.client.module.impl.NoSlowModule;
 import dev.jilaton.client.module.impl.ParkourModule;
+import dev.jilaton.client.module.impl.SafeWalkModule;
 import dev.jilaton.client.module.impl.ReachModule;
 import dev.jilaton.client.module.impl.SprintModule;
 import dev.jilaton.client.module.impl.SwingAnimationsModule;
@@ -66,6 +67,7 @@ public final class ModuleManager {
         register(new AutoArmorModule());
         register(new SprintModule());
         register(new ParkourModule());
+        register(new SafeWalkModule());
         register(new NoFallModule());
         register(new NoSlowModule());
         register(new FullbrightModule());
