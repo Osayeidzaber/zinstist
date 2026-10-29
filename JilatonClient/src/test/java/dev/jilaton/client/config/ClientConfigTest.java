@@ -78,6 +78,9 @@ class ClientConfigTest {
         setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
         setting(source.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).setValue(true);
         setting(source.get("auto_totem"), "refill_delay", NumberSetting.class).setValue(7.0);
+        setting(source.get("crystal_aura"), "face_place", BooleanSetting.class).setValue(false);
+        setting(source.get("crystal_aura"), "face_place_health", NumberSetting.class).setValue(13.5);
+        setting(source.get("crystal_aura"), "face_place_damage", NumberSetting.class).setValue(3.0);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -128,6 +131,9 @@ class ClientConfigTest {
         assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
         assertTrue(setting(restored.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).value());
         assertEquals(7.0, setting(restored.get("auto_totem"), "refill_delay", NumberSetting.class).value());
+        assertFalse(setting(restored.get("crystal_aura"), "face_place", BooleanSetting.class).value());
+        assertEquals(13.5, setting(restored.get("crystal_aura"), "face_place_health", NumberSetting.class).value());
+        assertEquals(3.0, setting(restored.get("crystal_aura"), "face_place_damage", NumberSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
         assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));

@@ -182,6 +182,8 @@ class ModuleManagerTest {
         assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("minimum_damage")));
         assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("maximum_self_damage")));
         assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("auto_switch")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("face_place_health")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("face_place_damage")));
     }
 
     @Test

@@ -7,12 +7,14 @@ import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
@@ -25,6 +27,11 @@ public final class CrystalAuraModule extends ClientModule {
     private final NumberSetting minimumDamage;
     private final NumberSetting maximumSelfDamage;
     private final NumberSetting actionDelay;
+    private final BooleanSetting facePlace;
+    private final NumberSetting facePlaceHealth;
+    private final NumberSetting facePlaceDamage;
+    private final BooleanSetting facePlaceLowArmor;
+    private final BooleanSetting facePlaceInHole;
     private final BooleanSetting placeCrystals;
     private final BooleanSetting breakCrystals;
     private final BooleanSetting autoSwitch;
@@ -45,6 +52,13 @@ public final class CrystalAuraModule extends ClientModule {
         minimumDamage = addSetting(new NumberSetting("minimum_damage", "Minimum target damage", 1.0, 20.0, 0.5, 4.0));
         maximumSelfDamage = addSetting(new NumberSetting("maximum_self_damage", "Maximum self damage", 1.0, 20.0, 0.5, 8.0));
         actionDelay = addSetting(new NumberSetting("action_delay", "Action delay (ticks)", 1.0, 5.0, 1.0, 1.0));
+        facePlace = addSetting(new BooleanSetting("face_place", "Face place", true));
+        facePlaceHealth = addSetting(new NumberSetting("face_place_health", "Face place health", 1.0, 40.0,
+                0.5, 10.0));
+        facePlaceDamage = addSetting(new NumberSetting("face_place_damage", "Face place minimum damage", 0.0,
+                20.0, 0.5, 2.0));
+        facePlaceLowArmor = addSetting(new BooleanSetting("face_place_low_armor", "Face place low-durability armor", true));
+        facePlaceInHole = addSetting(new BooleanSetting("face_place_in_hole", "Face place in resistant hole", true));
         placeCrystals = addSetting(new BooleanSetting("place", "Place crystals", true));
         breakCrystals = addSetting(new BooleanSetting("break", "Break crystals", true));
         autoSwitch = addSetting(new BooleanSetting("auto_switch", "Switch to crystals", true));
@@ -162,7 +176,7 @@ public final class CrystalAuraModule extends ClientModule {
             }
             float damageToTarget = targetDamage.estimate(crystal.position());
             float damageToSelf = selfDamage.estimate(crystal.position());
-            if (!isSafe(damageToTarget, damageToSelf, self)) {
+            if (!isSafe(damageToTarget, damageToSelf, self, target, true)) {
                 continue;
             }
             float score = damageToTarget - damageToSelf * 0.15F;
@@ -199,7 +213,7 @@ public final class CrystalAuraModule extends ClientModule {
 
                     float damageToTarget = targetDamage.estimate(center);
                     float damageToSelf = selfDamage.estimate(center);
-                    if (!isSafe(damageToTarget, damageToSelf, self)) {
+                    if (!isSafe(damageToTarget, damageToSelf, self, target, false)) {
                         continue;
                     }
                     float score = damageToTarget - damageToSelf * 0.15F;
@@ -213,11 +227,42 @@ public final class CrystalAuraModule extends ClientModule {
         return bestBase;
     }
 
-    private boolean isSafe(float targetDamage, float selfDamage, Player self) {
+    private boolean isSafe(float targetDamage, float selfDamage, Player self, Player target, boolean breaking) {
         float effectiveHealth = self.getHealth() + self.getAbsorptionAmount();
-        return targetDamage >= minimumDamage.value()
+        return targetDamage >= requiredTargetDamage(target, breaking)
                 && selfDamage <= maximumSelfDamage.value()
                 && selfDamage * 1.15F + 2.0F < effectiveHealth;
+    }
+
+    private float requiredTargetDamage(Player target, boolean breaking) {
+        boolean lowArmor = facePlaceLowArmor.value() && hasNearlyBrokenArmor(target);
+        boolean inHole = facePlaceInHole.value() && isInBlastResistantHole(target);
+        boolean facePlacing = CrystalAuraPolicy.shouldFacePlace(facePlace.value(),
+                target.getHealth() + target.getAbsorptionAmount(), (float) facePlaceHealth.value(), lowArmor, inHole);
+        return CrystalAuraPolicy.minimumDamage((float) minimumDamage.value(), (float) facePlaceDamage.value(),
+                facePlacing, breaking);
+    }
+
+    private static boolean hasNearlyBrokenArmor(Player target) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            ItemStack armor = target.getItemBySlot(slot);
+            if (armor.isDamageableItem()
+                    && armor.getMaxDamage() - armor.getDamageValue() <= armor.getMaxDamage() * 0.1F) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInBlastResistantHole(Player target) {
+        BlockPos feet = target.blockPosition();
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            if (target.level().getBlockState(feet.relative(direction)).getBlock().getExplosionResistance() < 600.0F) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean canHostCrystal(Minecraft client, BlockPos base) {
@@ -270,7 +315,7 @@ public final class CrystalAuraModule extends ClientModule {
         }
         CrystalDamageEstimator selfDamage = new CrystalDamageEstimator(client.level, self);
         CrystalDamageEstimator targetDamage = new CrystalDamageEstimator(client.level, target);
-        if (!isSafe(targetDamage.estimate(center), selfDamage.estimate(center), self)) {
+        if (!isSafe(targetDamage.estimate(center), selfDamage.estimate(center), self, target, false)) {
             return;
         }
 
