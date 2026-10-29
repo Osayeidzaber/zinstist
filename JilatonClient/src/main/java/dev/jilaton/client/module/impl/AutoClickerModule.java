@@ -40,7 +40,10 @@ public final class AutoClickerModule extends ClientModule {
         }
 
         if (!(hit.getEntity() instanceof LivingEntity target) || target == client.player
-                || (playersOnly.value() && !(target instanceof Player))) {
+                || (playersOnly.value() && !(target instanceof Player))
+                || (target instanceof Player candidate
+                        ? !PlayerTargetFilters.allowsPlayer(client, client.player, candidate)
+                        : client.player.isAlliedTo(target))) {
             return;
         }
 

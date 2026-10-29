@@ -1,8 +1,10 @@
 package dev.jilaton.client.module;
 
 import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.CrystalAuraModule;
 import dev.jilaton.client.module.impl.WTapModule;
 import dev.jilaton.client.module.impl.SwingAnimationsModule;
+import dev.jilaton.client.module.impl.TargetStrafeModule;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,9 @@ class ModuleManagerTest {
         assertEquals(3.0, wtap.releaseTicks().maximum());
         assertEquals(1.0, wtap.releaseTicks().value());
         assertTrue(wtap.playersOnly().value());
+        assertEquals("W Tap", wtap.mode().value());
+        assertTrue(wtap.mode().choices().contains("S Tap"));
+        assertTrue(wtap.onlyForward().value());
 
         assertTrue(new ModuleManager().get("wtap") instanceof WTapModule);
     }
@@ -74,5 +79,28 @@ class ModuleManagerTest {
         setting.cycle(1);
         assertEquals("A", setting.value());
         assertThrows(IllegalArgumentException.class, () -> setting.setValue("unknown"));
+    }
+
+    @Test
+    void crystalAuraIsRegisteredWithRealDamageAndActionSettings() {
+        CrystalAuraModule module = new ModuleManager().get("crystal_aura") instanceof CrystalAuraModule crystalAura
+                ? crystalAura : null;
+
+        assertTrue(module != null);
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("minimum_damage")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("maximum_self_damage")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("auto_switch")));
+    }
+
+    @Test
+    void targetStrafeIsRegisteredWithMovementAndOrbitControls() {
+        TargetStrafeModule module = new ModuleManager().get("target_strafe") instanceof TargetStrafeModule targetStrafe
+                ? targetStrafe : null;
+
+        assertTrue(module != null);
+        assertEquals(2.95, module.radius().value());
+        assertEquals(4.0, module.followRange().value());
+        assertTrue(module.requireAuraTarget().value());
+        assertTrue(module.requireMovementInput().value());
     }
 }

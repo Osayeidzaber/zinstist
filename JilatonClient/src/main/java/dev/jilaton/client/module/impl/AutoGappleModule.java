@@ -55,6 +55,12 @@ public final class AutoGappleModule extends ClientModule {
             clearUseState();
         }
 
+        ClientModule potionModule = dev.jilaton.client.JilatonClient.moduleManager().get("auto_pot");
+        if (potionModule instanceof AutoPotModule autoPot && autoPot.enabled()
+                && autoPot.blocksAutomaticFoodUse(client)) {
+            return;
+        }
+
         if (client.screen != null || player.isUsingItem() || client.options.keyUse.isDown()
                 || player.getHealth() > healthThreshold.value()
                 || client.level.getGameTime() < nextAttemptTick) {
@@ -85,6 +91,18 @@ public final class AutoGappleModule extends ClientModule {
             }
         }
         return -1;
+    }
+
+    public boolean willUseNow(Minecraft client) {
+        Player player = client.player;
+        if (player == null || client.level == null || client.gameMode == null || client.screen != null
+                || player.isUsingItem() || client.options.keyUse.isDown()
+                || player.getHealth() > healthThreshold.value()
+                || client.level.getGameTime() < nextAttemptTick) {
+            return false;
+        }
+        return findAppleSlot(player, Items.GOLDEN_APPLE) >= 0
+                || enchantedApples.value() && findAppleSlot(player, Items.ENCHANTED_GOLDEN_APPLE) >= 0;
     }
 
     private void restoreSlotIfSafe(Minecraft client) {

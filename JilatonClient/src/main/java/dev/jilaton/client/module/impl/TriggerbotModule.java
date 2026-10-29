@@ -37,7 +37,10 @@ public final class TriggerbotModule extends ClientModule {
         if (client.player == null || client.level == null || client.gameMode == null || client.screen != null
                 || !(client.hitResult instanceof EntityHitResult hit)
                 || !(hit.getEntity() instanceof LivingEntity target) || target == client.player
-                || (playersOnly.value() && !(target instanceof Player))) {
+                || (playersOnly.value() && !(target instanceof Player))
+                || (target instanceof Player candidate
+                        ? !PlayerTargetFilters.allowsPlayer(client, client.player, candidate)
+                        : client.player.isAlliedTo(target))) {
             resetTarget();
             return;
         }
