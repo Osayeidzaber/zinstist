@@ -5,6 +5,7 @@ import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AimAssistModule;
 import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.TriggerbotModule;
+import dev.jilaton.client.module.impl.HudModule;
 import dev.jilaton.client.module.impl.SprintModule;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
@@ -26,6 +27,7 @@ public final class ModuleManager {
         register(new AutoTotemModule());
         register(new SprintModule());
         register(new FullbrightModule());
+        register(new HudModule());
     }
 
     private void register(ClientModule module) {

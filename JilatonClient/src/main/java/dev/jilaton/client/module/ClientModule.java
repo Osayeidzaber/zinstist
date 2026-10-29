@@ -69,6 +69,10 @@ public abstract class ClientModule {
         return enabled;
     }
 
+    public boolean enabledByDefault() {
+        return false;
+    }
+
     public final int keyCode() {
         return keyCode;
     }

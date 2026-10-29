@@ -23,16 +23,14 @@ public final class ClientConfig {
     }
 
     public void load(ModuleManager modules) {
-        if (!Files.isRegularFile(path)) {
-            return;
-        }
-
         Properties values = new Properties();
-        try (InputStream input = Files.newInputStream(path)) {
-            values.load(input);
-        } catch (IOException exception) {
-            System.err.println("Jilaton could not read its configuration: " + exception.getMessage());
-            return;
+        if (Files.isRegularFile(path)) {
+            try (InputStream input = Files.newInputStream(path)) {
+                values.load(input);
+            } catch (IOException exception) {
+                System.err.println("Jilaton could not read its configuration: " + exception.getMessage());
+                return;
+            }
         }
 
         for (ClientModule module : modules.all()) {
@@ -64,7 +62,8 @@ public final class ClientConfig {
         }
 
         for (ClientModule module : modules.all()) {
-            module.setEnabled(Boolean.parseBoolean(values.getProperty("module." + module.id() + ".enabled", "false")));
+            module.setEnabled(Boolean.parseBoolean(values.getProperty(
+                    "module." + module.id() + ".enabled", Boolean.toString(module.enabledByDefault()))));
         }
     }
 

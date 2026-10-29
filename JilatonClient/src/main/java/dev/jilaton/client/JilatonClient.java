@@ -2,8 +2,10 @@ package dev.jilaton.client;
 
 import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.gui.ClickGuiScreen;
+import dev.jilaton.client.gui.HudRenderer;
 import dev.jilaton.client.module.ModuleManager;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -23,6 +25,8 @@ public final class JilatonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
+        HudRenderer hudRenderer = new HudRenderer(MODULES);
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("jilaton", "hud"), hudRenderer::render);
         Category category = Category.register(Identifier.fromNamespaceAndPath("jilaton", "main"));
         openGui = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.jilaton.open_gui",
