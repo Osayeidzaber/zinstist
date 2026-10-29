@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "refmap": "jilaton.refmap.json",
+  "package": "dev.jilaton.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "FirstPersonHandsAndItemsMixin",
+    "ClientInputAccessor",
+    "KeyMappingAccessor",
+    "KeyboardInputMixin",
+    "NoBobMixin",
+    "NoSlowMixin",
+    "NoFallPacketMixin",
+    "ServerboundMovePlayerPacketAccessor",
+    "VelocityPacketMixin",
+    "AutoTotemPacketMixin",
+    "WTapAttackMixin",
+    "HitboxMarginMixin",
+    "PlayerReachMixin",
+    "LivingEntityReachMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
