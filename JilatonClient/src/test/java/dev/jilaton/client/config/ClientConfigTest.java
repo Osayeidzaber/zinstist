@@ -32,6 +32,9 @@ class ClientConfigTest {
         ClientModule autoClicker = source.get("auto_clicker");
         BooleanSetting playersOnly = setting(autoClicker, "players_only", BooleanSetting.class);
         playersOnly.setValue(false);
+        setting(autoClicker, "right_click_enabled", BooleanSetting.class).setValue(true);
+        setting(autoClicker, "right_click_cps", NumberSetting.class).setValue(12.0);
+        setting(autoClicker, "right_click_block_only", BooleanSetting.class).setValue(true);
         autoClicker.setKeyCode(67);
 
         ClientModule autoGapple = source.get("auto_gapple");
@@ -39,6 +42,11 @@ class ClientConfigTest {
         setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
         setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
         setting(source.get("swing_animations"), "mode", ChoiceSetting.class).setValue("Power");
+        setting(source.get("kill_aura"), "players", BooleanSetting.class).setValue(false);
+        setting(source.get("kill_aura"), "hostiles", BooleanSetting.class).setValue(true);
+        setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
+        setting(source.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).setValue(true);
+        setting(source.get("auto_totem"), "refill_delay", NumberSetting.class).setValue(7.0);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -55,11 +63,19 @@ class ClientConfigTest {
         assertEquals(5.1, setting(restored.get("aim_assist"), "range", NumberSetting.class).value(), 0.000001);
         assertEquals(65, restored.get("aim_assist").keyCode());
         assertFalse(setting(restored.get("auto_clicker"), "players_only", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("auto_clicker"), "right_click_enabled", BooleanSetting.class).value());
+        assertEquals(12.0, setting(restored.get("auto_clicker"), "right_click_cps", NumberSetting.class).value());
+        assertTrue(setting(restored.get("auto_clicker"), "right_click_block_only", BooleanSetting.class).value());
         assertEquals(67, restored.get("auto_clicker").keyCode());
         assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("Power", setting(restored.get("swing_animations"), "mode", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "players", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("kill_aura"), "hostiles", BooleanSetting.class).value());
+        assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
+        assertTrue(setting(restored.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).value());
+        assertEquals(7.0, setting(restored.get("auto_totem"), "refill_delay", NumberSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
         assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));

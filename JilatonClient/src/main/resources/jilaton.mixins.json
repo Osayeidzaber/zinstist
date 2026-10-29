@@ -5,7 +5,18 @@
   "package": "dev.jilaton.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "FirstPersonHandsAndItemsMixin"
+    "FirstPersonHandsAndItemsMixin",
+    "ClientInputAccessor",
+    "KeyMappingAccessor",
+    "KeyboardInputMixin",
+    "NoBobMixin",
+    "NoSlowMixin",
+    "VelocityPacketMixin",
+    "AutoTotemPacketMixin",
+    "WTapAttackMixin",
+    "HitboxMarginMixin",
+    "PlayerReachMixin",
+    "LivingEntityReachMixin"
   ],
   "injectors": {
     "defaultRequire": 1
