@@ -1,6 +1,7 @@
 package dev.jilaton.client.gui;
 
 import dev.jilaton.client.config.ClientConfig;
+import dev.jilaton.client.config.ClientConfig.HudPosition;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.module.impl.HudModule;
@@ -20,6 +21,8 @@ public final class HudRenderer {
     private final ModuleManager modules;
     private final ClientConfig config;
     private final List<ClientModule> sortedModules;
+    private final List<ClientModule> activeModuleScratch = new ArrayList<>();
+    private final List<WidgetBounds> lastBounds = new ArrayList<>();
     private int lastCoordinateX = Integer.MIN_VALUE;
     private int lastCoordinateY = Integer.MIN_VALUE;
     private int lastCoordinateZ = Integer.MIN_VALUE;
@@ -33,59 +36,112 @@ public final class HudRenderer {
     }
 
     public void render(GuiGraphics graphics, net.minecraft.client.DeltaTracker deltaTracker) {
+        renderInternal(graphics, false);
+    }
+
+    public void renderForEditor(GuiGraphics graphics) {
+        renderInternal(graphics, true);
+    }
+
+    public List<WidgetBounds> lastBounds() {
+        return List.copyOf(lastBounds);
+    }
+
+    private void renderInternal(GuiGraphics graphics, boolean editorPreview) {
         Minecraft client = Minecraft.getInstance();
         ClientModule module = modules.get("hud");
-        if (!(module instanceof HudModule hud) || !hud.enabled() || client.player == null) {
+        lastBounds.clear();
+        if (!(module instanceof HudModule hud) || (!editorPreview && !hud.enabled()) || client.player == null
+                || (!editorPreview && client.screen instanceof HudEditorScreen)) {
             return;
         }
 
         Font font = client.font;
         int accent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
-        int top = 8;
+        int guiWidth = graphics.guiWidth();
+        int guiHeight = graphics.guiHeight();
+        int moduleListTop = 8;
         if (hud.watermark()) {
             String version = "JILATON";
             int width = font.width(version) + 20;
-            drawPanel(graphics, 8, top, width, 22);
-            graphics.fill(8, top, 10, top + 22, accent);
-            graphics.drawString(font, version, 16, top + 7, 0xFFF4F1FA);
-            top += 28;
+            int x = widgetX("watermark", 8, width, guiWidth);
+            int y = widgetY("watermark", 8, 22, guiHeight);
+            drawPanel(graphics, x, y, width, 22);
+            graphics.fill(x, y, x + 2, y + 22, accent);
+            graphics.drawString(font, version, x + 8, y + 7, 0xFFF4F1FA);
+            addBounds(editorPreview, "watermark", x, y, width, 22);
+            moduleListTop = y + 28;
         }
 
         if (hud.activeModules()) {
+            activeModuleScratch.clear();
+            int listWidth = 0;
             for (ClientModule active : sortedModules) {
                 if (active == hud || !active.enabled()) {
                     continue;
                 }
-                String label = active.name();
-                int width = font.width(label) + 18;
-                drawPanel(graphics, 8, top, width, 18);
-                graphics.fill(8, top, 10, top + 18, accent);
-                graphics.drawString(font, label, 15, top + 5, 0xFFE3E0EC);
-                top += 20;
+                activeModuleScratch.add(active);
+                listWidth = Math.max(listWidth, font.width(active.name()) + 18);
+            }
+            if (!activeModuleScratch.isEmpty()) {
+                int listHeight = activeModuleScratch.size() * 20 - 2;
+                int x = widgetX("modules", 8, listWidth, guiWidth);
+                int y = widgetY("modules", moduleListTop, listHeight, guiHeight);
+                for (ClientModule active : activeModuleScratch) {
+                    String label = active.name();
+                    int width = font.width(label) + 18;
+                    drawPanel(graphics, x, y, width, 18);
+                    graphics.fill(x, y, x + 2, y + 18, accent);
+                    graphics.drawString(font, label, x + 7, y + 5, 0xFFE3E0EC);
+                    y += 20;
+                }
+                addBounds(editorPreview, "modules", x, y - listHeight - 2, listWidth, listHeight);
             }
         }
 
         if (hud.performance()) {
             String stats = "FPS " + client.getFps() + "  ·  " + ping(client);
             int width = font.width(stats) + 18;
-            int x = graphics.guiWidth() - width - 8;
-            drawPanel(graphics, x, 8, width, 22);
-            graphics.drawString(font, stats, x + 9, 15, 0xFFE3E0EC);
+            int x = widgetX("performance", guiWidth - width - 8, width, guiWidth);
+            int y = widgetY("performance", 8, 22, guiHeight);
+            drawPanel(graphics, x, y, width, 22);
+            graphics.drawString(font, stats, x + 9, y + 7, 0xFFE3E0EC);
+            addBounds(editorPreview, "performance", x, y, width, 22);
         }
 
         Player player = client.player;
         if (hud.coordinates()) {
             String coordinates = coordinates(player);
             int width = font.width(coordinates) + 18;
-            int x = 8;
-            int y = graphics.guiHeight() - 29;
+            int x = widgetX("coordinates", 8, width, guiWidth);
+            int y = widgetY("coordinates", guiHeight - 29, 21, guiHeight);
             drawPanel(graphics, x, y, width, 21);
             graphics.drawString(font, coordinates, x + 9, y + 7, 0xFFE3E0EC);
+            addBounds(editorPreview, "coordinates", x, y, width, 21);
         }
 
         if (hud.keystrokes()) {
-            renderKeystrokes(graphics, client, accent);
+            int x = widgetX("keystrokes", 8, 70, guiWidth);
+            int y = widgetY("keystrokes", guiHeight - 104, 58, guiHeight);
+            renderKeystrokes(graphics, client, accent, x, y);
+            addBounds(editorPreview, "keystrokes", x, y, 70, 58);
         }
+    }
+
+    private void addBounds(boolean editorPreview, String id, int x, int y, int width, int height) {
+        if (editorPreview) {
+            lastBounds.add(new WidgetBounds(id, x, y, width, height));
+        }
+    }
+
+    private int widgetX(String widgetId, int defaultX, int widgetWidth, int guiWidth) {
+        HudPosition position = config.hudPosition(widgetId);
+        return position == null ? defaultX : (int) Math.round(Math.max(0, guiWidth - widgetWidth) * position.x());
+    }
+
+    private int widgetY(String widgetId, int defaultY, int widgetHeight, int guiHeight) {
+        HudPosition position = config.hudPosition(widgetId);
+        return position == null ? defaultY : (int) Math.round(Math.max(0, guiHeight - widgetHeight) * position.y());
     }
 
     private static String ping(Minecraft client) {
@@ -109,9 +165,7 @@ public final class HudRenderer {
         return cachedCoordinates;
     }
 
-    private static void renderKeystrokes(GuiGraphics graphics, Minecraft client, int accent) {
-        int x = 8;
-        int y = graphics.guiHeight() - 104;
+    private static void renderKeystrokes(GuiGraphics graphics, Minecraft client, int accent, int x, int y) {
         Font font = client.font;
         drawKey(graphics, font, client.options.keyUp, x + 24, y, 22, 19, accent);
         drawKey(graphics, font, client.options.keyLeft, x, y + 21, 22, 19, accent);
@@ -137,5 +191,11 @@ public final class HudRenderer {
 
     private static void drawPanel(GuiGraphics graphics, int x, int y, int width, int height) {
         graphics.fill(x, y, x + width, y + height, BACKGROUND);
+    }
+
+    public record WidgetBounds(String id, int x, int y, int width, int height) {
+        public boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        }
     }
 }

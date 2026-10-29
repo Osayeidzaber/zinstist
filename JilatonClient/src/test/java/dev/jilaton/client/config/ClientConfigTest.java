@@ -41,6 +41,8 @@ class ClientConfigTest {
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
         config.setCustomAccent("12aBef");
+        config.setHudPosition("watermark", 0.37, 0.68);
+        config.setHudPosition("performance", 1.4, -0.2);
         config.save(source);
         assertTrue(Files.isRegularFile(temporaryDirectory.resolve("jilaton.properties")));
 
@@ -57,6 +59,8 @@ class ClientConfigTest {
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
+        assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));
+        assertEquals(new ClientConfig.HudPosition(1.0, 0.0), restoredConfig.hudPosition("performance"));
     }
 
     @Test
@@ -74,6 +78,7 @@ class ClientConfigTest {
         ModuleManager source = new ModuleManager();
         config.setThemeId("rose");
         config.setCustomAccent("E070A8");
+        config.setHudPosition("coordinates", 0.25, 0.8);
         setting(source.get("aim_assist"), "range", NumberSetting.class).setValue(5.4);
         source.get("auto_clicker").setKeyCode(67);
         config.saveProfile("ranked_1", source);
@@ -86,6 +91,7 @@ class ClientConfigTest {
         assertEquals(67, restored.get("auto_clicker").keyCode());
         assertEquals("rose", restoredConfig.themeId());
         assertEquals("E070A8", restoredConfig.customAccent());
+        assertEquals(new ClientConfig.HudPosition(0.25, 0.8), restoredConfig.hudPosition("coordinates"));
         assertFalse(config.loadProfile("missing", restored));
         assertTrue(config.deleteProfile("ranked_1"));
         assertFalse(config.deleteProfile("ranked_1"));

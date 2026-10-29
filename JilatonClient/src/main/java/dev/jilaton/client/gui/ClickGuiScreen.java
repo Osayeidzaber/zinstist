@@ -27,7 +27,8 @@ public final class ClickGuiScreen extends Screen {
         MODULES,
         THEME,
         CONFIGS,
-        KEYBINDS
+        KEYBINDS,
+        HUD_EDITOR
     }
 
     private static final int PANEL = 0xFF080C19;
@@ -136,6 +137,7 @@ public final class ClickGuiScreen extends Screen {
             case THEME -> renderTheme(graphics, mouseX, mouseY);
             case CONFIGS -> renderConfigs(graphics, mouseX, mouseY);
             case KEYBINDS -> renderKeybinds(graphics, mouseX, mouseY);
+            case HUD_EDITOR -> { }
         }
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -157,6 +159,7 @@ public final class ClickGuiScreen extends Screen {
             case THEME -> "Theme Studio";
             case CONFIGS -> "Config Profiles";
             case KEYBINDS -> "Keybinds";
+            case HUD_EDITOR -> "HUD Editor";
         };
         graphics.drawString(font, title, contentX, panelY + 20, 0xFFF2F4FC);
         int count = 0;
@@ -174,6 +177,7 @@ public final class ClickGuiScreen extends Screen {
             case THEME -> "Choose a Jilaton palette or tune a custom accent";
             case CONFIGS -> profiles.size() + (profiles.size() == 1 ? " saved profile" : " saved profiles");
             case KEYBINDS -> active + " modules enabled  ·  click a row to edit its key";
+            case HUD_EDITOR -> "Drag widgets into place; press R to reset one";
         };
         graphics.drawString(font, subtitle, contentX, panelY + 38, 0xFF8791A9);
 
@@ -194,9 +198,9 @@ public final class ClickGuiScreen extends Screen {
 
         String[] categories = {"All", "Combat", "Movement", "Visuals", "Client"};
         int rowY = categoryRowStart();
-        int rowSpacing = categoryRowSpacing();
-        int rowInset = compact ? 3 : 6;
-        int rowHeight = compact ? 18 : 24;
+            int rowSpacing = categoryRowSpacing();
+        int rowInset = compact ? 2 : 6;
+        int rowHeight = compact ? 14 : 24;
         for (String category : categories) {
             int rowX = panelX + 12;
             boolean selected = page == Page.MODULES && selectedCategory.equals(category);
@@ -224,11 +228,13 @@ public final class ClickGuiScreen extends Screen {
             renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, sidebarLinkY(Page.THEME), dividerX, true);
             renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, sidebarLinkY(Page.CONFIGS), dividerX, true);
             renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, sidebarLinkY(Page.KEYBINDS), dividerX, true);
+            renderSidebarLink(graphics, mouseX, mouseY, "HUD Editor", Page.HUD_EDITOR, sidebarLinkY(Page.HUD_EDITOR), dividerX, true);
         } else {
             graphics.drawString(font, "GENERAL", panelX + 19, panelY + 246, 0xFF737F98);
             renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, panelY + 266, dividerX, false);
             renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 294, dividerX, false);
             renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 322, dividerX, false);
+            renderSidebarLink(graphics, mouseX, mouseY, "HUD Editor", Page.HUD_EDITOR, panelY + 350, dividerX, false);
 
             graphics.drawString(font, "RIGHT SHIFT", panelX + 19, panelY + panelHeight - 46, 0xFF8993AA);
             graphics.drawString(font, "TOGGLE MENU", panelX + 19, panelY + panelHeight - 32, 0xFF626D84);
@@ -238,8 +244,8 @@ public final class ClickGuiScreen extends Screen {
     private void renderSidebarLink(GuiGraphics graphics, int mouseX, int mouseY, String label, Page target, int y, int dividerX, boolean compact) {
         int x = panelX + 12;
         int width = dividerX - x - 12;
-        int inset = compact ? 3 : 6;
-        int height = compact ? 18 : 24;
+        int inset = compact ? 2 : 6;
+        int height = compact ? 14 : 24;
         boolean selected = page == target;
         boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y - inset && mouseY <= y - inset + height;
         if (selected) {
@@ -258,11 +264,11 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private int categoryRowStart() {
-        return panelY + (compactSidebar() ? 63 : 92);
+        return panelY + (compactSidebar() ? 62 : 92);
     }
 
     private int categoryRowSpacing() {
-        return compactSidebar() ? 16 : 28;
+        return compactSidebar() ? 14 : 28;
     }
 
     private int sidebarLinkY(Page target) {
@@ -271,13 +277,15 @@ public final class ClickGuiScreen extends Screen {
                 case THEME -> 266;
                 case CONFIGS -> 294;
                 case KEYBINDS -> 322;
+                case HUD_EDITOR -> 350;
                 default -> throw new IllegalArgumentException("Not a sidebar page: " + target);
             };
         }
-        return panelY + panelHeight - 60 + switch (target) {
+        return panelY + panelHeight - 72 + switch (target) {
             case THEME -> 0;
-            case CONFIGS -> 18;
-            case KEYBINDS -> 36;
+            case CONFIGS -> 14;
+            case KEYBINDS -> 28;
+            case HUD_EDITOR -> 42;
             default -> throw new IllegalArgumentException("Not a sidebar page: " + target);
         };
     }
@@ -334,6 +342,13 @@ public final class ClickGuiScreen extends Screen {
                 graphics.fill(x + 3, y + 3, x + 4, y + 5, color);
                 graphics.fill(x + 6, y + 3, x + 7, y + 5, color);
                 graphics.fill(x + 3, y + 6, x + 7, y + 7, color);
+            }
+            case "HUD Editor" -> {
+                graphics.fill(x, y, x + 10, y + 2, color);
+                graphics.fill(x, y + 8, x + 10, y + 10, color);
+                graphics.fill(x, y + 2, x + 2, y + 8, color);
+                graphics.fill(x + 8, y + 2, x + 10, y + 8, color);
+                graphics.fill(x + 4, y + 4, x + 7, y + 6, color);
             }
             default -> { }
         }
@@ -829,8 +844,8 @@ public final class ClickGuiScreen extends Screen {
         }
         int dividerX = contentX - 20;
         boolean compact = compactSidebar();
-        int rowInset = compact ? 3 : 6;
-        int rowHeight = compact ? 18 : 24;
+        int rowInset = compact ? 2 : 6;
+        int rowHeight = compact ? 14 : 24;
         String[] categories = {"All", "Combat", "Movement", "Visuals", "Client"};
         int rowY = categoryRowStart();
         for (String category : categories) {
@@ -843,12 +858,16 @@ public final class ClickGuiScreen extends Screen {
             rowY += categoryRowSpacing();
         }
 
-        int sidebarInset = compact ? 3 : 6;
-        int sidebarHeight = compact ? 18 : 24;
-        for (Page target : new Page[]{Page.THEME, Page.CONFIGS, Page.KEYBINDS}) {
+        int sidebarInset = compact ? 2 : 6;
+        int sidebarHeight = compact ? 14 : 24;
+        for (Page target : new Page[]{Page.THEME, Page.CONFIGS, Page.KEYBINDS, Page.HUD_EDITOR}) {
             int linkY = sidebarLinkY(target);
             if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
                     && mouseY >= linkY - sidebarInset && mouseY <= linkY - sidebarInset + sidebarHeight) {
+                if (target == Page.HUD_EDITOR) {
+                    minecraft.setScreen(new HudEditorScreen(modules, config, this));
+                    return true;
+                }
                 setPage(target);
                 if (target == Page.CONFIGS) {
                     refreshProfiles();
@@ -1124,6 +1143,7 @@ public final class ClickGuiScreen extends Screen {
             case THEME -> 0;
             case CONFIGS -> profiles.size() * 42 - 8;
             case KEYBINDS -> keybindContentHeight();
+            case HUD_EDITOR -> 0;
         };
         if (page == Page.CONFIGS) {
             viewportHeight -= 63;

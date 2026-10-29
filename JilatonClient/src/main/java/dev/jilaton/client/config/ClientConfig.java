@@ -15,7 +15,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
 
@@ -23,8 +25,10 @@ public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
     private static final Set<String> THEME_IDS = Set.of("violet", "blue", "cyan", "rose", "amber", "custom");
+    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes");
     private final Path path;
     private final Path profilesDirectory;
+    private final Map<String, HudPosition> hudPositions = new HashMap<>();
     private String themeId = "violet";
     private String customAccent = "8878FF";
 
@@ -61,6 +65,21 @@ public final class ClientConfig {
 
     public String customAccent() {
         return customAccent;
+    }
+
+    public HudPosition hudPosition(String widgetId) {
+        requireHudWidgetId(widgetId);
+        return hudPositions.get(widgetId);
+    }
+
+    public void setHudPosition(String widgetId, double xFraction, double yFraction) {
+        requireHudWidgetId(widgetId);
+        hudPositions.put(widgetId, new HudPosition(clampFraction(xFraction), clampFraction(yFraction)));
+    }
+
+    public void clearHudPosition(String widgetId) {
+        requireHudWidgetId(widgetId);
+        hudPositions.remove(widgetId);
     }
 
     public void setCustomAccent(String customAccent) {
@@ -106,6 +125,7 @@ public final class ClientConfig {
     }
 
     private void apply(Properties values, ModuleManager modules) {
+        hudPositions.clear();
         String configuredTheme = values.getProperty("ui.theme");
         if (configuredTheme != null) {
             try {
@@ -120,6 +140,23 @@ public final class ClientConfig {
                 setCustomAccent(configuredAccent);
             } catch (IllegalArgumentException exception) {
                 System.err.println("Jilaton ignored invalid custom accent color");
+            }
+        }
+
+        for (String widgetId : HUD_WIDGET_IDS) {
+            String prefix = "hud.position." + widgetId + ".";
+            String x = values.getProperty(prefix + "x");
+            String y = values.getProperty(prefix + "y");
+            if (x == null && y == null) {
+                continue;
+            }
+            try {
+                if (x == null || y == null) {
+                    throw new IllegalArgumentException("Incomplete HUD position");
+                }
+                setHudPosition(widgetId, Double.parseDouble(x), Double.parseDouble(y));
+            } catch (IllegalArgumentException exception) {
+                System.err.println("Jilaton ignored invalid HUD position for " + widgetId);
             }
         }
 
@@ -170,6 +207,14 @@ public final class ClientConfig {
         Properties values = new Properties();
         values.setProperty("ui.theme", themeId);
         values.setProperty("ui.custom_accent", customAccent);
+        for (String widgetId : HUD_WIDGET_IDS) {
+            HudPosition position = hudPositions.get(widgetId);
+            if (position != null) {
+                String prefix = "hud.position." + widgetId + ".";
+                values.setProperty(prefix + "x", Double.toString(position.x()));
+                values.setProperty(prefix + "y", Double.toString(position.y()));
+            }
+        }
         for (ClientModule module : modules.all()) {
             values.setProperty("module." + module.id() + ".enabled", Boolean.toString(module.enabled()));
             values.setProperty("module." + module.id() + ".keycode", Integer.toString(module.keyCode()));
@@ -242,6 +287,22 @@ public final class ClientConfig {
 
     private static boolean isValidProfileName(String name) {
         return name != null && name.matches(PROFILE_NAME_PATTERN);
+    }
+
+    private static double clampFraction(double value) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("HUD position must be finite");
+        }
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static void requireHudWidgetId(String widgetId) {
+        if (!HUD_WIDGET_IDS.contains(widgetId)) {
+            throw new IllegalArgumentException("Unknown HUD widget: " + widgetId);
+        }
+    }
+
+    public record HudPosition(double x, double y) {
     }
 
     private static String settingKey(ClientModule module, Setting setting) {
