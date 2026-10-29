@@ -3,6 +3,7 @@ package dev.jilaton.client.module;
 public enum ModuleCategory {
     COMBAT("Combat"),
     MOVEMENT("Movement"),
+    PLAYER("Player"),
     RENDER("Visuals"),
     CLIENT("Client");
 
