@@ -2,6 +2,13 @@ plugins {
     id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
 }
 
+loom {
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName = 'jilaton.refmap.json'
+    }
+}
+
 group = project.maven_group
 version = project.mod_version
 base {

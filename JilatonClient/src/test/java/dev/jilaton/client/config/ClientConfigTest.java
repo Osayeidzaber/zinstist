@@ -3,6 +3,7 @@ package dev.jilaton.client.config;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.setting.BooleanSetting;
+import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class ClientConfigTest {
         setting(autoGapple, "health_threshold", NumberSetting.class).setValue(7.5);
         setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
         setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
+        setting(source.get("swing_animations"), "mode", ChoiceSetting.class).setValue("Power");
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -57,6 +59,7 @@ class ClientConfigTest {
         assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
+        assertEquals("Power", setting(restored.get("swing_animations"), "mode", ChoiceSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
         assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));

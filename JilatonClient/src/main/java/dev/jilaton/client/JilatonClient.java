@@ -26,6 +26,10 @@ public final class JilatonClient implements ClientModInitializer {
     private static final ClientConfig CONFIG = new ClientConfig(FabricLoader.getInstance().getConfigDir());
     private static KeyMapping openGui;
 
+    public static ModuleManager moduleManager() {
+        return MODULES;
+    }
+
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);

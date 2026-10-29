@@ -5,6 +5,7 @@ import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.setting.BooleanSetting;
+import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -777,6 +778,21 @@ public final class ClickGuiScreen extends Screen {
         graphics.drawString(font, setting.label(), x, y + 3, 0xFFD1D0DA);
         if (setting instanceof BooleanSetting booleanSetting) {
             drawToggle(graphics, x + width - 36, y, booleanSetting.value());
+        } else if (setting instanceof ChoiceSetting choiceSetting) {
+            int controlX = x + width - 112;
+            boolean hovered = mouseX >= controlX && mouseX <= controlX + 104;
+            fillRounded(graphics, controlX, y - 1, 104, 20, 6, hovered ? accentSurface() : 0xFF1A2236);
+            graphics.drawString(font, "‹", controlX + 8, y + 4, 0xFFC5C9D7);
+            String choice = choiceSetting.value();
+            int availableWidth = 64;
+            if (font.width(choice) > availableWidth) {
+                while (!choice.isEmpty() && font.width(choice + "…") > availableWidth) {
+                    choice = choice.substring(0, choice.length() - 1);
+                }
+                choice += "…";
+            }
+            graphics.drawString(font, choice, controlX + (104 - font.width(choice)) / 2, y + 4, 0xFFE6E8F2);
+            graphics.drawString(font, "›", controlX + 91, y + 4, 0xFFC5C9D7);
         } else if (setting instanceof NumberSetting numberSetting) {
             int sliderX = x + width - 124;
             int sliderWidth = 76;
@@ -1011,6 +1027,11 @@ public final class ClickGuiScreen extends Screen {
                             if (mouseX >= cardX + cardWidth - 14 - 36) {
                                 booleanSetting.toggle();
                             }
+                        } else if (setting instanceof ChoiceSetting choiceSetting) {
+                            int controlX = cardX + cardWidth - 14 - 112;
+                            if (mouseX >= controlX && mouseX <= controlX + 104) {
+                                choiceSetting.cycle(mouseX < controlX + 52 ? -1 : 1);
+                            }
                         } else if (setting instanceof NumberSetting numberSetting) {
                             int sliderX = cardX + 14 + cardWidth - 28 - 124;
                             if (mouseX >= sliderX && mouseX <= sliderX + 76) {
@@ -1019,6 +1040,9 @@ public final class ClickGuiScreen extends Screen {
                             }
                         }
                         if ((setting instanceof BooleanSetting booleanSetting && mouseX >= cardX + cardWidth - 14 - 36)
+                                || (setting instanceof ChoiceSetting choiceSetting
+                                && mouseX >= cardX + cardWidth - 14 - 112
+                                && mouseX <= cardX + cardWidth - 14 - 8)
                                 || (setting instanceof NumberSetting numberSetting
                                 && mouseX >= cardX + 14 + cardWidth - 28 - 124
                                 && mouseX <= cardX + 14 + cardWidth - 28 - 48)) {

@@ -2,6 +2,8 @@ package dev.jilaton.client.module;
 
 import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.WTapModule;
+import dev.jilaton.client.module.impl.SwingAnimationsModule;
+import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import org.junit.jupiter.api.Test;
 
@@ -48,5 +50,29 @@ class ModuleManagerTest {
         assertTrue(wtap.playersOnly().value());
 
         assertTrue(new ModuleManager().get("wtap") instanceof WTapModule);
+    }
+
+    @Test
+    void swingAnimationsExposeLiveStyleAndScaleSettings() {
+        SwingAnimationsModule module = new SwingAnimationsModule();
+        ChoiceSetting mode = (ChoiceSetting) module.settings().stream()
+                .filter(setting -> setting.id().equals("mode"))
+                .findFirst().orElseThrow();
+        assertEquals("Smooth", mode.value());
+        mode.cycle(1);
+        assertEquals("Power", mode.value());
+        mode.setValue("Feast");
+        assertEquals("Feast", mode.value());
+        assertTrue(new ModuleManager().get("swing_animations") instanceof SwingAnimationsModule);
+    }
+
+    @Test
+    void choiceSettingRejectsUnknownModesAndCyclesInBothDirections() {
+        ChoiceSetting setting = new ChoiceSetting("mode", "Mode", java.util.List.of("A", "B", "C"), "A");
+        setting.cycle(-1);
+        assertEquals("C", setting.value());
+        setting.cycle(1);
+        assertEquals("A", setting.value());
+        assertThrows(IllegalArgumentException.class, () -> setting.setValue("unknown"));
     }
 }

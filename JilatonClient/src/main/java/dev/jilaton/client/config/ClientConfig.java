@@ -3,6 +3,7 @@ package dev.jilaton.client.config;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.setting.BooleanSetting;
+import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
 
@@ -176,6 +177,8 @@ public final class ClientConfig {
                         }
                     } else if (setting instanceof NumberSetting numberSetting) {
                         numberSetting.setValue(Double.parseDouble(value));
+                    } else if (setting instanceof ChoiceSetting choiceSetting) {
+                        choiceSetting.setValue(value);
                     }
                 } catch (IllegalArgumentException exception) {
                     System.err.println("Jilaton ignored invalid setting " + key);
@@ -223,6 +226,8 @@ public final class ClientConfig {
                     values.setProperty(settingKey(module, setting), Boolean.toString(booleanSetting.value()));
                 } else if (setting instanceof NumberSetting numberSetting) {
                     values.setProperty(settingKey(module, setting), Double.toString(numberSetting.value()));
+                } else if (setting instanceof ChoiceSetting choiceSetting) {
+                    values.setProperty(settingKey(module, setting), choiceSetting.value());
                 }
             }
         }

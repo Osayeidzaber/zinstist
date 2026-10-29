@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "refmap": "jilaton.refmap.json",
+  "package": "dev.jilaton.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "FirstPersonHandsAndItemsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -8,6 +8,7 @@ import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.HudModule;
 import dev.jilaton.client.module.impl.SprintModule;
+import dev.jilaton.client.module.impl.SwingAnimationsModule;
 import dev.jilaton.client.module.impl.TriggerbotModule;
 import dev.jilaton.client.module.impl.WTapModule;
 import net.minecraft.client.Minecraft;
@@ -34,6 +35,7 @@ public final class ModuleManager {
         register(new AutoArmorModule());
         register(new SprintModule());
         register(new FullbrightModule());
+        register(new SwingAnimationsModule());
         register(new HudModule());
     }
 
