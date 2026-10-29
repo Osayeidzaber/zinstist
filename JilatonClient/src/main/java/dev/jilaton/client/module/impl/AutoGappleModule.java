@@ -14,6 +14,7 @@ import net.minecraft.world.item.Items;
 public final class AutoGappleModule extends ClientModule {
     private final NumberSetting healthThreshold;
     private final BooleanSetting enchantedApples;
+    private final BooleanSetting considerAbsorption;
     private int slotBeforeUse = -1;
     private int appleSlot = -1;
     private boolean restorePending;
@@ -23,6 +24,7 @@ public final class AutoGappleModule extends ClientModule {
         super("auto_gapple", "AutoGapple", "Uses a hotbar golden apple below the selected health threshold.", ModuleCategory.COMBAT);
         healthThreshold = addSetting(new NumberSetting("health_threshold", "Health threshold", 1.0, 20.0, 0.5, 10.0));
         enchantedApples = addSetting(new BooleanSetting("enchanted_apples", "Use enchanted apples", true));
+        considerAbsorption = addSetting(new BooleanSetting("consider_absorption", "Count absorption", true));
     }
 
     @Override
@@ -55,8 +57,14 @@ public final class AutoGappleModule extends ClientModule {
             clearUseState();
         }
 
+        ClientModule potionModule = dev.jilaton.client.JilatonClient.moduleManager().get("auto_pot");
+        if (potionModule instanceof AutoPotModule autoPot && autoPot.enabled()
+                && autoPot.blocksAutomaticFoodUse(client)) {
+            return;
+        }
+
         if (client.screen != null || player.isUsingItem() || client.options.keyUse.isDown()
-                || player.getHealth() > healthThreshold.value()
+                || !belowHealthThreshold(player)
                 || client.level.getGameTime() < nextAttemptTick) {
             return;
         }
@@ -87,6 +95,22 @@ public final class AutoGappleModule extends ClientModule {
         return -1;
     }
 
+    public boolean willUseNow(Minecraft client) {
+        Player player = client.player;
+        if (player == null || client.level == null || client.gameMode == null || client.screen != null
+                || player.isUsingItem() || client.options.keyUse.isDown()
+                || !belowHealthThreshold(player)
+                || client.level.getGameTime() < nextAttemptTick) {
+            return false;
+        }
+        return findAppleSlot(player, Items.GOLDEN_APPLE) >= 0
+                || enchantedApples.value() && findAppleSlot(player, Items.ENCHANTED_GOLDEN_APPLE) >= 0;
+    }
+
+    public boolean isManagingHotbar() {
+        return slotBeforeUse >= 0;
+    }
+
     private void restoreSlotIfSafe(Minecraft client) {
         if (client.player == null || slotBeforeUse < 0 || appleSlot < 0 || client.player.isUsingItem()) {
             return;
@@ -100,5 +124,10 @@ public final class AutoGappleModule extends ClientModule {
         slotBeforeUse = -1;
         appleSlot = -1;
         restorePending = false;
+    }
+
+    private boolean belowHealthThreshold(Player player) {
+        return AutoGapplePolicy.shouldUse(player.getHealth(), player.getAbsorptionAmount(),
+                healthThreshold.value(), considerAbsorption.value());
     }
 }

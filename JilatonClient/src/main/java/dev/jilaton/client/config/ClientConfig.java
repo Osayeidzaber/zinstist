@@ -2,6 +2,7 @@ package dev.jilaton.client.config;
 
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
+import dev.jilaton.client.module.impl.FriendManager;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
@@ -26,7 +27,7 @@ public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
     private static final Set<String> THEME_IDS = Set.of("violet", "blue", "cyan", "rose", "amber", "custom");
-    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes");
+    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target");
     private final Path path;
     private final Path profilesDirectory;
     private final Map<String, HudPosition> hudPositions = new HashMap<>();
@@ -40,9 +41,7 @@ public final class ClientConfig {
 
     public void load(ModuleManager modules) {
         Properties values = read(path);
-        if (values != null) {
-            apply(values, modules);
-        }
+        apply(values == null ? new Properties() : values, modules);
     }
 
     public void save(ModuleManager modules) {
@@ -127,6 +126,10 @@ public final class ClientConfig {
 
     private void apply(Properties values, ModuleManager modules) {
         hudPositions.clear();
+        String configuredFriends = values.getProperty("friends.names");
+        if (configuredFriends != null) {
+            FriendManager.replace(List.of(configuredFriends.split(",")));
+        }
         String configuredTheme = values.getProperty("ui.theme");
         if (configuredTheme != null) {
             try {
@@ -210,6 +213,7 @@ public final class ClientConfig {
         Properties values = new Properties();
         values.setProperty("ui.theme", themeId);
         values.setProperty("ui.custom_accent", customAccent);
+        values.setProperty("friends.names", String.join(",", FriendManager.names()));
         for (String widgetId : HUD_WIDGET_IDS) {
             HudPosition position = hudPositions.get(widgetId);
             if (position != null) {
