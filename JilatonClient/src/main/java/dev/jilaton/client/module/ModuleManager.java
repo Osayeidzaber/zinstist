@@ -13,12 +13,14 @@ import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class ModuleManager {
     private final Map<String, ClientModule> modules = new LinkedHashMap<>();
+    private final Collection<ClientModule> modulesView = Collections.unmodifiableCollection(modules.values());
     private final Map<String, Boolean> previousKeyStates = new HashMap<>();
 
     public ModuleManager() {
@@ -40,7 +42,7 @@ public final class ModuleManager {
     }
 
     public Collection<ClientModule> all() {
-        return modules.values();
+        return modulesView;
     }
 
     public ClientModule get(String id) {
