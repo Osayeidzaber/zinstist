@@ -120,7 +120,8 @@ public final class ClickGuiScreen extends Screen {
             scrollOffset = targetScrollOffset;
         }
 
-        renderBlurredBackground(graphics);
+        // Minecraft 1.21.11 applies its screen blur before this render pass.
+        // Requesting it again here throws "Can only blur once per frame".
         graphics.fill(0, 0, width, height, 0x6606080D);
         fillRounded(graphics, panelX - 3, panelY - 2, panelWidth + 6, panelHeight + 6, 12, 0x30000000);
         fillRounded(graphics, panelX, panelY, panelWidth, panelHeight, 9, PANEL);
