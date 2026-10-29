@@ -9,6 +9,7 @@ import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.HudModule;
 import dev.jilaton.client.module.impl.SprintModule;
 import dev.jilaton.client.module.impl.TriggerbotModule;
+import dev.jilaton.client.module.impl.WTapModule;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
@@ -26,6 +27,7 @@ public final class ModuleManager {
     public ModuleManager() {
         register(new AimAssistModule());
         register(new TriggerbotModule());
+        register(new WTapModule());
         register(new AutoClickerModule());
         register(new AutoTotemModule());
         register(new AutoGappleModule());

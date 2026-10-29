@@ -1,6 +1,7 @@
 package dev.jilaton.client.module;
 
 import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.WTapModule;
 import dev.jilaton.client.setting.NumberSetting;
 import org.junit.jupiter.api.Test;
 
@@ -35,5 +36,17 @@ class ModuleManagerTest {
 
         brightness.setValue(12.0);
         assertEquals(1.0, brightness.value());
+    }
+
+    @Test
+    void wtapExposesBoundedReleaseAndPlayerFilterSettings() {
+        WTapModule wtap = new WTapModule();
+
+        assertEquals(1.0, wtap.releaseTicks().minimum());
+        assertEquals(3.0, wtap.releaseTicks().maximum());
+        assertEquals(1.0, wtap.releaseTicks().value());
+        assertTrue(wtap.playersOnly().value());
+
+        assertTrue(new ModuleManager().get("wtap") instanceof WTapModule);
     }
 }
