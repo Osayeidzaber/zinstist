@@ -17,6 +17,7 @@ import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.FriendsModule;
 import dev.jilaton.client.module.impl.HitboxModule;
 import dev.jilaton.client.module.impl.HudModule;
+import dev.jilaton.client.module.impl.InventoryMoveModule;
 import dev.jilaton.client.module.impl.KillAuraModule;
 import dev.jilaton.client.module.impl.NoBobModule;
 import dev.jilaton.client.module.impl.NoFallModule;
@@ -73,6 +74,7 @@ public final class ModuleManager {
         register(new AutoArmorModule());
         register(new SprintModule());
         register(new ParkourModule());
+        register(new InventoryMoveModule());
         register(new SafeWalkModule());
         register(new NoFallModule());
         register(new NoSlowModule());

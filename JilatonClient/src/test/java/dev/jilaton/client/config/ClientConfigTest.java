@@ -62,6 +62,8 @@ class ClientConfigTest {
         setting(source.get("no_slow"), "item_use_scale", NumberSetting.class).setValue(0.65);
         setting(source.get("no_slow"), "consume_scale", NumberSetting.class).setValue(0.4);
         setting(source.get("no_slow"), "block_scale", NumberSetting.class).setValue(1.6);
+        setting(source.get("inventory_move"), "behavior", ChoiceSetting.class).setValue("Normal");
+        setting(source.get("inventory_move"), "passthrough_sneak", BooleanSetting.class).setValue(true);
         setting(source.get("bow_aim"), "range", NumberSetting.class).setValue(48.0);
         setting(source.get("bow_aim"), "high_arc", BooleanSetting.class).setValue(true);
         setting(source.get("auto_weapon"), "preference", ChoiceSetting.class).setValue("Axe");
@@ -110,6 +112,8 @@ class ClientConfigTest {
         assertEquals(0.65, setting(restored.get("no_slow"), "item_use_scale", NumberSetting.class).value(), 0.000001);
         assertEquals(0.4, setting(restored.get("no_slow"), "consume_scale", NumberSetting.class).value(), 0.000001);
         assertEquals(1.6, setting(restored.get("no_slow"), "block_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals("Normal", setting(restored.get("inventory_move"), "behavior", ChoiceSetting.class).value());
+        assertTrue(setting(restored.get("inventory_move"), "passthrough_sneak", BooleanSetting.class).value());
         assertEquals(48.0, setting(restored.get("bow_aim"), "range", NumberSetting.class).value(), 0.000001);
         assertTrue(setting(restored.get("bow_aim"), "high_arc", BooleanSetting.class).value());
         assertEquals("Axe", setting(restored.get("auto_weapon"), "preference", ChoiceSetting.class).value());

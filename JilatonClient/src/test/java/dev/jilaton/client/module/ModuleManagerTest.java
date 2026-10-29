@@ -12,6 +12,7 @@ import dev.jilaton.client.module.impl.WTapModule;
 import dev.jilaton.client.module.impl.SwingAnimationsModule;
 import dev.jilaton.client.module.impl.TargetStrafeModule;
 import dev.jilaton.client.module.impl.HitboxModule;
+import dev.jilaton.client.module.impl.InventoryMoveModule;
 import dev.jilaton.client.module.impl.KillAuraModule;
 import dev.jilaton.client.module.impl.NoFallModule;
 import dev.jilaton.client.module.impl.NoMissCooldownModule;
@@ -61,6 +62,18 @@ class ModuleManagerTest {
         assertEquals(ModuleCategory.MOVEMENT, manager.get("safe_walk").category());
         assertFalse(manager.get("safe_walk").enabled());
         assertEquals(2, manager.get("safe_walk").settings().size());
+    }
+
+    @Test
+    void inventoryMoveExposesScreenPolicyAndSneakSettings() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule inventoryMove = manager.get("inventory_move");
+
+        assertTrue(inventoryMove instanceof InventoryMoveModule);
+        assertEquals(ModuleCategory.MOVEMENT, inventoryMove.category());
+        assertFalse(inventoryMove.enabled());
+        assertEquals(2, inventoryMove.settings().size());
+        assertEquals("Safe", ((ChoiceSetting) inventoryMove.settings().get(0)).value());
     }
 
     @Test
