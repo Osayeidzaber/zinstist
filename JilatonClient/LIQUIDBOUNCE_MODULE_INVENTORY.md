@@ -146,7 +146,7 @@ Found **232** module entry class files across 8 categories.
 | `movement/inventorymove/ModuleInventoryMove` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/liquidwalk/ModuleLiquidWalk` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/longjump/ModuleLongJump` | — | Not integrated; dependencies, settings, and behavior not yet audited |
-| `movement/noslow/ModuleNoSlow` | `NoSlow (partial)` | Partial adaptation; source behavior and dependencies need further audit |
+| `movement/noslow/ModuleNoSlow` | `NoSlow (partial)` | REA archive inventory and static `javap` show a `PlayerUseMultiplier` event with item-action-specific multiplier groups; Jilaton adapts vanilla `LocalPlayer.modifyInput` slowdown scaling and `isSlowDueToUsingItem` sprint eligibility, with tested removal/scale policy. Per-action groups, axis-specific values, and server-specific packet modes are not ported |
 | `movement/noweb/ModuleNoWeb` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/speed/ModuleSpeed` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `movement/spider/ModuleSpider` | — | Not integrated; dependencies, settings, and behavior not yet audited |

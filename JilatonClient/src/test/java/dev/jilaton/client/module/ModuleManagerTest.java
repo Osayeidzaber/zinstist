@@ -61,6 +61,18 @@ class ModuleManagerTest {
     }
 
     @Test
+    void noSlowHasIndependentVanillaAndSprintSettings() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule noSlow = manager.get("no_slow");
+
+        assertEquals(ModuleCategory.MOVEMENT, noSlow.category());
+        assertFalse(noSlow.enabled());
+        assertEquals(3, noSlow.settings().size());
+        assertEquals(1.0, ((NumberSetting) noSlow.settings().stream()
+                .filter(setting -> setting.id().equals("item_use_scale")).findFirst().orElseThrow()).value());
+    }
+
+    @Test
     void fullbrightGammaSettingStaysWithinMinecraftUnitRange() {
         FullbrightModule fullbright = new FullbrightModule();
         NumberSetting brightness = fullbright.brightness();
