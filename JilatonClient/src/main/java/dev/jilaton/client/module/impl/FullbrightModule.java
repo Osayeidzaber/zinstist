@@ -11,7 +11,9 @@ public final class FullbrightModule extends ClientModule {
 
     public FullbrightModule() {
         super("fullbright", "Fullbright", "Raises local gamma while enabled.", ModuleCategory.RENDER);
-        brightness = addSetting(new NumberSetting("brightness", "Brightness", 1.0, 16.0, 0.5, 12.0));
+        // Minecraft 1.21.11 models gamma as a unit double and rejects values outside [0, 1].
+        // Keeping the setting in the game's native range also clamps legacy saved values safely.
+        brightness = addSetting(new NumberSetting("brightness", "Brightness", 0.0, 1.0, 0.05, 1.0));
     }
 
     @Override
