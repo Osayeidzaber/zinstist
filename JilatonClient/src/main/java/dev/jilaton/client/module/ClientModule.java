@@ -133,6 +133,21 @@ public abstract class ClientModule {
         }
     }
 
+    public final void handleMovementInput(MovementInputEvent event) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            onMovementInput(event);
+        } catch (Throwable failure) {
+            LOGGER.error("Module '{}' failed while handling movement input and will be disabled", id, failure);
+            setEnabled(false);
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+    }
+
     protected void onEnable(Minecraft client) {
     }
 
@@ -140,5 +155,8 @@ public abstract class ClientModule {
     }
 
     protected void onTick(Minecraft client) {
+    }
+
+    protected void onMovementInput(MovementInputEvent event) {
     }
 }
