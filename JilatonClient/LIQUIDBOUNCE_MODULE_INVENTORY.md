@@ -15,12 +15,12 @@ Found **232** module entry class files across 8 categories.
 | `combat/ModuleAutoLeave` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/ModuleAutoRod` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/ModuleAutoShoot` | — | Not integrated; dependencies, settings, and behavior not yet audited |
-| `combat/ModuleAutoWeapon` | — | Not integrated; dependencies, settings, and behavior not yet audited |
+| `combat/ModuleAutoWeapon` | `AutoWeapon (partial)` | REA inventory and static `javap` show preferred hotbar weapon selection on target/attack, silent switch-back, shield-break axe selection, optional mace-smash integration, and action settings. Jilaton implements attack-time selection by active attack-damage attributes/Sharpness, axe-on-block, vanilla mace-smash eligibility, slot-owner-aware switch-back, and AutoPot/AutoGapple slot-reservation checks. LiquidBounce multi-choice preferences, silent-hotbar arbitration, on-target switching, and auto-Mace module coordination remain unported |
 | `combat/ModuleFakeLag` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/ModuleHitbox` | `Hitbox (partial)` | Partial adaptation; source behavior and dependencies need further audit |
 | `combat/ModuleKeepSprint` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/ModuleMaceKill` | — | Not integrated; dependencies, settings, and behavior not yet audited |
-| `combat/ModuleNoMissCooldown` | — | Not integrated; dependencies, settings, and behavior not yet audited |
+| `combat/ModuleNoMissCooldown` | `NoMissCooldown (partial)` | REA archive inventory and static `javap` show two settings: replace the `Minecraft.startAttack` `missTime` read with zero and optionally consume the action when the hit result is `MISS`. Jilaton implements both as independent settings, including suppression of the miss delay write; it affects only the local miss-time gate, not server attack-strength or validation |
 | `combat/ModuleSuperKnockback` | `WTap (partial)` | Partial adaptation; source behavior and dependencies need further audit |
 | `combat/ModuleSwordBlock` | — | Not integrated; dependencies, settings, and behavior not yet audited |
 | `combat/ModuleTickBase` | — | Not integrated; dependencies, settings, and behavior not yet audited |

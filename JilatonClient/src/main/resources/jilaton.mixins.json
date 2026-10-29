@@ -12,6 +12,7 @@
     "NoBobMixin",
     "NoSlowMixin",
     "NoFallPacketMixin",
+    "NoMissCooldownMixin",
     "ServerboundMovePlayerPacketAccessor",
     "VelocityPacketMixin",
     "AutoTotemPacketMixin",

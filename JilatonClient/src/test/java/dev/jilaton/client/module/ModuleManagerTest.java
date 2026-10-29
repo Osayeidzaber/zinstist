@@ -5,6 +5,7 @@ import dev.jilaton.client.module.impl.CrystalAuraModule;
 import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AutoAnchorModule;
 import dev.jilaton.client.module.impl.AutoTotemModule;
+import dev.jilaton.client.module.impl.AutoWeaponModule;
 import dev.jilaton.client.module.impl.AnchorAuraModule;
 import dev.jilaton.client.module.impl.WTapModule;
 import dev.jilaton.client.module.impl.SwingAnimationsModule;
@@ -12,6 +13,7 @@ import dev.jilaton.client.module.impl.TargetStrafeModule;
 import dev.jilaton.client.module.impl.HitboxModule;
 import dev.jilaton.client.module.impl.KillAuraModule;
 import dev.jilaton.client.module.impl.NoFallModule;
+import dev.jilaton.client.module.impl.NoMissCooldownModule;
 import dev.jilaton.client.module.impl.SafeWalkModule;
 import dev.jilaton.client.module.impl.ReachModule;
 import dev.jilaton.client.module.ModuleCategory;
@@ -70,6 +72,28 @@ class ModuleManagerTest {
         assertEquals(3, noSlow.settings().size());
         assertEquals(1.0, ((NumberSetting) noSlow.settings().stream()
                 .filter(setting -> setting.id().equals("item_use_scale")).findFirst().orElseThrow()).value());
+    }
+
+    @Test
+    void autoWeaponIsRegisteredWithConfigurableSelectionAndRestoration() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule autoWeapon = manager.get("auto_weapon");
+
+        assertTrue(autoWeapon instanceof AutoWeaponModule);
+        assertEquals(ModuleCategory.COMBAT, autoWeapon.category());
+        assertFalse(autoWeapon.enabled());
+        assertEquals(7, autoWeapon.settings().size());
+    }
+
+    @Test
+    void noMissCooldownExposesTheReferenceMissTimeControls() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule noMissCooldown = manager.get("no_miss_cooldown");
+
+        assertTrue(noMissCooldown instanceof NoMissCooldownModule);
+        assertEquals(ModuleCategory.COMBAT, noMissCooldown.category());
+        assertFalse(noMissCooldown.enabled());
+        assertEquals(2, noMissCooldown.settings().size());
     }
 
     @Test

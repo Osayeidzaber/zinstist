@@ -107,6 +107,10 @@ public final class AutoGappleModule extends ClientModule {
                 || enchantedApples.value() && findAppleSlot(player, Items.ENCHANTED_GOLDEN_APPLE) >= 0;
     }
 
+    public boolean isManagingHotbar() {
+        return slotBeforeUse >= 0;
+    }
+
     private void restoreSlotIfSafe(Minecraft client) {
         if (client.player == null || slotBeforeUse < 0 || appleSlot < 0 || client.player.isUsingItem()) {
             return;

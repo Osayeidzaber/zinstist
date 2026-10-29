@@ -60,6 +60,11 @@ class ClientConfigTest {
         setting(source.get("safe_walk"), "edge_distance", NumberSetting.class).setValue(0.45);
         setting(source.get("safe_walk"), "keep_ticks", NumberSetting.class).setValue(3.0);
         setting(source.get("no_slow"), "item_use_scale", NumberSetting.class).setValue(0.65);
+        setting(source.get("auto_weapon"), "preference", ChoiceSetting.class).setValue("Axe");
+        setting(source.get("auto_weapon"), "mace_smash", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_weapon"), "switch_back_delay", NumberSetting.class).setValue(4.0);
+        setting(source.get("no_miss_cooldown"), "remove_attack_cooldown", BooleanSetting.class).setValue(false);
+        setting(source.get("no_miss_cooldown"), "cancel_attack_on_miss", BooleanSetting.class).setValue(true);
         setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
         setting(source.get("swing_animations"), "mode", ChoiceSetting.class).setValue("Power");
         setting(source.get("kill_aura"), "players", BooleanSetting.class).setValue(false);
@@ -99,6 +104,11 @@ class ClientConfigTest {
         assertEquals(0.45, setting(restored.get("safe_walk"), "edge_distance", NumberSetting.class).value(), 0.000001);
         assertEquals(3.0, setting(restored.get("safe_walk"), "keep_ticks", NumberSetting.class).value(), 0.000001);
         assertEquals(0.65, setting(restored.get("no_slow"), "item_use_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals("Axe", setting(restored.get("auto_weapon"), "preference", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("auto_weapon"), "mace_smash", BooleanSetting.class).value());
+        assertEquals(4.0, setting(restored.get("auto_weapon"), "switch_back_delay", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("no_miss_cooldown"), "remove_attack_cooldown", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("no_miss_cooldown"), "cancel_attack_on_miss", BooleanSetting.class).value());
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("Power", setting(restored.get("swing_animations"), "mode", ChoiceSetting.class).value());
         assertFalse(setting(restored.get("kill_aura"), "players", BooleanSetting.class).value());
