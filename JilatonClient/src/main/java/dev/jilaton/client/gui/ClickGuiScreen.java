@@ -120,7 +120,9 @@ public final class ClickGuiScreen extends Screen {
             scrollOffset = targetScrollOffset;
         }
 
-        graphics.fill(0, 0, width, height, 0x9906080D);
+        renderBlurredBackground(graphics);
+        graphics.fill(0, 0, width, height, 0x6606080D);
+        fillRounded(graphics, panelX - 3, panelY - 2, panelWidth + 6, panelHeight + 6, 12, 0x30000000);
         fillRounded(graphics, panelX, panelY, panelWidth, panelHeight, 9, PANEL);
         accent = selectedAccent();
         graphics.fill(panelX + 1, panelY + 1, panelX + panelWidth - 1, panelY + 3, accent);
@@ -200,7 +202,9 @@ public final class ClickGuiScreen extends Screen {
             } else if (hovered) {
                 fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, 0xFF131A2B);
             }
-            graphics.drawString(font, category, rowX + 12, rowY, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
+            int iconColor = selected ? accent : hovered ? 0xFFB9C2D8 : 0xFF78839B;
+            drawSidebarIcon(graphics, category, rowX + 10, rowY + 2, iconColor);
+            graphics.drawString(font, category, rowX + 29, rowY, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
             String countText = Integer.toString(moduleCount);
             graphics.drawString(font, countText, rowX + rowWidth - font.width(countText) - 10, rowY,
                     selected ? 0xFFCBC5FF : 0xFF6F7890);
@@ -227,7 +231,89 @@ public final class ClickGuiScreen extends Screen {
         } else if (hovered) {
             fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF131A2B);
         }
-        graphics.drawString(font, label, x + 12, y, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
+        drawSidebarIcon(graphics, label, x + 10, y + 2,
+                selected ? accent : hovered ? 0xFFB9C2D8 : 0xFF78839B);
+        graphics.drawString(font, label, x + 29, y, selected ? 0xFFF1EFFF : 0xFFAAB2C5);
+    }
+
+    private static void drawSidebarIcon(GuiGraphics graphics, String name, int x, int y, int color) {
+        switch (name) {
+            case "All" -> {
+                graphics.fill(x, y, x + 3, y + 3, color);
+                graphics.fill(x + 5, y, x + 8, y + 3, color);
+                graphics.fill(x, y + 5, x + 3, y + 8, color);
+                graphics.fill(x + 5, y + 5, x + 8, y + 8, color);
+            }
+            case "Combat" -> {
+                drawIconLine(graphics, x, y + 8, x + 8, y, color);
+                drawIconLine(graphics, x + 1, y, x + 8, y + 7, color);
+                graphics.fill(x - 1, y + 7, x + 3, y + 9, color);
+                graphics.fill(x + 6, y - 1, x + 10, y + 1, color);
+            }
+            case "Movement" -> {
+                graphics.fill(x, y + 3, x + 7, y + 6, color);
+                drawIconLine(graphics, x + 4, y, x + 9, y + 4, color);
+                drawIconLine(graphics, x + 4, y + 8, x + 9, y + 4, color);
+            }
+            case "Visuals" -> {
+                drawIconLine(graphics, x, y + 4, x + 4, y, color);
+                drawIconLine(graphics, x + 4, y, x + 9, y + 4, color);
+                drawIconLine(graphics, x + 9, y + 4, x + 4, y + 8, color);
+                drawIconLine(graphics, x + 4, y + 8, x, y + 4, color);
+                graphics.fill(x + 3, y + 3, x + 6, y + 6, color);
+            }
+            case "Client" -> {
+                graphics.fill(x, y + 1, x + 9, y + 3, color);
+                graphics.fill(x, y + 7, x + 9, y + 9, color);
+                graphics.fill(x + 3, y + 4, x + 6, y + 6, color);
+                graphics.fill(x + 1, y, x + 3, y + 4, color);
+                graphics.fill(x + 7, y + 6, x + 9, y + 10, color);
+            }
+            case "Theme" -> {
+                graphics.fill(x, y, x + 4, y + 4, 0xFF8878FF);
+                graphics.fill(x + 5, y, x + 9, y + 4, 0xFF50D5C8);
+                graphics.fill(x, y + 5, x + 4, y + 9, 0xFFFF78AD);
+                graphics.fill(x + 5, y + 5, x + 9, y + 9, color);
+            }
+            case "Configs" -> {
+                graphics.fill(x, y + 2, x + 4, y + 4, color);
+                graphics.fill(x + 4, y + 1, x + 8, y + 4, color);
+                graphics.fill(x, y + 4, x + 9, y + 9, color);
+            }
+            case "Keybinds" -> {
+                graphics.fill(x, y, x + 10, y + 2, color);
+                graphics.fill(x, y + 7, x + 10, y + 9, color);
+                graphics.fill(x, y + 2, x + 2, y + 7, color);
+                graphics.fill(x + 8, y + 2, x + 10, y + 7, color);
+                graphics.fill(x + 3, y + 3, x + 4, y + 5, color);
+                graphics.fill(x + 6, y + 3, x + 7, y + 5, color);
+                graphics.fill(x + 3, y + 6, x + 7, y + 7, color);
+            }
+            default -> { }
+        }
+    }
+
+    private static void drawIconLine(GuiGraphics graphics, int x0, int y0, int x1, int y1, int color) {
+        int dx = Math.abs(x1 - x0);
+        int sx = x0 < x1 ? 1 : -1;
+        int dy = -Math.abs(y1 - y0);
+        int sy = y0 < y1 ? 1 : -1;
+        int error = dx + dy;
+        while (true) {
+            graphics.fill(x0, y0, x0 + 2, y0 + 2, color);
+            if (x0 == x1 && y0 == y1) {
+                break;
+            }
+            int doubledError = error * 2;
+            if (doubledError >= dy) {
+                error += dy;
+                x0 += sx;
+            }
+            if (doubledError <= dx) {
+                error += dx;
+                y0 += sy;
+            }
+        }
     }
 
     private void setPage(Page nextPage) {
