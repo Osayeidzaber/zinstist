@@ -33,6 +33,10 @@ class ClientConfigTest {
         playersOnly.setValue(false);
         autoClicker.setKeyCode(67);
 
+        ClientModule autoGapple = source.get("auto_gapple");
+        setting(autoGapple, "health_threshold", NumberSetting.class).setValue(7.5);
+        setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
+
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
         config.setCustomAccent("12aBef");
@@ -47,6 +51,8 @@ class ClientConfigTest {
         assertEquals(65, restored.get("aim_assist").keyCode());
         assertFalse(setting(restored.get("auto_clicker"), "players_only", BooleanSetting.class).value());
         assertEquals(67, restored.get("auto_clicker").keyCode());
+        assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
     }

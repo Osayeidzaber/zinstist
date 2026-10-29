@@ -1,8 +1,9 @@
 package dev.jilaton.client.module;
 
 import dev.jilaton.client.module.impl.AimAssistModule;
-import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AutoArmorModule;
+import dev.jilaton.client.module.impl.AutoClickerModule;
+import dev.jilaton.client.module.impl.AutoGappleModule;
 import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.FullbrightModule;
 import dev.jilaton.client.module.impl.HudModule;
@@ -25,6 +26,7 @@ public final class ModuleManager {
         register(new TriggerbotModule());
         register(new AutoClickerModule());
         register(new AutoTotemModule());
+        register(new AutoGappleModule());
         register(new AutoArmorModule());
         register(new SprintModule());
         register(new FullbrightModule());
