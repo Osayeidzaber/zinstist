@@ -25,11 +25,11 @@ import java.util.Set;
 public final class ClickGuiScreen extends Screen {
     private enum Page {
         MODULES,
+        THEME,
         CONFIGS,
         KEYBINDS
     }
 
-    private static final int ACCENT = 0xFF8878FF;
     private static final int PANEL = 0xFF080C19;
     private static final int SIDEBAR = 0xFF0B1020;
     private static final int CARD = 0xFF101629;
@@ -45,6 +45,8 @@ public final class ClickGuiScreen extends Screen {
     private String profileStatus = "Profiles are stored on this computer.";
     private boolean profileStatusError;
     private Page page = Page.MODULES;
+    private int accent = ClientTheme.VIOLET.accent();
+    private int draggingThemeSlider = -1;
     private String selectedCategory = "All";
     private String bindingModuleId;
     private boolean showEnabledOnly;
@@ -90,7 +92,7 @@ public final class ClickGuiScreen extends Screen {
             targetScrollOffset = 0.0;
             scrollOffset = 0.0;
         });
-        search.setVisible(page != Page.CONFIGS);
+        search.setVisible(page == Page.MODULES || page == Page.KEYBINDS);
         addRenderableWidget(search);
 
         int profileInputWidth = Math.min(214, Math.max(80, contentWidth - 224));
@@ -120,13 +122,15 @@ public final class ClickGuiScreen extends Screen {
 
         graphics.fill(0, 0, width, height, 0x9906080D);
         fillRounded(graphics, panelX, panelY, panelWidth, panelHeight, 9, PANEL);
-        graphics.fill(panelX + 1, panelY + 1, panelX + panelWidth - 1, panelY + 3, ACCENT);
+        accent = selectedAccent();
+        graphics.fill(panelX + 1, panelY + 1, panelX + panelWidth - 1, panelY + 3, accent);
         graphics.fill(panelX + 1, panelY + 4, panelX + panelWidth - 1, panelY + panelHeight - 1, 0xFF0A0E1B);
         graphics.fill(contentX - 10, panelY + 8, contentX - 9, panelY + panelHeight - 8, BORDER);
         renderHeader(graphics);
         renderSidebar(graphics, mouseX, mouseY);
         switch (page) {
             case MODULES -> renderModules(graphics, mouseX, mouseY);
+            case THEME -> renderTheme(graphics, mouseX, mouseY);
             case CONFIGS -> renderConfigs(graphics, mouseX, mouseY);
             case KEYBINDS -> renderKeybinds(graphics, mouseX, mouseY);
         }
@@ -136,15 +140,16 @@ public final class ClickGuiScreen extends Screen {
     private void renderHeader(GuiGraphics graphics) {
         graphics.fill(panelX + 1, panelY + 4, contentX - 10, panelY + panelHeight - 1, SIDEBAR);
         fillRounded(graphics, panelX + 17, panelY + 15, 22, 22, 6, 0xFF252044);
-        graphics.drawString(font, "J", panelX + 24, panelY + 22, ACCENT);
+        graphics.drawString(font, "J", panelX + 24, panelY + 22, accent);
         graphics.drawString(font, "JILATON", panelX + 46, panelY + 18, 0xFFF1F3FC);
         graphics.drawString(font, "CLIENT  /  0.1", panelX + 46, panelY + 32, 0xFF7F879B);
         String status = bindingModuleId == null ? "JILATON  ·  PVP MODULES" : "PRESS KEY  ·  ESC CANCEL  ·  DEL CLEAR";
-        graphics.drawString(font, status, panelX + 20, panelY + panelHeight - 25, bindingModuleId == null ? 0xFF707A91 : ACCENT);
+        graphics.drawString(font, status, panelX + 20, panelY + panelHeight - 25, bindingModuleId == null ? 0xFF707A91 : accent);
 
         String title = switch (page) {
             case MODULES -> selectedCategory.equals("All") ? "All Modules"
                     : selectedCategory.equals("Visuals") ? "Visual Modules" : selectedCategory + " Modules";
+            case THEME -> "Theme Studio";
             case CONFIGS -> "Config Profiles";
             case KEYBINDS -> "Keybinds";
         };
@@ -161,12 +166,13 @@ public final class ClickGuiScreen extends Screen {
         }
         String subtitle = switch (page) {
             case MODULES -> count + " modules  ·  " + active + " enabled";
+            case THEME -> "Choose a Jilaton palette or tune a custom accent";
             case CONFIGS -> profiles.size() + (profiles.size() == 1 ? " saved profile" : " saved profiles");
             case KEYBINDS -> active + " modules enabled  ·  click a row to edit its key";
         };
         graphics.drawString(font, subtitle, contentX, panelY + 38, 0xFF8791A9);
 
-        if (page != Page.CONFIGS) {
+        if (page == Page.MODULES || page == Page.KEYBINDS) {
             fillRounded(graphics, searchContainerX, panelY + 16, searchContainerWidth, 26, 6, 0xFF0D1425);
             graphics.fill(searchContainerX + 9, panelY + 24, searchContainerX + 15, panelY + 30, 0xFF8D96AD);
             graphics.fill(searchContainerX + 13, panelY + 29, searchContainerX + 17, panelY + 31, 0xFF8D96AD);
@@ -189,8 +195,8 @@ public final class ClickGuiScreen extends Screen {
                     .filter(module -> module.category().displayName().equals(category)).count();
             boolean hovered = mouseX >= rowX && mouseX <= rowX + rowWidth && mouseY >= rowY - 5 && mouseY <= rowY + 15;
             if (selected) {
-                fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, 0xFF201D3D);
-                graphics.fill(rowX, rowY - 2, rowX + 2, rowY + 14, ACCENT);
+                fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, accentSurface());
+                graphics.fill(rowX, rowY - 2, rowX + 2, rowY + 14, accent);
             } else if (hovered) {
                 fillRounded(graphics, rowX, rowY - 6, rowWidth, 24, 6, 0xFF131A2B);
             }
@@ -202,8 +208,9 @@ public final class ClickGuiScreen extends Screen {
         }
 
         graphics.drawString(font, "GENERAL", panelX + 19, panelY + 246, 0xFF737F98);
-        renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 266, dividerX);
-        renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 294, dividerX);
+        renderSidebarLink(graphics, mouseX, mouseY, "Theme", Page.THEME, panelY + 266, dividerX);
+        renderSidebarLink(graphics, mouseX, mouseY, "Configs", Page.CONFIGS, panelY + 294, dividerX);
+        renderSidebarLink(graphics, mouseX, mouseY, "Keybinds", Page.KEYBINDS, panelY + 322, dividerX);
 
         graphics.drawString(font, "RIGHT SHIFT", panelX + 19, panelY + panelHeight - 46, 0xFF8993AA);
         graphics.drawString(font, "TOGGLE MENU", panelX + 19, panelY + panelHeight - 32, 0xFF626D84);
@@ -215,8 +222,8 @@ public final class ClickGuiScreen extends Screen {
         boolean selected = page == target;
         boolean hovered = mouseX >= x && mouseX <= x + width && mouseY >= y - 6 && mouseY <= y + 18;
         if (selected) {
-            fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF201D3D);
-            graphics.fill(x, y - 2, x + 2, y + 14, ACCENT);
+            fillRounded(graphics, x, y - 6, width, 24, 6, accentSurface());
+            graphics.fill(x, y - 2, x + 2, y + 14, accent);
         } else if (hovered) {
             fillRounded(graphics, x, y - 6, width, 24, 6, 0xFF131A2B);
         }
@@ -225,8 +232,9 @@ public final class ClickGuiScreen extends Screen {
 
     private void setPage(Page nextPage) {
         page = nextPage;
-        search.setVisible(page != Page.CONFIGS);
+        search.setVisible(page == Page.MODULES || page == Page.KEYBINDS);
         profileName.setVisible(page == Page.CONFIGS);
+        draggingThemeSlider = -1;
         setFocused(null);
         scrollOffset = 0.0;
         targetScrollOffset = 0.0;
@@ -256,12 +264,12 @@ public final class ClickGuiScreen extends Screen {
             int cardHeight = baseHeight + settingsHeight;
             boolean hovered = mouseX >= cardX && mouseX <= cardX + cardWidth && mouseY >= cardY && mouseY <= cardY + cardHeight;
             fillRounded(graphics, cardX, cardY, cardWidth, cardHeight, 7, hovered ? CARD_HOVER : CARD);
-            graphics.fill(cardX, cardY + 8, cardX + 2, cardY + baseHeight - 8, module.enabled() ? ACCENT : 0xFF2D3750);
+            graphics.fill(cardX, cardY + 8, cardX + 2, cardY + baseHeight - 8, module.enabled() ? accent : 0xFF2D3750);
             graphics.drawString(font, module.name(), cardX + 14, cardY + 10, 0xFFF0F3FC);
             graphics.drawString(font, module.description(), cardX + 14, cardY + 28, 0xFF8993AA);
             drawToggle(graphics, cardX + cardWidth - 40, cardY + 13, module.enabled());
             fillRounded(graphics, cardX + cardWidth - 108, cardY + 10, 48, 20, 5,
-                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? 0xFF423B70 : 0xFF1A2236);
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1A2236);
             String keyName = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS" : keyName(module.keyCode());
             if (keyName.length() > 6) {
                 keyName = keyName.substring(0, 5) + "…";
@@ -301,7 +309,7 @@ public final class ClickGuiScreen extends Screen {
             int scrollRange = maxScroll(totalHeight, viewportHeight);
             int thumbY = trackTop + (scrollRange == 0 ? 0 : (int) Math.round(maxThumbTravel * scrollOffset / scrollRange));
             graphics.fill(trackX, trackTop, trackX + 2, trackTop + trackHeight, BORDER);
-            fillRounded(graphics, trackX - 1, thumbY, 4, thumbHeight, 2, ACCENT);
+            fillRounded(graphics, trackX - 1, thumbY, 4, thumbHeight, 2, accent);
         }
     }
 
@@ -317,14 +325,14 @@ public final class ClickGuiScreen extends Screen {
         graphics.drawString(font, compactCards ? "COMPACT" : "ROOMY", densityX + 9, y + 7,
                 compactCards ? 0xFFB8ADFF : 0xFF9CA6BC);
         if (mouseX >= densityX && mouseX <= densityX + 78 && mouseY >= y && mouseY <= y + 22) {
-            graphics.fill(densityX, y + 21, densityX + 78, y + 22, ACCENT);
+            graphics.fill(densityX, y + 21, densityX + 78, y + 22, accent);
         }
     }
 
     private void renderConfigs(GuiGraphics graphics, int mouseX, int mouseY) {
         int top = viewportTop();
         int inputY = top + 15;
-        drawActionButton(graphics, "SAVE", profileSaveX, inputY, 64, ACCENT, mouseX, mouseY);
+        drawActionButton(graphics, "SAVE", profileSaveX, inputY, 64, accent, mouseX, mouseY);
         drawActionButton(graphics, "LOAD", profileLoadX, inputY, 64, selectedProfile == null ? 0xFF20283A : 0xFF34305C, mouseX, mouseY);
         drawActionButton(graphics, "DELETE", profileDeleteX, inputY, 72, selectedProfile == null ? 0xFF20283A : 0xFF3A2634, mouseX, mouseY);
         graphics.drawString(font, profileStatus, contentX, inputY + 31, profileStatusError ? 0xFFFF858D : 0xFF8993AA);
@@ -367,7 +375,7 @@ public final class ClickGuiScreen extends Screen {
             graphics.drawString(font, module.name(), contentX + 13, rowY + 8, 0xFFE9EDF7);
             graphics.drawString(font, module.category().displayName(), contentX + 13, rowY + 25, 0xFF7F8AA2);
             fillRounded(graphics, contentX + contentWidth - 122, rowY + 10, 108, 24, 6,
-                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? 0xFF393260 : 0xFF1A2236);
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1A2236);
             String binding = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS A KEY" : keyName(module.keyCode());
             int bindingWidth = font.width(binding);
             graphics.drawString(font, binding, contentX + contentWidth - 122 + (108 - bindingWidth) / 2,
@@ -379,6 +387,146 @@ public final class ClickGuiScreen extends Screen {
         }
         graphics.disableScissor();
         drawScrollbar(graphics, top, viewportBottom(), visible * 52 - 8);
+    }
+
+    private void renderTheme(GuiGraphics graphics, int mouseX, int mouseY) {
+        int top = viewportTop() + 8;
+        int columns = 3;
+        int gap = 8;
+        int cardWidth = (contentWidth - 20) / columns;
+        ClientTheme[] themes = ClientTheme.values();
+        for (int i = 0; i < themes.length; i++) {
+            ClientTheme theme = themes[i];
+            int x = contentX + (i % columns) * (cardWidth + gap);
+            int y = top + (i / columns) * 50;
+            boolean selected = config.themeId().equals(theme.id());
+            boolean hovered = mouseX >= x && mouseX <= x + cardWidth && mouseY >= y && mouseY <= y + 42;
+            fillRounded(graphics, x, y, cardWidth, 42, 7,
+                    selected ? accentSurface() : hovered ? CARD_HOVER : CARD);
+            graphics.drawString(font, theme.label(), x + 12, y + 9, 0xFFE8ECF6);
+            graphics.drawString(font, theme.id().toUpperCase(Locale.ROOT), x + 12, y + 24, 0xFF78839B);
+            fillRounded(graphics, x + cardWidth - 32, y + 9, 20, 24, 6, theme.accent());
+            if (selected) {
+                graphics.fill(x + 8, y + 8, x + 10, y + 34, theme.accent());
+            }
+        }
+
+        int panelTop = top + 108;
+        fillRounded(graphics, contentX, panelTop, contentWidth - 4, 184, 8, CARD);
+        graphics.drawString(font, "CUSTOM ACCENT", contentX + 13, panelTop + 13, 0xFFE9EDF7);
+        graphics.drawString(font, "H S B", contentX + 13, panelTop + 28, 0xFF78839B);
+        int swatch = parseAccent(config.customAccent());
+        fillRounded(graphics, contentX + contentWidth - 50, panelTop + 12, 34, 28, 6, swatch);
+        graphics.drawString(font, "#" + config.customAccent(), contentX + contentWidth - 111, panelTop + 22, 0xFFD0D5E2);
+
+        float[] hsb = customHsb();
+        int sliderX = contentX + 140;
+        int sliderWidth = Math.max(96, contentWidth - 185);
+        String[] labels = {"HUE", "SATURATION", "BRIGHTNESS"};
+        for (int i = 0; i < labels.length; i++) {
+            int sliderY = panelTop + 48 + i * 35;
+            renderThemeSlider(graphics, labels[i], i, sliderX, sliderY, sliderWidth, hsb);
+        }
+    }
+
+    private void renderThemeSlider(GuiGraphics graphics, String label, int channel, int x, int y,
+                                   int width, float[] hsb) {
+        graphics.drawString(font, label, contentX + 13, y + 6, 0xFFAEB7CA);
+        int segments = 24;
+        for (int i = 0; i < segments; i++) {
+            float value = (float) i / (segments - 1);
+            float[] sample = hsb.clone();
+            sample[channel] = value;
+            int left = x + width * i / segments;
+            int right = x + width * (i + 1) / segments;
+            graphics.fill(left, y + 8, Math.max(left + 1, right), y + 14, hsbColor(sample));
+        }
+        int knobX = x + Math.round(width * hsb[channel]);
+        graphics.fill(knobX - 2, y + 5, knobX + 3, y + 17, 0xFFF0F2FA);
+        String value = String.format(Locale.ROOT, "%d%%", Math.round(hsb[channel] * 100));
+        graphics.drawString(font, value, x + width + 8, y + 6, 0xFF8993AA);
+    }
+
+    private void selectTheme(String id) {
+        config.setThemeId(id);
+        accent = selectedAccent();
+        config.save(modules);
+    }
+
+    private void updateThemeSlider(int channel, double mouseX) {
+        int x = contentX + 140;
+        int sliderWidth = Math.max(96, contentWidth - 185);
+        float value = (float) Math.max(0.0, Math.min(1.0, (mouseX - x) / sliderWidth));
+        float[] hsb = customHsb();
+        hsb[channel] = value;
+        int rgb = hsbColor(hsb) & 0xFFFFFF;
+        config.setCustomAccent(String.format(Locale.ROOT, "%06X", rgb));
+        config.setThemeId("custom");
+        accent = selectedAccent();
+    }
+
+    private int selectedAccent() {
+        return ClientTheme.resolveAccent(config.themeId(), config.customAccent());
+    }
+
+    private int accentSurface() {
+        int red = 10 + Math.round((((accent >> 16) & 0xFF) - 10) * 0.18F);
+        int green = 14 + Math.round((((accent >> 8) & 0xFF) - 14) * 0.18F);
+        int blue = 27 + Math.round(((accent & 0xFF) - 27) * 0.18F);
+        return 0xFF000000 | (red << 16) | (green << 8) | blue;
+    }
+
+    private static int parseAccent(String value) {
+        try {
+            return 0xFF000000 | Integer.parseInt(value, 16);
+        } catch (NumberFormatException exception) {
+            return ClientTheme.VIOLET.accent();
+        }
+    }
+
+    private float[] customHsb() {
+        int color = parseAccent(config.customAccent());
+        float red = ((color >> 16) & 0xFF) / 255.0F;
+        float green = ((color >> 8) & 0xFF) / 255.0F;
+        float blue = (color & 0xFF) / 255.0F;
+        float max = Math.max(red, Math.max(green, blue));
+        float min = Math.min(red, Math.min(green, blue));
+        float delta = max - min;
+        float hue;
+        if (delta == 0.0F) {
+            hue = 0.0F;
+        } else if (max == red) {
+            hue = ((green - blue) / delta) % 6.0F / 6.0F;
+        } else if (max == green) {
+            hue = ((blue - red) / delta + 2.0F) / 6.0F;
+        } else {
+            hue = ((red - green) / delta + 4.0F) / 6.0F;
+        }
+        if (hue < 0.0F) hue += 1.0F;
+        float saturation = max == 0.0F ? 0.0F : delta / max;
+        return new float[]{hue, saturation, max};
+    }
+
+    private static int hsbColor(float[] hsb) {
+        float hue = (hsb[0] - (float) Math.floor(hsb[0])) * 6.0F;
+        int sector = (int) hue;
+        float fraction = hue - sector;
+        float p = hsb[2] * (1.0F - hsb[1]);
+        float q = hsb[2] * (1.0F - fraction * hsb[1]);
+        float t = hsb[2] * (1.0F - (1.0F - fraction) * hsb[1]);
+        float red;
+        float green;
+        float blue;
+        switch (sector % 6) {
+            case 0 -> { red = hsb[2]; green = t; blue = p; }
+            case 1 -> { red = q; green = hsb[2]; blue = p; }
+            case 2 -> { red = p; green = hsb[2]; blue = t; }
+            case 3 -> { red = p; green = q; blue = hsb[2]; }
+            case 4 -> { red = t; green = p; blue = hsb[2]; }
+            default -> { red = hsb[2]; green = p; blue = q; }
+        }
+        return 0xFF000000 | (Math.round(red * 255.0F) << 16)
+                | (Math.round(green * 255.0F) << 8) | Math.round(blue * 255.0F);
     }
 
     private void drawActionButton(GuiGraphics graphics, String label, int x, int y, int width, int color, int mouseX, int mouseY) {
@@ -405,7 +553,7 @@ public final class ClickGuiScreen extends Screen {
         int scrollRange = contentHeight - viewportHeight;
         int thumbY = top + (scrollRange <= 0 ? 0 : (int) Math.round(thumbTravel * scrollOffset / scrollRange));
         graphics.fill(trackX, top, trackX + 2, bottom, BORDER);
-        fillRounded(graphics, trackX - 1, thumbY, 4, thumbHeight, 2, ACCENT);
+        fillRounded(graphics, trackX - 1, thumbY, 4, thumbHeight, 2, accent);
     }
 
     private void refreshProfiles() {
@@ -488,14 +636,14 @@ public final class ClickGuiScreen extends Screen {
             double fraction = (numberSetting.value() - numberSetting.minimum()) / (numberSetting.maximum() - numberSetting.minimum());
             int filled = (int) Math.round(sliderWidth * fraction);
             graphics.fill(sliderX, y + 8, sliderX + sliderWidth, y + 11, 0xFF41424F);
-            graphics.fill(sliderX, y + 8, sliderX + filled, y + 11, ACCENT);
+            graphics.fill(sliderX, y + 8, sliderX + filled, y + 11, accent);
             graphics.fill(sliderX + filled - 3, y + 5, sliderX + filled + 3, y + 14, 0xFFECE7FF);
             graphics.drawString(font, String.format(Locale.ROOT, "%.1f", numberSetting.value()), sliderX + sliderWidth + 10, y + 3, 0xFFB9B6C6);
         }
     }
 
-    private static void drawToggle(GuiGraphics graphics, int x, int y, boolean enabled) {
-        int color = enabled ? 0xFF7562D8 : 0xFF293247;
+    private void drawToggle(GuiGraphics graphics, int x, int y, boolean enabled) {
+        int color = enabled ? accent : 0xFF293247;
         fillRounded(graphics, x, y, 32, 16, 8, color);
         int knobX = enabled ? x + 19 : x + 3;
         fillRounded(graphics, knobX, y + 3, 10, 10, 5, 0xFFF4F1FB);
@@ -561,14 +709,47 @@ public final class ClickGuiScreen extends Screen {
 
         if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
                 && mouseY >= panelY + 260 && mouseY <= panelY + 284) {
+            setPage(Page.THEME);
+            return true;
+        }
+        if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
+                && mouseY >= panelY + 288 && mouseY <= panelY + 312) {
             setPage(Page.CONFIGS);
             refreshProfiles();
             return true;
         }
         if (mouseX >= panelX + 12 && mouseX <= dividerX - 12
-                && mouseY >= panelY + 288 && mouseY <= panelY + 312) {
+                && mouseY >= panelY + 316 && mouseY <= panelY + 340) {
             setPage(Page.KEYBINDS);
             return true;
+        }
+
+        if (page == Page.THEME) {
+            int top = viewportTop() + 8;
+            int cardWidth = (contentWidth - 20) / 3;
+            ClientTheme[] themes = ClientTheme.values();
+            for (int i = 0; i < themes.length; i++) {
+                int x = contentX + (i % 3) * (cardWidth + 8);
+                int y = top + (i / 3) * 50;
+                if (mouseX >= x && mouseX <= x + cardWidth && mouseY >= y && mouseY <= y + 42) {
+                    selectTheme(themes[i].id());
+                    return true;
+                }
+            }
+
+            int customPanelY = top + 108;
+            int sliderX = contentX + 140;
+            int sliderWidth = Math.max(96, contentWidth - 185);
+            for (int channel = 0; channel < 3; channel++) {
+                int sliderY = customPanelY + 48 + channel * 35;
+                if (mouseX >= sliderX && mouseX <= sliderX + sliderWidth
+                        && mouseY >= sliderY + 4 && mouseY <= sliderY + 19) {
+                    draggingThemeSlider = channel;
+                    updateThemeSlider(channel, mouseX);
+                    return true;
+                }
+            }
+            return false;
         }
 
         if (page == Page.CONFIGS) {
@@ -708,6 +889,10 @@ public final class ClickGuiScreen extends Screen {
         if (super.mouseDragged(event, dragX, dragY)) {
             return true;
         }
+        if (page == Page.THEME && draggingThemeSlider >= 0 && event.button() == 0) {
+            updateThemeSlider(draggingThemeSlider, mouseX);
+            return true;
+        }
         if (page != Page.MODULES || event.button() != 0) {
             return false;
         }
@@ -733,6 +918,16 @@ public final class ClickGuiScreen extends Screen {
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        boolean changedTheme = draggingThemeSlider >= 0;
+        draggingThemeSlider = -1;
+        if (changedTheme) {
+            config.save(modules);
+        }
+        return super.mouseReleased(event);
     }
 
     @Override
@@ -793,6 +988,7 @@ public final class ClickGuiScreen extends Screen {
         int viewportHeight = viewportBottom() - viewportTop();
         int contentHeight = switch (page) {
             case MODULES -> totalContentHeight();
+            case THEME -> 0;
             case CONFIGS -> profiles.size() * 42 - 8;
             case KEYBINDS -> keybindContentHeight();
         };

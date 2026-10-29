@@ -25,7 +25,7 @@ public final class JilatonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
-        HudRenderer hudRenderer = new HudRenderer(MODULES);
+        HudRenderer hudRenderer = new HudRenderer(MODULES, CONFIG);
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("jilaton", "hud"), hudRenderer::render);
         Category category = Category.register(Identifier.fromNamespaceAndPath("jilaton", "main"));
         openGui = KeyBindingHelper.registerKeyBinding(new KeyMapping(

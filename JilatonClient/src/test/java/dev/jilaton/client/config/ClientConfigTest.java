@@ -34,16 +34,21 @@ class ClientConfigTest {
         autoClicker.setKeyCode(67);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
+        config.setThemeId("blue");
+        config.setCustomAccent("12aBef");
         config.save(source);
         assertTrue(Files.isRegularFile(temporaryDirectory.resolve("jilaton.properties")));
 
         ModuleManager restored = new ModuleManager();
-        config.load(restored);
+        ClientConfig restoredConfig = new ClientConfig(temporaryDirectory);
+        restoredConfig.load(restored);
 
         assertEquals(5.1, setting(restored.get("aim_assist"), "range", NumberSetting.class).value(), 0.000001);
         assertEquals(65, restored.get("aim_assist").keyCode());
         assertFalse(setting(restored.get("auto_clicker"), "players_only", BooleanSetting.class).value());
         assertEquals(67, restored.get("auto_clicker").keyCode());
+        assertEquals("blue", restoredConfig.themeId());
+        assertEquals("12ABEF", restoredConfig.customAccent());
     }
 
     @Test
@@ -59,15 +64,20 @@ class ClientConfigTest {
     void savesListsLoadsAndDeletesNamedProfiles() throws Exception {
         ClientConfig config = new ClientConfig(temporaryDirectory);
         ModuleManager source = new ModuleManager();
+        config.setThemeId("rose");
+        config.setCustomAccent("E070A8");
         setting(source.get("aim_assist"), "range", NumberSetting.class).setValue(5.4);
         source.get("auto_clicker").setKeyCode(67);
         config.saveProfile("ranked_1", source);
 
         assertEquals(java.util.List.of("ranked_1"), config.listProfiles());
         ModuleManager restored = new ModuleManager();
-        assertTrue(config.loadProfile("ranked_1", restored));
+        ClientConfig restoredConfig = new ClientConfig(temporaryDirectory);
+        assertTrue(restoredConfig.loadProfile("ranked_1", restored));
         assertEquals(5.4, setting(restored.get("aim_assist"), "range", NumberSetting.class).value(), 0.000001);
         assertEquals(67, restored.get("auto_clicker").keyCode());
+        assertEquals("rose", restoredConfig.themeId());
+        assertEquals("E070A8", restoredConfig.customAccent());
         assertFalse(config.loadProfile("missing", restored));
         assertTrue(config.deleteProfile("ranked_1"));
         assertFalse(config.deleteProfile("ranked_1"));
@@ -80,6 +90,8 @@ class ClientConfigTest {
         assertThrows(IllegalArgumentException.class, () -> config.saveProfile("../outside", new ModuleManager()));
         assertThrows(IllegalArgumentException.class, () -> config.loadProfile("C:\\outside", new ModuleManager()));
         assertThrows(IllegalArgumentException.class, () -> config.deleteProfile(""));
+        assertThrows(IllegalArgumentException.class, () -> config.setThemeId("../theme"));
+        assertThrows(IllegalArgumentException.class, () -> config.setCustomAccent("GGGGGG"));
     }
 
     private static <T extends Setting> T setting(ClientModule module, String id, Class<T> type) {

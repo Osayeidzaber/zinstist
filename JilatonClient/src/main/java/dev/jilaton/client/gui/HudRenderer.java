@@ -1,5 +1,6 @@
 package dev.jilaton.client.gui;
 
+import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.module.impl.HudModule;
@@ -15,17 +16,18 @@ import java.util.List;
 import java.util.Locale;
 
 public final class HudRenderer {
-    private static final int ACCENT = 0xFF9B7BFF;
     private static final int BACKGROUND = 0xB0101118;
     private final ModuleManager modules;
+    private final ClientConfig config;
     private final List<ClientModule> sortedModules;
     private int lastCoordinateX = Integer.MIN_VALUE;
     private int lastCoordinateY = Integer.MIN_VALUE;
     private int lastCoordinateZ = Integer.MIN_VALUE;
     private String cachedCoordinates = "";
 
-    public HudRenderer(ModuleManager modules) {
+    public HudRenderer(ModuleManager modules, ClientConfig config) {
         this.modules = modules;
+        this.config = config;
         sortedModules = new ArrayList<>(modules.all());
         sortedModules.sort(Comparator.comparing(ClientModule::name, String.CASE_INSENSITIVE_ORDER));
     }
@@ -38,12 +40,13 @@ public final class HudRenderer {
         }
 
         Font font = client.font;
+        int accent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
         int top = 8;
         if (hud.watermark()) {
             String version = "JILATON";
             int width = font.width(version) + 20;
             drawPanel(graphics, 8, top, width, 22);
-            graphics.fill(8, top, 10, top + 22, ACCENT);
+            graphics.fill(8, top, 10, top + 22, accent);
             graphics.drawString(font, version, 16, top + 7, 0xFFF4F1FA);
             top += 28;
         }
@@ -56,7 +59,7 @@ public final class HudRenderer {
                 String label = active.name();
                 int width = font.width(label) + 18;
                 drawPanel(graphics, 8, top, width, 18);
-                graphics.fill(8, top, 10, top + 18, ACCENT);
+                graphics.fill(8, top, 10, top + 18, accent);
                 graphics.drawString(font, label, 15, top + 5, 0xFFE3E0EC);
                 top += 20;
             }

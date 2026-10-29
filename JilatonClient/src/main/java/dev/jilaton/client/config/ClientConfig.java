@@ -16,13 +16,17 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.Properties;
 
 public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
+    private static final Set<String> THEME_IDS = Set.of("violet", "blue", "cyan", "rose", "amber", "custom");
     private final Path path;
     private final Path profilesDirectory;
+    private String themeId = "violet";
+    private String customAccent = "8878FF";
 
     public ClientConfig(Path configDirectory) {
         this.path = configDirectory.resolve("jilaton.properties");
@@ -42,6 +46,28 @@ public final class ClientConfig {
         } catch (IOException exception) {
             System.err.println("Jilaton could not save its configuration: " + exception.getMessage());
         }
+    }
+
+    public String themeId() {
+        return themeId;
+    }
+
+    public void setThemeId(String themeId) {
+        if (themeId == null || !THEME_IDS.contains(themeId)) {
+            throw new IllegalArgumentException("Unknown Jilaton theme: " + themeId);
+        }
+        this.themeId = themeId;
+    }
+
+    public String customAccent() {
+        return customAccent;
+    }
+
+    public void setCustomAccent(String customAccent) {
+        if (customAccent == null || !customAccent.matches("[0-9A-Fa-f]{6}")) {
+            throw new IllegalArgumentException("Accent color must be six hexadecimal digits");
+        }
+        this.customAccent = customAccent.toUpperCase(java.util.Locale.ROOT);
     }
 
     public List<String> listProfiles() throws IOException {
@@ -80,6 +106,23 @@ public final class ClientConfig {
     }
 
     private void apply(Properties values, ModuleManager modules) {
+        String configuredTheme = values.getProperty("ui.theme");
+        if (configuredTheme != null) {
+            try {
+                setThemeId(configuredTheme);
+            } catch (IllegalArgumentException exception) {
+                System.err.println("Jilaton ignored invalid UI theme");
+            }
+        }
+        String configuredAccent = values.getProperty("ui.custom_accent");
+        if (configuredAccent != null) {
+            try {
+                setCustomAccent(configuredAccent);
+            } catch (IllegalArgumentException exception) {
+                System.err.println("Jilaton ignored invalid custom accent color");
+            }
+        }
+
         for (ClientModule module : modules.all()) {
             for (Setting setting : module.settings()) {
                 String key = settingKey(module, setting);
@@ -123,8 +166,10 @@ public final class ClientConfig {
         }
     }
 
-    private static Properties snapshot(ModuleManager modules) {
+    private Properties snapshot(ModuleManager modules) {
         Properties values = new Properties();
+        values.setProperty("ui.theme", themeId);
+        values.setProperty("ui.custom_accent", customAccent);
         for (ClientModule module : modules.all()) {
             values.setProperty("module." + module.id() + ".enabled", Boolean.toString(module.enabled()));
             values.setProperty("module." + module.id() + ".keycode", Integer.toString(module.keyCode()));
