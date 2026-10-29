@@ -39,6 +39,9 @@ class ClientConfigTest {
         setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
         setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
         setting(source.get("swing_animations"), "mode", ChoiceSetting.class).setValue("Power");
+        setting(source.get("kill_aura"), "players", BooleanSetting.class).setValue(false);
+        setting(source.get("kill_aura"), "hostiles", BooleanSetting.class).setValue(true);
+        setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -60,6 +63,9 @@ class ClientConfigTest {
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
         assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("Power", setting(restored.get("swing_animations"), "mode", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "players", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("kill_aura"), "hostiles", BooleanSetting.class).value());
+        assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
         assertEquals(new ClientConfig.HudPosition(0.37, 0.68), restoredConfig.hudPosition("watermark"));
