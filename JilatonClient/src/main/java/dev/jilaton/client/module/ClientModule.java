@@ -2,6 +2,7 @@ package dev.jilaton.client.module;
 
 import dev.jilaton.client.setting.Setting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.protocol.Packet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,6 +134,51 @@ public abstract class ClientModule {
         }
     }
 
+    public final void handleMovementInput(MovementInputEvent event) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            onMovementInput(event);
+        } catch (Throwable failure) {
+            LOGGER.error("Module '{}' failed while handling movement input and will be disabled", id, failure);
+            setEnabled(false);
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+    }
+
+    public final void handlePlayerMove(PlayerMoveEvent event) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            onPlayerMove(event);
+        } catch (Throwable failure) {
+            LOGGER.error("Module '{}' failed while handling player movement and will be disabled", id, failure);
+            setEnabled(false);
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+    }
+
+    public final void handleOutgoingPacket(Packet<?> packet) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            onOutgoingPacket(packet);
+        } catch (Throwable failure) {
+            LOGGER.error("Module '{}' failed while handling an outgoing packet and will be disabled", id, failure);
+            setEnabled(false);
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+    }
+
     protected void onEnable(Minecraft client) {
     }
 
@@ -140,5 +186,14 @@ public abstract class ClientModule {
     }
 
     protected void onTick(Minecraft client) {
+    }
+
+    protected void onMovementInput(MovementInputEvent event) {
+    }
+
+    protected void onPlayerMove(PlayerMoveEvent event) {
+    }
+
+    protected void onOutgoingPacket(Packet<?> packet) {
     }
 }
