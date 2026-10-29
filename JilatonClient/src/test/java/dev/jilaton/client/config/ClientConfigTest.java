@@ -36,6 +36,7 @@ class ClientConfigTest {
         ClientModule autoGapple = source.get("auto_gapple");
         setting(autoGapple, "health_threshold", NumberSetting.class).setValue(7.5);
         setting(autoGapple, "enchanted_apples", BooleanSetting.class).setValue(false);
+        setting(source.get("hud"), "keystrokes", BooleanSetting.class).setValue(true);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -53,6 +54,7 @@ class ClientConfigTest {
         assertEquals(67, restored.get("auto_clicker").keyCode());
         assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("hud"), "keystrokes", BooleanSetting.class).value());
         assertEquals("blue", restoredConfig.themeId());
         assertEquals("12ABEF", restoredConfig.customAccent());
     }

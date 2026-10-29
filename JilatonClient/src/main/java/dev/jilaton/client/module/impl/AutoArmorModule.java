@@ -15,6 +15,9 @@ import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.equipment.Equippable;
 
 public final class AutoArmorModule extends ClientModule {
+    private static final EquipmentSlot[] ARMOR_SLOTS = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
+    };
     private final NumberSetting minimumUpgrade;
     private long nextEquipTick;
 
@@ -37,12 +40,12 @@ public final class AutoArmorModule extends ClientModule {
     protected void onTick(Minecraft client) {
         Player player = client.player;
         if (player == null || client.level == null || client.gameMode == null || client.screen != null
-                || player.containerMenu != player.inventoryMenu || client.level.getGameTime() < nextEquipTick) {
+                || player.containerMenu != player.inventoryMenu || !player.inventoryMenu.getCarried().isEmpty()
+                || client.level.getGameTime() < nextEquipTick) {
             return;
         }
 
-        for (EquipmentSlot equipmentSlot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST,
-                EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+        for (EquipmentSlot equipmentSlot : ARMOR_SLOTS) {
             ItemStack current = player.getItemBySlot(equipmentSlot);
             double currentScore = armorScore(current, equipmentSlot);
             int bestInventorySlot = -1;

@@ -9,6 +9,7 @@ public final class HudModule extends ClientModule {
     private final BooleanSetting activeModules;
     private final BooleanSetting performance;
     private final BooleanSetting coordinates;
+    private final BooleanSetting keystrokes;
 
     public HudModule() {
         super("hud", "HUD", "Controls Jilaton's on-screen status elements.", ModuleCategory.CLIENT);
@@ -16,6 +17,7 @@ public final class HudModule extends ClientModule {
         activeModules = addSetting(new BooleanSetting("active_modules", "Active modules", true));
         performance = addSetting(new BooleanSetting("performance", "FPS and ping", true));
         coordinates = addSetting(new BooleanSetting("coordinates", "Coordinates", true));
+        keystrokes = addSetting(new BooleanSetting("keystrokes", "Keystrokes", false));
     }
 
     @Override
@@ -37,5 +39,9 @@ public final class HudModule extends ClientModule {
 
     public boolean coordinates() {
         return coordinates.value();
+    }
+
+    public boolean keystrokes() {
+        return keystrokes.value();
     }
 }

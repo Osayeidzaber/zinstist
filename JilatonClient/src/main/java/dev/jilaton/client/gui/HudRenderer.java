@@ -82,6 +82,10 @@ public final class HudRenderer {
             drawPanel(graphics, x, y, width, 21);
             graphics.drawString(font, coordinates, x + 9, y + 7, 0xFFE3E0EC);
         }
+
+        if (hud.keystrokes()) {
+            renderKeystrokes(graphics, client, accent);
+        }
     }
 
     private static String ping(Minecraft client) {
@@ -103,6 +107,32 @@ public final class HudRenderer {
             cachedCoordinates = String.format(Locale.ROOT, "X %.1f   Y %.1f   Z %.1f", x / 10.0, y / 10.0, z / 10.0);
         }
         return cachedCoordinates;
+    }
+
+    private static void renderKeystrokes(GuiGraphics graphics, Minecraft client, int accent) {
+        int x = 8;
+        int y = graphics.guiHeight() - 104;
+        Font font = client.font;
+        drawKey(graphics, font, client.options.keyUp, x + 24, y, 22, 19, accent);
+        drawKey(graphics, font, client.options.keyLeft, x, y + 21, 22, 19, accent);
+        drawKey(graphics, font, client.options.keyDown, x + 24, y + 21, 22, 19, accent);
+        drawKey(graphics, font, client.options.keyRight, x + 48, y + 21, 22, 19, accent);
+        drawKey(graphics, font, client.options.keyJump, x, y + 42, 70, 16, accent);
+    }
+
+    private static void drawKey(GuiGraphics graphics, Font font, net.minecraft.client.KeyMapping mapping,
+                                int x, int y, int width, int height, int accent) {
+        boolean down = mapping.isDown();
+        graphics.fill(x, y, x + width, y + height, down ? 0xCC24203D : BACKGROUND);
+        if (down) {
+            graphics.fill(x, y, x + width, y + 2, accent);
+        }
+        String label = mapping.getTranslatedKeyMessage().getString().toUpperCase(Locale.ROOT);
+        if (width <= 22 && label.length() > 3) {
+            label = label.substring(0, 3);
+        }
+        int labelX = x + (width - font.width(label)) / 2;
+        graphics.drawString(font, label, labelX, y + (height - 8) / 2, down ? 0xFFF4F1FA : 0xFF9AA3B9);
     }
 
     private static void drawPanel(GuiGraphics graphics, int x, int y, int width, int height) {
