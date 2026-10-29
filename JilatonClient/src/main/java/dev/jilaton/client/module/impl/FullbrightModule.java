@@ -6,16 +6,12 @@ import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 
 public final class FullbrightModule extends ClientModule {
-    private final NumberSetting brightness = new NumberSetting("brightness", "Brightness", 1.0, 16.0, 0.5, 12.0);
+    private final NumberSetting brightness;
     private double previousGamma = 1.0;
 
     public FullbrightModule() {
         super("fullbright", "Fullbright", "Raises local gamma while enabled.", ModuleCategory.RENDER);
-    }
-
-    @Override
-    public java.util.List<dev.jilaton.client.setting.Setting> settings() {
-        return java.util.List.of(brightness);
+        brightness = addSetting(new NumberSetting("brightness", "Brightness", 1.0, 16.0, 0.5, 12.0));
     }
 
     @Override

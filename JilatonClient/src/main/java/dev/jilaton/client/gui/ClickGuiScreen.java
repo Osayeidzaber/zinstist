@@ -78,7 +78,7 @@ public final class ClickGuiScreen extends Screen {
         graphics.fill(dividerX, panelY + 70, dividerX + 1, panelY + panelHeight - 20, 0xFF292A34);
         graphics.drawString(font, "LIBRARY", panelX + 22, panelY + 76, 0xFF777986);
 
-        String[] categories = {"All", "Movement", "Visuals"};
+        String[] categories = {"All", "Combat", "Movement", "Visuals"};
         int rowY = panelY + 95;
         for (String category : categories) {
             int rowX = panelX + 14;
@@ -177,7 +177,7 @@ public final class ClickGuiScreen extends Screen {
             return true;
         }
         int dividerX = contentX - 20;
-        String[] categories = {"All", "Movement", "Visuals"};
+        String[] categories = {"All", "Combat", "Movement", "Visuals"};
         int rowY = panelY + 95;
         for (String category : categories) {
             if (mouseX >= panelX + 14 && mouseX <= dividerX - 10 && mouseY >= rowY - 6 && mouseY <= rowY + 16) {

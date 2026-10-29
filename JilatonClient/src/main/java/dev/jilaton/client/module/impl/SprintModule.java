@@ -6,15 +6,11 @@ import dev.jilaton.client.setting.BooleanSetting;
 import net.minecraft.client.Minecraft;
 
 public final class SprintModule extends ClientModule {
-    private final BooleanSetting forwardOnly = new BooleanSetting("forward_only", "Forward input only", true);
+    private final BooleanSetting forwardOnly;
 
     public SprintModule() {
         super("sprint", "Sprint", "Automatically sprint while moving.", ModuleCategory.MOVEMENT);
-    }
-
-    @Override
-    public java.util.List<dev.jilaton.client.setting.Setting> settings() {
-        return java.util.List.of(forwardOnly);
+        forwardOnly = addSetting(new BooleanSetting("forward_only", "Forward input only", true));
     }
 
     @Override

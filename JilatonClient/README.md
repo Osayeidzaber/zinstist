@@ -1,6 +1,6 @@
 # Jilaton Client
 
-Jilaton Client is an original Java/Fabric project. Its first increment establishes a clean build, a small lifecycle-aware module system, persistent settings, and a functional in-game control screen. The user supplied Anubis 0.9.9.3 JAR was inspected only as a static reference; neither it nor the other supplied client JARs were executed or included in the build.
+Jilaton Client is a Java/Fabric client in active development. The current build contains a lifecycle-aware module/settings system, persistent configuration, and a searchable in-game control screen, with Sprint, Fullbright, AimAssist, AutoClicker, and Triggerbot modules. The user supplied Anubis 0.9.9.3 JAR was inspected only as a static reference; neither it nor the other supplied client JARs were executed or included in the build. The JAR has not yet been run in Minecraft.
 
 Anubis source recovery is retained under `reference/` for attribution and investigation. It is not part of Jilaton's source set. The supplied JAR declares GPL-3.0-only; see `LICENSE` and `ATTRIBUTION.md`. Jilaton's new implementation does not copy recovered source or proprietary client assets.
 

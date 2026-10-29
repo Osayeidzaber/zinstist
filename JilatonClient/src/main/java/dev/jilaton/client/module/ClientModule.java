@@ -2,21 +2,46 @@ package dev.jilaton.client.module;
 
 import dev.jilaton.client.setting.Setting;
 import net.minecraft.client.Minecraft;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public abstract class ClientModule {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton");
     private final String id;
     private final String name;
     private final String description;
     private final ModuleCategory category;
+    private final List<Setting> settings = new ArrayList<>();
+    private final List<Setting> settingsView = Collections.unmodifiableList(settings);
     private boolean enabled;
 
     protected ClientModule(String id, String name, String description, ModuleCategory category) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.category = category;
+        this.id = requireId(id);
+        this.name = Objects.requireNonNull(name, "name");
+        this.description = Objects.requireNonNull(description, "description");
+        this.category = Objects.requireNonNull(category, "category");
+    }
+
+    private static String requireId(String id) {
+        Objects.requireNonNull(id, "id");
+        if (!id.matches("[a-z0-9][a-z0-9_-]*")) {
+            throw new IllegalArgumentException("Module ids must be stable lowercase identifiers: " + id);
+        }
+        return id;
+    }
+
+    protected final <S extends Setting> S addSetting(S setting) {
+        Objects.requireNonNull(setting, "setting");
+        if (settings.stream().anyMatch(existing -> existing.id().equals(setting.id()))) {
+            throw new IllegalArgumentException("Duplicate setting id: " + id + "/" + setting.id());
+        }
+        settings.add(setting);
+        return setting;
     }
 
     public final String id() {
@@ -36,7 +61,7 @@ public abstract class ClientModule {
     }
 
     public List<Setting> settings() {
-        return List.of();
+        return settingsView;
     }
 
     public final boolean enabled() {
@@ -48,11 +73,26 @@ public abstract class ClientModule {
             return;
         }
         if (enabled) {
-            onEnable(Minecraft.getInstance());
-            this.enabled = true;
+            try {
+                onEnable(Minecraft.getInstance());
+                this.enabled = true;
+            } catch (Throwable failure) {
+                this.enabled = false;
+                try {
+                    onDisable(Minecraft.getInstance());
+                } catch (Throwable cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+                LOGGER.error("Module '{}' failed to enable and was rolled back", id, failure);
+                if (failure instanceof Error error) {
+                    throw error;
+                }
+            }
         } else {
             try {
                 onDisable(Minecraft.getInstance());
+            } catch (Throwable failure) {
+                LOGGER.error("Module '{}' failed while disabling", id, failure);
             } finally {
                 this.enabled = false;
             }
@@ -65,7 +105,15 @@ public abstract class ClientModule {
 
     public final void tick(Minecraft client) {
         if (enabled) {
-            onTick(client);
+            try {
+                onTick(client);
+            } catch (Throwable failure) {
+                LOGGER.error("Module '{}' failed while ticking and will be disabled", id, failure);
+                setEnabled(false);
+                if (failure instanceof Error error) {
+                    throw error;
+                }
+            }
         }
     }
 
