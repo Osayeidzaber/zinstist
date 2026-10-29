@@ -1,19 +1,18 @@
 package dev.jilaton.client.module;
 
-import dev.jilaton.client.module.impl.FullbrightModule;
-import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AimAssistModule;
-import dev.jilaton.client.module.impl.AutoTotemModule;
-import dev.jilaton.client.module.impl.TriggerbotModule;
-import dev.jilaton.client.module.impl.HudModule;
+import dev.jilaton.client.module.impl.AutoClickerModule;
 import dev.jilaton.client.module.impl.AutoArmorModule;
+import dev.jilaton.client.module.impl.AutoTotemModule;
+import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.HudModule;
 import dev.jilaton.client.module.impl.SprintModule;
+import dev.jilaton.client.module.impl.TriggerbotModule;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

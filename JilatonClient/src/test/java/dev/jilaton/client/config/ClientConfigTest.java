@@ -13,6 +13,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClientConfigTest {
@@ -52,6 +53,33 @@ class ClientConfigTest {
         assertEquals(1.0, setting.value(), 0.000001);
         setting.setValue(-4.0);
         assertEquals(0.0, setting.value(), 0.000001);
+    }
+
+    @Test
+    void savesListsLoadsAndDeletesNamedProfiles() throws Exception {
+        ClientConfig config = new ClientConfig(temporaryDirectory);
+        ModuleManager source = new ModuleManager();
+        setting(source.get("aim_assist"), "range", NumberSetting.class).setValue(5.4);
+        source.get("auto_clicker").setKeyCode(67);
+        config.saveProfile("ranked_1", source);
+
+        assertEquals(java.util.List.of("ranked_1"), config.listProfiles());
+        ModuleManager restored = new ModuleManager();
+        assertTrue(config.loadProfile("ranked_1", restored));
+        assertEquals(5.4, setting(restored.get("aim_assist"), "range", NumberSetting.class).value(), 0.000001);
+        assertEquals(67, restored.get("auto_clicker").keyCode());
+        assertFalse(config.loadProfile("missing", restored));
+        assertTrue(config.deleteProfile("ranked_1"));
+        assertFalse(config.deleteProfile("ranked_1"));
+        assertTrue(config.listProfiles().isEmpty());
+    }
+
+    @Test
+    void rejectsProfileNamesThatCouldEscapeTheProfileDirectory() {
+        ClientConfig config = new ClientConfig(temporaryDirectory);
+        assertThrows(IllegalArgumentException.class, () -> config.saveProfile("../outside", new ModuleManager()));
+        assertThrows(IllegalArgumentException.class, () -> config.loadProfile("C:\\outside", new ModuleManager()));
+        assertThrows(IllegalArgumentException.class, () -> config.deleteProfile(""));
     }
 
     private static <T extends Setting> T setting(ClientModule module, String id, Class<T> type) {
