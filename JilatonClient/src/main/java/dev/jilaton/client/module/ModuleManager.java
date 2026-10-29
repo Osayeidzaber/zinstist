@@ -1,0 +1,134 @@
+package dev.jilaton.client.module;
+
+import dev.jilaton.client.module.impl.AimAssistModule;
+import dev.jilaton.client.module.impl.AntiBotModule;
+import dev.jilaton.client.module.impl.AnchorAuraModule;
+import dev.jilaton.client.module.impl.AutoAnchorModule;
+import dev.jilaton.client.module.impl.AutoArmorModule;
+import dev.jilaton.client.module.impl.AutoClickerModule;
+import dev.jilaton.client.module.impl.AutoGappleModule;
+import dev.jilaton.client.module.impl.AutoPotModule;
+import dev.jilaton.client.module.impl.AutoTotemModule;
+import dev.jilaton.client.module.impl.CrystalAuraModule;
+import dev.jilaton.client.module.impl.CriticalsModule;
+import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.FriendsModule;
+import dev.jilaton.client.module.impl.HitboxModule;
+import dev.jilaton.client.module.impl.HudModule;
+import dev.jilaton.client.module.impl.KillAuraModule;
+import dev.jilaton.client.module.impl.NoBobModule;
+import dev.jilaton.client.module.impl.NoSlowModule;
+import dev.jilaton.client.module.impl.ParkourModule;
+import dev.jilaton.client.module.impl.ReachModule;
+import dev.jilaton.client.module.impl.SprintModule;
+import dev.jilaton.client.module.impl.SwingAnimationsModule;
+import dev.jilaton.client.module.impl.TriggerbotModule;
+import dev.jilaton.client.module.impl.TeamsModule;
+import dev.jilaton.client.module.impl.TargetStrafeModule;
+import dev.jilaton.client.module.impl.VelocityModule;
+import dev.jilaton.client.module.impl.WTapModule;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.player.Input;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public final class ModuleManager {
+    private final Map<String, ClientModule> modules = new LinkedHashMap<>();
+    private final Collection<ClientModule> modulesView = Collections.unmodifiableCollection(modules.values());
+    private final Map<String, Boolean> previousKeyStates = new HashMap<>();
+
+    public ModuleManager() {
+        register(new AntiBotModule());
+        register(new FriendsModule());
+        register(new TeamsModule());
+        register(new AimAssistModule());
+        register(new KillAuraModule());
+        register(new HitboxModule());
+        register(new ReachModule());
+        register(new CriticalsModule());
+        register(new CrystalAuraModule());
+        register(new AutoAnchorModule());
+        register(new AnchorAuraModule());
+        register(new TriggerbotModule());
+        register(new VelocityModule());
+        register(new WTapModule());
+        register(new TargetStrafeModule());
+        register(new AutoClickerModule());
+        register(new AutoTotemModule());
+        register(new AutoPotModule());
+        register(new AutoGappleModule());
+        register(new AutoArmorModule());
+        register(new SprintModule());
+        register(new ParkourModule());
+        register(new NoSlowModule());
+        register(new FullbrightModule());
+        register(new SwingAnimationsModule());
+        register(new NoBobModule());
+        register(new HudModule());
+    }
+
+    private void register(ClientModule module) {
+        if (modules.putIfAbsent(module.id(), module) != null) {
+            throw new IllegalStateException("Duplicate module id: " + module.id());
+        }
+    }
+
+    public Collection<ClientModule> all() {
+        return modulesView;
+    }
+
+    public ClientModule get(String id) {
+        return modules.get(id);
+    }
+
+    public void tick(Minecraft client) {
+        updateKeybinds(client);
+        modules.values().forEach(module -> module.tick(client));
+    }
+
+    public Input handleMovementInput(Input input) {
+        MovementInputEvent event = dispatchMovementInput(input);
+        return event == null ? input : event.input();
+    }
+
+    public MovementInputEvent dispatchMovementInput(Input input) {
+        MovementInputEvent event = null;
+        for (ClientModule module : modules.values()) {
+            if (!module.enabled()) {
+                continue;
+            }
+            if (event == null) {
+                event = new MovementInputEvent(input);
+            }
+            module.handleMovementInput(event);
+        }
+        return event;
+    }
+
+    public void disableAll() {
+        modules.values().forEach(module -> module.setEnabled(false));
+    }
+
+    private void updateKeybinds(Minecraft client) {
+        if (client.screen != null || client.getWindow() == null) {
+            previousKeyStates.replaceAll((id, wasDown) -> false);
+            return;
+        }
+
+        long window = client.getWindow().handle();
+        for (ClientModule module : modules.values()) {
+            int keyCode = module.keyCode();
+            boolean down = keyCode >= 0 && GLFW.glfwGetKey(window, keyCode) == GLFW.GLFW_PRESS;
+            boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
+            if (down && !wasDown) {
+                module.toggle();
+            }
+            previousKeyStates.put(module.id(), down);
+        }
+    }
+}
