@@ -33,4 +33,8 @@ public final class ModuleManager {
     public void tick(Minecraft client) {
         modules.values().forEach(module -> module.tick(client));
     }
+
+    public void disableAll() {
+        modules.values().forEach(module -> module.setEnabled(false));
+    }
 }
