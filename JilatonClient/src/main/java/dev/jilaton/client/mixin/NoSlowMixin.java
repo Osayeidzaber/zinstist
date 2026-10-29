@@ -25,7 +25,9 @@ public abstract class NoSlowMixin {
         NoSlowModule module = noSlowModule();
         return NoSlowPolicy.itemUseMultiplier(module != null && module.enabled(),
                 module != null && module.removeItemSlowdown(),
-                module == null ? 1.0 : module.itemUseScale(), originalMultiplier);
+                module == null ? 1.0 : module.itemUseScale(),
+                module == null ? 1.0 : module.scaleFor(((LocalPlayer) (Object) this)
+                        .getUseItem().getUseAnimation()), originalMultiplier);
     }
 
     @Redirect(

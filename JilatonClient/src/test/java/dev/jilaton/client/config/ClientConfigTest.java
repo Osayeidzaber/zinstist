@@ -60,6 +60,8 @@ class ClientConfigTest {
         setting(source.get("safe_walk"), "edge_distance", NumberSetting.class).setValue(0.45);
         setting(source.get("safe_walk"), "keep_ticks", NumberSetting.class).setValue(3.0);
         setting(source.get("no_slow"), "item_use_scale", NumberSetting.class).setValue(0.65);
+        setting(source.get("no_slow"), "consume_scale", NumberSetting.class).setValue(0.4);
+        setting(source.get("no_slow"), "block_scale", NumberSetting.class).setValue(1.6);
         setting(source.get("auto_weapon"), "preference", ChoiceSetting.class).setValue("Axe");
         setting(source.get("auto_weapon"), "mace_smash", BooleanSetting.class).setValue(false);
         setting(source.get("auto_weapon"), "switch_back_delay", NumberSetting.class).setValue(4.0);
@@ -104,6 +106,8 @@ class ClientConfigTest {
         assertEquals(0.45, setting(restored.get("safe_walk"), "edge_distance", NumberSetting.class).value(), 0.000001);
         assertEquals(3.0, setting(restored.get("safe_walk"), "keep_ticks", NumberSetting.class).value(), 0.000001);
         assertEquals(0.65, setting(restored.get("no_slow"), "item_use_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals(0.4, setting(restored.get("no_slow"), "consume_scale", NumberSetting.class).value(), 0.000001);
+        assertEquals(1.6, setting(restored.get("no_slow"), "block_scale", NumberSetting.class).value(), 0.000001);
         assertEquals("Axe", setting(restored.get("auto_weapon"), "preference", ChoiceSetting.class).value());
         assertFalse(setting(restored.get("auto_weapon"), "mace_smash", BooleanSetting.class).value());
         assertEquals(4.0, setting(restored.get("auto_weapon"), "switch_back_delay", NumberSetting.class).value(), 0.000001);

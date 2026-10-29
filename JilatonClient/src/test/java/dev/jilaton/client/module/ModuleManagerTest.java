@@ -69,7 +69,7 @@ class ModuleManagerTest {
 
         assertEquals(ModuleCategory.MOVEMENT, noSlow.category());
         assertFalse(noSlow.enabled());
-        assertEquals(3, noSlow.settings().size());
+        assertEquals(9, noSlow.settings().size());
         assertEquals(1.0, ((NumberSetting) noSlow.settings().stream()
                 .filter(setting -> setting.id().equals("item_use_scale")).findFirst().orElseThrow()).value());
     }
