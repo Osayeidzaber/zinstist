@@ -1,7 +1,7 @@
 # Jilaton Client
 
-This repository begins with a preserved static recovery snapshot of the supplied Anubis 0.9.9.3 JAR. It is not the original Anubis source checkout and is not currently a buildable project. The recovered Java files were produced by CFR 0.152 and must be treated as imperfect decompiler output.
+Jilaton Client is an original Java/Fabric project. Its first increment establishes a clean build, a small lifecycle-aware module system, persistent settings, and a functional in-game control screen. The user supplied Anubis 0.9.9.3 JAR was inspected only as a static reference; neither it nor the other supplied client JARs were executed or included in the build.
 
-The Anubis JAR declares GPL-3.0-only and names Horcus and 4ldenz on the project site. See `LICENSE` and `ATTRIBUTION.md`. Any derivative distributed from this base must preserve applicable GPL notices and source obligations. No proprietary client code or assets are included.
+Anubis source recovery is retained under `reference/` for attribution and investigation. It is not part of Jilaton's source set. The supplied JAR declares GPL-3.0-only; see `LICENSE` and `ATTRIBUTION.md`. Jilaton's new implementation does not copy recovered source or proprietary client assets.
 
-The retained original JAR remains outside this repository. No untrusted JAR was executed.
+The retained Anubis JAR and analysis artifacts remain outside the build source set. No untrusted JAR was executed.
