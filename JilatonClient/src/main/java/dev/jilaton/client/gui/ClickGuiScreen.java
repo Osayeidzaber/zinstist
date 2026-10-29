@@ -10,8 +10,11 @@ import dev.jilaton.client.setting.Setting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import com.mojang.blaze3d.platform.InputConstants;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -27,12 +30,16 @@ public final class ClickGuiScreen extends Screen {
     private final Set<String> expanded = new HashSet<>();
     private EditBox search;
     private String selectedCategory = "All";
+    private String bindingModuleId;
     private int panelX;
     private int panelY;
     private int panelWidth;
     private int panelHeight;
     private int contentX;
     private int contentWidth;
+    private double scrollOffset;
+    private double targetScrollOffset;
+    private long lastFrameNanos;
 
     public ClickGuiScreen(ModuleManager modules, ClientConfig config) {
         super(Component.literal("Jilaton Client"));
@@ -51,11 +58,26 @@ public final class ClickGuiScreen extends Screen {
         contentWidth = panelWidth - sidebarWidth - 40;
         search = new EditBox(font, contentX, panelY + 39, Math.max(110, contentWidth - 8), 20, Component.literal("Search modules"));
         search.setHint(Component.literal("Search modules"));
+        search.setResponder(value -> {
+            targetScrollOffset = 0.0;
+            scrollOffset = 0.0;
+        });
         addRenderableWidget(search);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        long now = System.nanoTime();
+        double frameSeconds = lastFrameNanos == 0L ? 0.0 : Math.min(0.05, (now - lastFrameNanos) / 1_000_000_000.0);
+        lastFrameNanos = now;
+        int maxScroll = maximumScroll();
+        targetScrollOffset = Math.max(0.0, Math.min(maxScroll, targetScrollOffset));
+        double animation = 1.0 - Math.exp(-frameSeconds / 0.075);
+        scrollOffset += (targetScrollOffset - scrollOffset) * animation;
+        if (Math.abs(targetScrollOffset - scrollOffset) < 0.15) {
+            scrollOffset = targetScrollOffset;
+        }
+
         graphics.fill(0, 0, width, height, 0x9906080D);
         graphics.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, PANEL);
         graphics.fill(panelX, panelY, panelX + panelWidth, panelY + 2, ACCENT);
@@ -69,7 +91,8 @@ public final class ClickGuiScreen extends Screen {
     private void renderHeader(GuiGraphics graphics) {
         graphics.drawString(font, "JILATON", panelX + 22, panelY + 20, 0xFFF5F2FF);
         graphics.drawString(font, "CLIENT", panelX + 88, panelY + 20, ACCENT);
-        graphics.drawString(font, "PVP  /  CUSTOMIZE", panelX + 22, panelY + 36, 0xFF777986);
+        String status = bindingModuleId == null ? "PVP  /  CUSTOMIZE" : "PRESS KEY  ·  ESC CANCEL  ·  DEL CLEAR";
+        graphics.drawString(font, status, panelX + 22, panelY + 36, bindingModuleId == null ? 0xFF777986 : ACCENT);
     }
 
     private void renderSidebar(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -100,10 +123,15 @@ public final class ClickGuiScreen extends Screen {
 
     private void renderModules(GuiGraphics graphics, int mouseX, int mouseY) {
         String query = search.getValue().trim().toLowerCase(Locale.ROOT);
-        int cardY = panelY + 75;
+        int viewportTop = panelY + 75;
+        int viewportBottom = panelY + panelHeight - 18;
+        int viewportHeight = viewportBottom - viewportTop;
+        int cardY = viewportTop - (int) Math.round(scrollOffset);
         int cardX = contentX;
         int cardWidth = contentWidth - 8;
         boolean any = false;
+
+        graphics.enableScissor(cardX, viewportTop, cardX + cardWidth, viewportBottom);
 
         for (ClientModule module : modules.all()) {
             if (!matches(module, query)) {
@@ -124,7 +152,15 @@ public final class ClickGuiScreen extends Screen {
             graphics.drawString(font, module.description(), cardX + 14, cardY + 32, 0xFF9A9BA8);
             graphics.drawString(font, module.category().displayName().toUpperCase(Locale.ROOT), cardX + 14, cardY + 52, 0xFF777986);
             drawToggle(graphics, cardX + cardWidth - 48, cardY + 14, module.enabled());
-            graphics.drawString(font, isExpanded ? "−" : "+", cardX + cardWidth - 78, cardY + 15, 0xFFA8A9B5);
+            graphics.fill(cardX + cardWidth - 108, cardY + 12, cardX + cardWidth - 58, cardY + 32,
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? 0xFF42345E : 0xFF30313C);
+            String keyName = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS" : keyName(module.keyCode());
+            if (keyName.length() > 6) {
+                keyName = keyName.substring(0, 5) + "…";
+            }
+            int keyTextX = cardX + cardWidth - 108 + (50 - font.width(keyName)) / 2;
+            graphics.drawString(font, keyName, keyTextX, cardY + 18, 0xFFE2DDF3);
+            graphics.drawString(font, isExpanded ? "−" : "+", cardX + cardWidth - 137, cardY + 15, 0xFFA8A9B5);
 
             if (isExpanded) {
                 int settingY = cardY + baseHeight + 8;
@@ -137,7 +173,21 @@ public final class ClickGuiScreen extends Screen {
         }
 
         if (!any) {
-            graphics.drawString(font, "No modules match this view.", contentX + 8, panelY + 112, 0xFF9A9BA8);
+            graphics.drawString(font, "No modules match this view.", contentX + 8, viewportTop + 37, 0xFF9A9BA8);
+        }
+        graphics.disableScissor();
+
+        int totalHeight = totalContentHeight();
+        if (totalHeight > viewportHeight) {
+            int trackX = panelX + panelWidth - 13;
+            int trackTop = viewportTop;
+            int trackHeight = viewportHeight;
+            int thumbHeight = Math.max(24, (int) ((long) trackHeight * trackHeight / totalHeight));
+            int maxThumbTravel = trackHeight - thumbHeight;
+            int scrollRange = maxScroll(totalHeight, viewportHeight);
+            int thumbY = trackTop + (scrollRange == 0 ? 0 : (int) Math.round(maxThumbTravel * scrollOffset / scrollRange));
+            graphics.fill(trackX, trackTop, trackX + 2, trackTop + trackHeight, 0xFF292A34);
+            graphics.fill(trackX - 1, thumbY, trackX + 3, thumbY + thumbHeight, ACCENT);
         }
     }
 
@@ -182,13 +232,20 @@ public final class ClickGuiScreen extends Screen {
         for (String category : categories) {
             if (mouseX >= panelX + 14 && mouseX <= dividerX - 10 && mouseY >= rowY - 6 && mouseY <= rowY + 16) {
                 selectedCategory = category;
+                targetScrollOffset = 0.0;
+                scrollOffset = 0.0;
                 return true;
             }
             rowY += 30;
         }
 
+        if (mouseY < panelY + 75 || mouseY > panelY + panelHeight - 18
+                || mouseX < contentX || mouseX > contentX + contentWidth) {
+            return false;
+        }
+
         String query = search.getValue().trim().toLowerCase(Locale.ROOT);
-        int cardY = panelY + 75;
+        int cardY = panelY + 75 - (int) Math.round(scrollOffset);
         int cardX = contentX;
         int cardWidth = contentWidth - 8;
         for (ClientModule module : modules.all()) {
@@ -202,7 +259,9 @@ public final class ClickGuiScreen extends Screen {
                 if (mouseX >= cardX + cardWidth - 54) {
                     module.toggle();
                     config.save(modules);
-                } else if (mouseX >= cardX + cardWidth - 92) {
+                } else if (mouseX >= cardX + cardWidth - 114) {
+                    bindingModuleId = module.id();
+                } else if (mouseX >= cardX + cardWidth - 150) {
                     if (isExpanded) {
                         expanded.remove(module.id());
                     } else {
@@ -244,6 +303,10 @@ public final class ClickGuiScreen extends Screen {
         if (event.button() != 0) {
             return false;
         }
+        if (event.x() < contentX || event.x() > contentX + contentWidth
+                || event.y() < panelY + 75 || event.y() > panelY + panelHeight - 18) {
+            return false;
+        }
         for (ClientModule module : modules.all()) {
             if (!expanded.contains(module.id())) {
                 continue;
@@ -264,9 +327,49 @@ public final class ClickGuiScreen extends Screen {
         return false;
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        int viewportTop = panelY + 75;
+        int viewportBottom = panelY + panelHeight - 18;
+        if (mouseX >= contentX && mouseX <= contentX + contentWidth && mouseY >= viewportTop && mouseY <= viewportBottom) {
+            targetScrollOffset = Math.max(0.0, Math.min(maximumScroll(), targetScrollOffset - verticalAmount * 34.0));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (bindingModuleId == null) {
+            return super.keyPressed(event);
+        }
+
+        if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            bindingModuleId = null;
+            return true;
+        }
+
+        ClientModule module = modules.get(bindingModuleId);
+        if (module != null) {
+            int key = event.key() == GLFW.GLFW_KEY_BACKSPACE || event.key() == GLFW.GLFW_KEY_DELETE
+                    ? -1 : event.key();
+            module.setKeyCode(key);
+            config.save(modules);
+        }
+        bindingModuleId = null;
+        return true;
+    }
+
+    private static String keyName(int keyCode) {
+        if (keyCode < 0) {
+            return "UNBOUND";
+        }
+        return InputConstants.Type.KEYSYM.getOrCreate(keyCode).getDisplayName().getString().toUpperCase(Locale.ROOT);
+    }
+
     private int findSettingY(ClientModule targetModule, Setting targetSetting) {
         String query = search.getValue().trim().toLowerCase(Locale.ROOT);
-        int cardY = panelY + 75;
+        int cardY = panelY + 75 - (int) Math.round(scrollOffset);
         for (ClientModule module : modules.all()) {
             if (!matches(module, query) || (!selectedCategory.equals("All") && !selectedCategory.equals(module.category().displayName()))) {
                 continue;
@@ -278,6 +381,25 @@ public final class ClickGuiScreen extends Screen {
             cardY += 76 + (expanded.contains(module.id()) ? module.settings().size() * 34 + 10 : 0) + 10;
         }
         return -1;
+    }
+
+    private int maximumScroll() {
+        return maxScroll(totalContentHeight(), panelHeight - 93);
+    }
+
+    private int totalContentHeight() {
+        String query = search.getValue().trim().toLowerCase(Locale.ROOT);
+        int total = 0;
+        for (ClientModule module : modules.all()) {
+            if (matches(module, query) && (selectedCategory.equals("All") || selectedCategory.equals(module.category().displayName()))) {
+                total += 76 + (expanded.contains(module.id()) ? module.settings().size() * 34 + 10 : 0) + 10;
+            }
+        }
+        return total;
+    }
+
+    private static int maxScroll(int contentHeight, int viewportHeight) {
+        return Math.max(0, contentHeight - viewportHeight);
     }
 
     @Override

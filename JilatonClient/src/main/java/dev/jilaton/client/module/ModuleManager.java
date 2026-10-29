@@ -7,13 +7,17 @@ import dev.jilaton.client.module.impl.AutoTotemModule;
 import dev.jilaton.client.module.impl.TriggerbotModule;
 import dev.jilaton.client.module.impl.SprintModule;
 import net.minecraft.client.Minecraft;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class ModuleManager {
     private final Map<String, ClientModule> modules = new LinkedHashMap<>();
+    private final Map<String, Boolean> previousKeyStates = new HashMap<>();
 
     public ModuleManager() {
         register(new AimAssistModule());
@@ -39,10 +43,29 @@ public final class ModuleManager {
     }
 
     public void tick(Minecraft client) {
+        updateKeybinds(client);
         modules.values().forEach(module -> module.tick(client));
     }
 
     public void disableAll() {
         modules.values().forEach(module -> module.setEnabled(false));
+    }
+
+    private void updateKeybinds(Minecraft client) {
+        if (client.screen != null || client.getWindow() == null) {
+            previousKeyStates.replaceAll((id, wasDown) -> false);
+            return;
+        }
+
+        long window = client.getWindow().handle();
+        for (ClientModule module : modules.values()) {
+            int keyCode = module.keyCode();
+            boolean down = keyCode >= 0 && GLFW.glfwGetKey(window, keyCode) == GLFW.GLFW_PRESS;
+            boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
+            if (down && !wasDown) {
+                module.toggle();
+            }
+            previousKeyStates.put(module.id(), down);
+        }
     }
 }

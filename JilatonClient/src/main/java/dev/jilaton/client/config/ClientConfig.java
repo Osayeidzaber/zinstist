@@ -52,6 +52,15 @@ public final class ClientConfig {
                     System.err.println("Jilaton ignored invalid setting " + key);
                 }
             }
+
+            String keyCode = values.getProperty("module." + module.id() + ".keycode");
+            if (keyCode != null) {
+                try {
+                    module.setKeyCode(Integer.parseInt(keyCode));
+                } catch (IllegalArgumentException exception) {
+                    System.err.println("Jilaton ignored invalid key binding for " + module.id());
+                }
+            }
         }
 
         for (ClientModule module : modules.all()) {
@@ -63,6 +72,7 @@ public final class ClientConfig {
         Properties values = new Properties();
         for (ClientModule module : modules.all()) {
             values.setProperty("module." + module.id() + ".enabled", Boolean.toString(module.enabled()));
+            values.setProperty("module." + module.id() + ".keycode", Integer.toString(module.keyCode()));
             for (Setting setting : module.settings()) {
                 if (setting instanceof BooleanSetting booleanSetting) {
                     values.setProperty(settingKey(module, setting), Boolean.toString(booleanSetting.value()));

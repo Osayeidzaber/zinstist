@@ -19,6 +19,7 @@ public abstract class ClientModule {
     private final List<Setting> settings = new ArrayList<>();
     private final List<Setting> settingsView = Collections.unmodifiableList(settings);
     private boolean enabled;
+    private int keyCode = -1;
 
     protected ClientModule(String id, String name, String description, ModuleCategory category) {
         this.id = requireId(id);
@@ -66,6 +67,17 @@ public abstract class ClientModule {
 
     public final boolean enabled() {
         return enabled;
+    }
+
+    public final int keyCode() {
+        return keyCode;
+    }
+
+    public final void setKeyCode(int keyCode) {
+        if (keyCode < -1) {
+            throw new IllegalArgumentException("Key code must be -1 (unbound) or a nonnegative key value");
+        }
+        this.keyCode = keyCode;
     }
 
     public final void setEnabled(boolean enabled) {
