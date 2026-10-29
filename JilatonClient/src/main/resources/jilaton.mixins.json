@@ -5,7 +5,13 @@
   "package": "dev.jilaton.client.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "FirstPersonHandsAndItemsMixin"
+    "FirstPersonHandsAndItemsMixin",
+    "ClientInputAccessor",
+    "KeyboardInputMixin",
+    "NoBobMixin",
+    "NoSlowMixin",
+    "VelocityPacketMixin",
+    "WTapAttackMixin"
   ],
   "injectors": {
     "defaultRequire": 1
