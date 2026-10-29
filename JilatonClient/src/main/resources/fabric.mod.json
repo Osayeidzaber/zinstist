@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "jilaton",
+  "version": "${version}",
+  "name": "Jilaton Client",
+  "description": "A fast, configurable Fabric client.",
+  "license": "GPL-3.0-only",
+  "environment": "client",
+  "mixins": [
+    "jilaton.mixins.json"
+  ],
+  "entrypoints": {
+    "client": [
+      "dev.jilaton.client.JilatonClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
