@@ -26,4 +26,22 @@ class CrystalDamageEstimatorTest {
         assertEquals(CrystalDamageEstimator.rawDamage(1.0, 12.0),
                 CrystalDamageEstimator.rawDamage(2.0, 12.0));
     }
+
+    @Test
+    void rawDamageUsesAnchorPowerFiveDiameter() {
+        assertEquals(71.0F, CrystalDamageEstimator.rawDamage(1.0, 10.0), 0.0001F);
+    }
+
+    @Test
+    void anchorExposureRayStartsBeyondTheIgnoredSourceBlock() {
+        var center = new net.minecraft.world.phys.Vec3(0.5, 0.5, 0.5);
+        var sample = new net.minecraft.world.phys.Vec3(2.5, 0.5, 0.5);
+        var start = CrystalDamageEstimator.sourceBlockTraceStart(center, sample,
+                new net.minecraft.core.BlockPos(0, 0, 0));
+
+        assertEquals(1.001, start.x, 0.00001);
+        assertEquals(center.y, start.y, 0.00001);
+        assertEquals(center.z, start.z, 0.00001);
+        assertEquals(center, CrystalDamageEstimator.sourceBlockTraceStart(center, sample, null));
+    }
 }

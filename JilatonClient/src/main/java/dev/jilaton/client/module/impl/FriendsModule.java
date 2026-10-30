@@ -2,11 +2,12 @@ package dev.jilaton.client.module.impl;
 
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
-import net.minecraft.client.Minecraft;
 
 public final class FriendsModule extends ClientModule {
     public FriendsModule() {
-        super("friends", "Friends", "Protects players in your friend list from combat targeting.", ModuleCategory.COMBAT);
+        super("friends", "Friends",
+                "Middle-click a player to add or remove them. Friends wear a blue hat and are protected from combat targeting.",
+                ModuleCategory.COMBAT);
     }
 
     @Override
@@ -14,13 +15,4 @@ public final class FriendsModule extends ClientModule {
         return true;
     }
 
-    @Override
-    protected void onTick(Minecraft client) {
-        FriendHatRenderer.update(client);
-    }
-
-    @Override
-    protected void onDisable(Minecraft client) {
-        FriendHatRenderer.clear();
-    }
 }

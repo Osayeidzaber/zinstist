@@ -3,6 +3,7 @@ package dev.jilaton.client.module.impl;
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
@@ -14,10 +15,23 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.core.component.DataComponents;
 
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+
 public final class AutoPotModule extends ClientModule {
     private static final float THROW_PITCH = 85.0F;
 
+    private final BooleanSetting heal;
+    private final BooleanSetting speed;
+    private final BooleanSetting strength;
+    private final BooleanSetting regeneration;
+    private final BooleanSetting fireResistance;
+    private final BooleanSetting jumpBoost;
+    private final BooleanSetting waterBreathing;
     private final NumberSetting healthThreshold;
+    private final NumberSetting refreshWindow;
     private Player preparedPlayer;
     private int originalSlot = -1;
     private int potionSlot = -1;
@@ -27,9 +41,18 @@ public final class AutoPotModule extends ClientModule {
     private long reservedThroughTick = Long.MIN_VALUE;
 
     public AutoPotModule() {
-        super("auto_pot", "AutoPot", "Throws a splash healing potion at your feet below the health threshold.",
+        super("auto_pot", "AutoPot", "Throws splash healing and configured buff potions when needed.",
                 ModuleCategory.COMBAT);
+        heal = addSetting(new BooleanSetting("health", "Health", true));
+        regeneration = addSetting(new BooleanSetting("regen", "Regen", true));
+        strength = addSetting(new BooleanSetting("strength", "Strength", true));
+        speed = addSetting(new BooleanSetting("speed", "Speed", true));
+        fireResistance = addSetting(new BooleanSetting("fire_resistance", "Fire resistance", true));
+        jumpBoost = addSetting(new BooleanSetting("jump_boost", "Jump boost", true));
+        waterBreathing = addSetting(new BooleanSetting("water_breathing", "Water breathing", true));
         healthThreshold = addSetting(new NumberSetting("health_threshold", "Health threshold", 1.0, 20.0, 0.5, 8.0));
+        refreshWindow = addSetting(new NumberSetting("refresh_window", "Buff refresh window (seconds)",
+                0.0, 60.0, 1.0, 5.0));
     }
 
     @Override
@@ -46,6 +69,7 @@ public final class AutoPotModule extends ClientModule {
     @Override
     protected void onTick(Minecraft client) {
         if (preparedPlayer != null) {
+            JilatonClient.moduleManager().rotationManager().suspendRequestsForTick();
             finishPreparedUse(client);
             return;
         }
@@ -53,7 +77,6 @@ public final class AutoPotModule extends ClientModule {
         Player player = client.player;
         if (player == null || client.level == null || client.gameMode == null || client.screen != null
                 || player.isUsingItem() || client.options.keyUse.isDown()
-                || player.getHealth() > healthThreshold.value()
                 || client.level.getGameTime() < cooldownUntilTick) {
             return;
         }
@@ -64,7 +87,13 @@ public final class AutoPotModule extends ClientModule {
             return;
         }
 
-        int slot = findHealingPotion(player);
+        int slot = -1;
+        if (heal.value() && player.getHealth() <= healthThreshold.value()) {
+            slot = findPotion(player, true);
+        }
+        if (slot < 0) {
+            slot = findPotion(player, false);
+        }
         if (slot < 0) {
             return;
         }
@@ -73,6 +102,7 @@ public final class AutoPotModule extends ClientModule {
         originalSlot = player.getInventory().getSelectedSlot();
         potionSlot = slot;
         originalPitch = player.getXRot();
+        JilatonClient.moduleManager().rotationManager().suspendRequestsForTick();
         player.getInventory().setSelectedSlot(potionSlot);
         player.setXRot(THROW_PITCH);
         useAtTick = client.level.getGameTime() + 1L;
@@ -112,7 +142,9 @@ public final class AutoPotModule extends ClientModule {
         clearPreparedState();
     }
 
-    private static int findHealingPotion(Player player) {
+    private int findPotion(Player player, boolean requireHealing) {
+        Set<AutoPotPolicy.EffectType> configuredBuffs = enabledBuffs();
+        int refreshWindowTicks = (int) Math.round(refreshWindow.value() * 20.0);
         for (int slot = 0; slot < 9; slot++) {
             ItemStack stack = player.getInventory().getItem(slot);
             if (!stack.is(Items.SPLASH_POTION)) {
@@ -122,13 +154,67 @@ public final class AutoPotModule extends ClientModule {
             if (contents == null) {
                 continue;
             }
+            List<AutoPotPolicy.EffectStatus> effects = new ArrayList<>();
             for (MobEffectInstance effect : contents.getAllEffects()) {
-                if (effect.is(MobEffects.INSTANT_HEALTH)) {
-                    return slot;
-                }
+                AutoPotPolicy.EffectType type = effectType(effect);
+                MobEffectInstance active = type == AutoPotPolicy.EffectType.HEALING
+                        || type == AutoPotPolicy.EffectType.UNSUPPORTED
+                        ? null : player.getEffect(effect.getEffect());
+                effects.add(new AutoPotPolicy.EffectStatus(type,
+                        active == null ? null : active.getDuration()));
+            }
+
+            if (AutoPotPolicy.isEligible(effects, requireHealing, heal.value(),
+                    player.getHealth() <= healthThreshold.value(), configuredBuffs, refreshWindowTicks)) {
+                return slot;
             }
         }
         return -1;
+    }
+
+    private Set<AutoPotPolicy.EffectType> enabledBuffs() {
+        Set<AutoPotPolicy.EffectType> enabled = EnumSet.noneOf(AutoPotPolicy.EffectType.class);
+        if (speed.value()) enabled.add(AutoPotPolicy.EffectType.SPEED);
+        if (strength.value()) enabled.add(AutoPotPolicy.EffectType.STRENGTH);
+        if (regeneration.value()) enabled.add(AutoPotPolicy.EffectType.REGENERATION);
+        if (fireResistance.value()) enabled.add(AutoPotPolicy.EffectType.FIRE_RESISTANCE);
+        if (jumpBoost.value()) enabled.add(AutoPotPolicy.EffectType.JUMP_BOOST);
+        if (waterBreathing.value()) enabled.add(AutoPotPolicy.EffectType.WATER_BREATHING);
+        return enabled;
+    }
+
+    public boolean acceptsRefillItem(ItemStack stack, Player player) {
+        if (!enabled() || !stack.is(Items.SPLASH_POTION)) {
+            return false;
+        }
+        PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
+        if (contents == null || !contents.getAllEffects().iterator().hasNext()) {
+            return false;
+        }
+
+        List<AutoPotPolicy.EffectStatus> effects = new ArrayList<>();
+        for (MobEffectInstance effect : contents.getAllEffects()) {
+            AutoPotPolicy.EffectType type = effectType(effect);
+            MobEffectInstance active = type == AutoPotPolicy.EffectType.HEALING
+                    || type == AutoPotPolicy.EffectType.UNSUPPORTED
+                    ? null : player.getEffect(effect.getEffect());
+            effects.add(new AutoPotPolicy.EffectStatus(type,
+                    active == null ? null : active.getDuration()));
+        }
+        int refreshWindowTicks = (int) Math.round(refreshWindow.value() * 20.0);
+        return AutoPotPolicy.isEligible(effects, false, heal.value(), true,
+                enabledBuffs(), refreshWindowTicks);
+    }
+
+    private static AutoPotPolicy.EffectType effectType(MobEffectInstance effect) {
+        if (effect.is(MobEffects.INSTANT_HEALTH)) return AutoPotPolicy.EffectType.HEALING;
+        if (effect.is(MobEffects.SPEED)) return AutoPotPolicy.EffectType.SPEED;
+        if (effect.is(MobEffects.STRENGTH)) return AutoPotPolicy.EffectType.STRENGTH;
+        if (effect.is(MobEffects.REGENERATION)) return AutoPotPolicy.EffectType.REGENERATION;
+        if (effect.is(MobEffects.FIRE_RESISTANCE)) return AutoPotPolicy.EffectType.FIRE_RESISTANCE;
+        if (effect.is(MobEffects.JUMP_BOOST)) return AutoPotPolicy.EffectType.JUMP_BOOST;
+        if (effect.is(MobEffects.WATER_BREATHING)) return AutoPotPolicy.EffectType.WATER_BREATHING;
+        return AutoPotPolicy.EffectType.UNSUPPORTED;
     }
 
     private void restorePreparedState(Minecraft client) {

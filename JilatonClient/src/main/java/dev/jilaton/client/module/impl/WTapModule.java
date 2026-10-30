@@ -96,7 +96,7 @@ public final class WTapModule extends ClientModule {
         }
 
         Input current = event.input();
-        Input tapped = SprintTapInput.apply(current);
+        Input tapped = SprintTapInput.apply(current, mode.value().equals("S Tap"));
         if (tapped != current) {
             event.setInput(tapped);
         }

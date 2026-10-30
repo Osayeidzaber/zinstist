@@ -1,5 +1,6 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.setting.NumberSetting;
@@ -20,10 +21,12 @@ public final class ParkourModule extends ClientModule {
     @Override
     protected void onTick(Minecraft client) {
         Player player = client.player;
+        ClientModule safeWalk = JilatonClient.moduleManager().get("safe_walk");
         if (player == null || client.level == null || client.screen != null || !player.onGround()
                 || player.isInWater() || player.isInLava() || player.isPassenger()
                 || player.getAbilities().flying || player.horizontalCollision
-                || client.options.keyJump.isDown() || client.options.keyShift.isDown()) {
+                || client.options.keyJump.isDown() || client.options.keyShift.isDown()
+                || safeWalk instanceof SafeWalkModule module && module.enabled() && module.guardingEdge()) {
             return;
         }
 

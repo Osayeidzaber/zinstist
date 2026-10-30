@@ -41,9 +41,7 @@ public final class ClientConfig {
 
     public void load(ModuleManager modules) {
         Properties values = read(path);
-        if (values != null) {
-            apply(values, modules);
-        }
+        apply(values == null ? new Properties() : values, modules);
     }
 
     public void save(ModuleManager modules) {

@@ -2,6 +2,7 @@ package dev.jilaton.client.mixin;
 
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
+import dev.jilaton.client.module.impl.VelocityPolicy;
 import dev.jilaton.client.module.impl.VelocityModule;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -10,6 +11,8 @@ import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 @Mixin(ClientPacketListener.class)
 public abstract class VelocityPacketMixin {
@@ -32,10 +35,33 @@ public abstract class VelocityPacketMixin {
         }
 
         Vec3 movement = packet.getMovement();
+        boolean moving = client.player.input != null && client.player.input.keyPresses != null
+                && (client.player.input.keyPresses.forward() || client.player.input.keyPresses.backward()
+                || client.player.input.keyPresses.left() || client.player.input.keyPresses.right());
+        velocity.onVelocityPacketReceived(movement, moving);
+        if (velocity.responseMode().equals("Reversal")) {
+            return movement;
+        }
+        if (velocity.responseMode().equals("Strafe")) {
+            velocity.onAcceptedVelocityPacket();
+            return movement;
+        }
+        if (!VelocityPolicy.shouldModify(client.player.onGround(), moving,
+                ThreadLocalRandom.current().nextInt(100), velocity.chancePercent(),
+                velocity.groundFilter(), velocity.onlyMove())) {
+            return movement;
+        }
+
+        velocity.onAcceptedVelocityPacket();
+
+        Vec3 current = client.player.getDeltaMovement();
         return new Vec3(
-                movement.x * velocity.horizontalScale(),
-                movement.y * velocity.verticalScale(),
-                movement.z * velocity.horizontalScale()
+                VelocityPolicy.applyAxis(movement.x, current.x, velocity.horizontalScale() * 100.0,
+                        velocity.motionHorizontalScale() * 100.0),
+                VelocityPolicy.applyAxis(movement.y, current.y, velocity.verticalScale() * 100.0,
+                        velocity.motionVerticalScale() * 100.0),
+                VelocityPolicy.applyAxis(movement.z, current.z, velocity.horizontalScale() * 100.0,
+                        velocity.motionHorizontalScale() * 100.0)
         );
     }
 }

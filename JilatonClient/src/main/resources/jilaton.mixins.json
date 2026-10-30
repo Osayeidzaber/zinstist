@@ -7,11 +7,26 @@
   "client": [
     "FirstPersonHandsAndItemsMixin",
     "ClientInputAccessor",
+    "KeyMappingAccessor",
     "KeyboardInputMixin",
     "NoBobMixin",
+    "NoJumpDelayMixin",
+    "StepMixin",
     "NoSlowMixin",
+    "NoFallPacketMixin",
+    "ConnectionPacketSendMixin",
+    "NoMissCooldownMixin",
+    "ServerboundMovePlayerPacketAccessor",
     "VelocityPacketMixin",
-    "WTapAttackMixin"
+    "AutoTotemPacketMixin",
+    "WTapAttackMixin",
+    "HitboxMarginMixin",
+    "PlayerReachMixin",
+    "LivingEntityReachMixin",
+    "LivingEntityTravelMixin",
+    "KeepSprintMixin",
+    "HighJumpMixin",
+    "TitleScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,6 +1,7 @@
 package dev.jilaton.client.mixin;
 
 import dev.jilaton.client.JilatonClient;
+import dev.jilaton.client.module.MovementInputEvent;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec2;
@@ -15,15 +16,22 @@ public abstract class KeyboardInputMixin {
     private void jilaton$dispatchMovementInput(CallbackInfo callbackInfo) {
         ClientInputAccessor inputAccessor = (ClientInputAccessor) this;
         Input original = ((net.minecraft.client.player.ClientInput) (Object) this).keyPresses;
-        Input adjusted = JilatonClient.moduleManager().handleMovementInput(original);
-        if (adjusted == original) {
+        MovementInputEvent event = JilatonClient.moduleManager().dispatchMovementInput(original);
+        if (event == null) {
             return;
         }
 
-        inputAccessor.jilaton$setKeyPresses(adjusted);
-        float forward = impulse(adjusted.forward(), adjusted.backward());
-        float sideways = impulse(adjusted.left(), adjusted.right());
-        inputAccessor.jilaton$setMoveVector(new Vec2(sideways, forward).normalized());
+        Input adjusted = event.input();
+        if (adjusted != original) {
+            inputAccessor.jilaton$setKeyPresses(adjusted);
+        }
+        if (event.moveVectorOverride() != null) {
+            inputAccessor.jilaton$setMoveVector(event.moveVectorOverride());
+        } else if (adjusted != original) {
+            float forward = impulse(adjusted.forward(), adjusted.backward());
+            float sideways = impulse(adjusted.left(), adjusted.right());
+            inputAccessor.jilaton$setMoveVector(new Vec2(sideways, forward).normalized());
+        }
     }
 
     private static float impulse(boolean positive, boolean negative) {

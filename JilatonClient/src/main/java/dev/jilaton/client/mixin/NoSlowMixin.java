@@ -3,6 +3,7 @@ package dev.jilaton.client.mixin;
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.impl.NoSlowModule;
+import dev.jilaton.client.module.impl.NoSlowPolicy;
 import net.minecraft.client.player.LocalPlayer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,8 +23,11 @@ public abstract class NoSlowMixin {
     )
     private float jilaton$removeItemUseSlowdown(float originalMultiplier) {
         NoSlowModule module = noSlowModule();
-        return module != null && module.enabled() && module.removeItemSlowdown()
-                ? 1.0F : originalMultiplier;
+        return NoSlowPolicy.itemUseMultiplier(module != null && module.enabled(),
+                module != null && module.removeItemSlowdown(),
+                module == null ? 1.0 : module.itemUseScale(),
+                module == null ? 1.0 : module.scaleFor(((LocalPlayer) (Object) this)
+                        .getUseItem().getUseAnimation()), originalMultiplier);
     }
 
     @Redirect(
@@ -35,8 +39,8 @@ public abstract class NoSlowMixin {
     )
     private boolean jilaton$allowSprintWhileUsing(LocalPlayer player) {
         NoSlowModule module = noSlowModule();
-        return module == null || !module.enabled() || !module.allowSprintWhileUsing()
-                ? player.isUsingItem() : false;
+        return NoSlowPolicy.slowDueToItemUse(module != null && module.enabled(),
+                module != null && module.allowSprintWhileUsing(), player.isUsingItem());
     }
 
     private static NoSlowModule noSlowModule() {

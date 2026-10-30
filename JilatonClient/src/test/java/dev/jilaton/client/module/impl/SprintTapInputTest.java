@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SprintTapInputTest {
     @Test
-    void forwardSampleBecomesBackwardAndPreservesOtherControls() {
-        Input tapped = SprintTapInput.apply(new Input(true, false, true, false, true, true, true));
+    void sTapTurnsForwardIntoBackwardAndPreservesOtherControls() {
+        Input tapped = SprintTapInput.apply(new Input(true, false, true, false, true, true, true), true);
 
         assertFalse(tapped.forward());
         assertTrue(tapped.backward());
@@ -22,9 +22,18 @@ class SprintTapInputTest {
     }
 
     @Test
+    void wTapReleasesForwardWithoutAddingBackwardInput() {
+        Input tapped = SprintTapInput.apply(new Input(true, false, false, false, false, false, true), false);
+
+        assertFalse(tapped.forward());
+        assertFalse(tapped.backward());
+        assertFalse(tapped.sprint());
+    }
+
+    @Test
     void sampleWithoutForwardInputIsUnchanged() {
         Input original = new Input(false, true, false, true, false, false, false);
 
-        assertSame(original, SprintTapInput.apply(original));
+        assertSame(original, SprintTapInput.apply(original, true));
     }
 }

@@ -1,5 +1,7 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.JilatonClient;
+import dev.jilaton.client.module.ClientModule;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
@@ -10,12 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public final class FriendHatRenderer {
-    private static volatile List<HatPosition> positions = List.of();
-
     private FriendHatRenderer() {
     }
 
@@ -23,46 +20,31 @@ public final class FriendHatRenderer {
         WorldRenderEvents.AFTER_ENTITIES.register(FriendHatRenderer::render);
     }
 
-    static void update(Minecraft client) {
-        if (client.level == null || client.player == null) {
-            clear();
-            return;
-        }
-
-        List<HatPosition> next = new ArrayList<>();
-        for (Player player : client.level.players()) {
-            if (player == client.player || !FriendManager.contains(player) || !player.isAlive()) {
-                continue;
-            }
-            Vec3 current = player.position();
-            next.add(new HatPosition(player.xo, player.yo, player.zo,
-                    current.x, current.y, current.z, player.getBbHeight()));
-        }
-        positions = List.copyOf(next);
-    }
-
-    static void clear() {
-        positions = List.of();
-    }
-
     private static void render(WorldRenderContext context) {
-        if (positions.isEmpty() || context.consumers() == null || context.matrices() == null) {
+        Minecraft client = Minecraft.getInstance();
+        ClientModule friends = JilatonClient.moduleManager().get("friends");
+        if (client.level == null || client.player == null
+                || !(friends instanceof FriendsModule) || !friends.enabled()
+                || context.consumers() == null || context.matrices() == null) {
             return;
         }
 
-        Minecraft client = Minecraft.getInstance();
         Vec3 camera = client.gameRenderer.getMainCamera().position();
         float partialTick = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         PoseStack matrices = context.matrices();
         VertexConsumer buffer = context.consumers().getBuffer(RenderTypes.debugQuads());
 
-        for (HatPosition hat : positions) {
-            double x = hat.previousX() + (hat.currentX() - hat.previousX()) * partialTick - camera.x;
-            double y = hat.previousY() + (hat.currentY() - hat.previousY()) * partialTick - camera.y;
-            double z = hat.previousZ() + (hat.currentZ() - hat.previousZ()) * partialTick - camera.z;
+        for (Player player : client.level.players()) {
+            if (player == client.player || !FriendManager.contains(player) || !player.isAlive()) {
+                continue;
+            }
+
+            double x = player.xo + (player.getX() - player.xo) * partialTick - camera.x;
+            double y = player.yo + (player.getY() - player.yo) * partialTick - camera.y;
+            double z = player.zo + (player.getZ() - player.zo) * partialTick - camera.z;
 
             matrices.pushPose();
-            matrices.translate(x, y + hat.height() + 0.04, z);
+            matrices.translate(x, y + player.getBbHeight() + 0.04, z);
             Matrix4f pose = matrices.last().pose();
             drawBrim(buffer, pose);
             drawCrown(buffer, pose);
@@ -100,7 +82,4 @@ public final class FriendHatRenderer {
         buffer.addVertex(pose, x3, y3, z3).setColor(75, 141, 255, 255);
     }
 
-    private record HatPosition(double previousX, double previousY, double previousZ,
-                               double currentX, double currentY, double currentZ, float height) {
-    }
 }

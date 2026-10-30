@@ -7,6 +7,7 @@ package dev.jilaton.client.module.impl;
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.rotation.RotationPriorities;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
@@ -20,6 +21,9 @@ public final class AimAssistModule extends ClientModule {
     private final NumberSetting range;
     private final NumberSetting fieldOfView;
     private final NumberSetting turnSpeed;
+    private final NumberSetting angleFactor;
+    private final BooleanSetting horizontal;
+    private final BooleanSetting vertical;
     private final BooleanSetting stickyTarget;
     private Player currentTarget;
 
@@ -28,6 +32,9 @@ public final class AimAssistModule extends ClientModule {
         range = addSetting(new NumberSetting("range", "Range", 2.0, 6.0, 0.1, 4.2));
         fieldOfView = addSetting(new NumberSetting("field_of_view", "Field of view", 5.0, 120.0, 1.0, 60.0));
         turnSpeed = addSetting(new NumberSetting("turn_speed", "Turn speed", 1.0, 18.0, 0.5, 6.0));
+        angleFactor = addSetting(new NumberSetting("angle_factor", "Angle factor", 0.05, 1.0, 0.05, 0.35));
+        horizontal = addSetting(new BooleanSetting("horizontal", "Horizontal aim", true));
+        vertical = addSetting(new BooleanSetting("vertical", "Vertical aim", true));
         stickyTarget = addSetting(new BooleanSetting("sticky_target", "Keep current target", true));
     }
 
@@ -116,10 +123,21 @@ public final class AimAssistModule extends ClientModule {
         double horizontal = Math.sqrt(difference.x * difference.x + difference.z * difference.z);
         float targetYaw = (float) (Math.atan2(difference.z, difference.x) * (180.0 / Math.PI)) - 90.0F;
         float targetPitch = (float) (-Math.atan2(difference.y, horizontal) * (180.0 / Math.PI));
-        float yawDelta = Mth.wrapDegrees(targetYaw - player.getYRot());
-        float pitchDelta = targetPitch - player.getXRot();
-        float maxStep = (float) turnSpeed.value();
-        player.setYRot(player.getYRot() + Mth.clamp(yawDelta, -maxStep, maxStep));
-        player.setXRot(Mth.clamp(player.getXRot() + Mth.clamp(pitchDelta, -maxStep, maxStep), -90.0F, 90.0F));
+        AimAssistPolicy.Angles smoothed = AimAssistPolicy.apply(player.getYRot(), player.getXRot(),
+                targetYaw, targetPitch, angleFactor.value(), this.horizontal.value(), vertical.value());
+        JilatonClient.moduleManager().rotationManager().request(id(), RotationPriorities.AIM_ASSIST,
+                smoothed.yaw(), smoothed.pitch(), (float) turnSpeed.value());
+    }
+
+    public NumberSetting angleFactor() {
+        return angleFactor;
+    }
+
+    public BooleanSetting horizontal() {
+        return horizontal;
+    }
+
+    public BooleanSetting vertical() {
+        return vertical;
     }
 }

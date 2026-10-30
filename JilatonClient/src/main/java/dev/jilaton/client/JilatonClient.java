@@ -7,14 +7,17 @@ import dev.jilaton.client.gui.HudRenderer;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.module.impl.WTapModule;
+import dev.jilaton.client.module.impl.CriticalsModule;
 import dev.jilaton.client.module.impl.FriendManager;
 import dev.jilaton.client.module.impl.FriendHatRenderer;
 import dev.jilaton.client.module.impl.FriendsModule;
+import dev.jilaton.client.module.impl.AutoAnchorModule;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
@@ -41,14 +44,35 @@ public final class JilatonClient implements ClientModInitializer {
         return MODULES;
     }
 
+    public static ClientConfig clientConfig() {
+        return CONFIG;
+    }
+
+    public static void openClickGui(Screen parent) {
+        net.minecraft.client.Minecraft.getInstance().setScreen(new ClickGuiScreen(MODULES, CONFIG, parent));
+    }
+
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
         JilatonCommands.register(CONFIG);
         AttackEntityCallback.EVENT.register((attacker, world, hand, target, hitResult) -> {
+            ClientModule criticals = MODULES.get("criticals");
+            if (criticals instanceof CriticalsModule module && module.beforeAttack(attacker, world, target)) {
+                return InteractionResult.FAIL;
+            }
             ClientModule wtap = MODULES.get("wtap");
             if (wtap instanceof WTapModule module) {
                 module.beforeAttack(attacker, world, target);
+            }
+            return InteractionResult.PASS;
+        });
+        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            ClientModule autoAnchor = MODULES.get("auto_anchor");
+            if (player == net.minecraft.client.Minecraft.getInstance().player
+                    && autoAnchor instanceof AutoAnchorModule module
+                    && module.handleManualUse(net.minecraft.client.Minecraft.getInstance(), player, world, hand, hitResult)) {
+                return InteractionResult.SUCCESS;
             }
             return InteractionResult.PASS;
         });
@@ -67,7 +91,7 @@ public final class JilatonClient implements ClientModInitializer {
             MODULES.tick(client);
             handleFriendMiddleClick(client);
             while (openGui.consumeClick()) {
-                Screen nextScreen = client.screen instanceof ClickGuiScreen ? null : new ClickGuiScreen(MODULES, CONFIG);
+                Screen nextScreen = client.screen instanceof ClickGuiScreen ? null : new ClickGuiScreen(MODULES, CONFIG, null);
                 client.setScreen(nextScreen);
             }
         });
