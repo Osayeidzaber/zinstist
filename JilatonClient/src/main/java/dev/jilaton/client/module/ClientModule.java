@@ -21,6 +21,11 @@ public abstract class ClientModule {
     private final List<Setting> settingsView = Collections.unmodifiableList(settings);
     private boolean enabled;
     private int keyCode = -1;
+    private java.util.function.Consumer<ClientModule> stateListener = module -> { };
+
+    final void setStateListener(java.util.function.Consumer<ClientModule> listener) {
+        stateListener = Objects.requireNonNull(listener);
+    }
 
     protected ClientModule(String id, String name, String description, ModuleCategory category) {
         this.id = requireId(id);
@@ -74,6 +79,8 @@ public abstract class ClientModule {
         return false;
     }
 
+    public boolean holdKey() { return false; }
+
     public final int keyCode() {
         return keyCode;
     }
@@ -86,6 +93,7 @@ public abstract class ClientModule {
     }
 
     public final void setEnabled(boolean enabled) {
+        boolean previous = this.enabled;
         if (this.enabled == enabled) {
             return;
         }
@@ -114,6 +122,11 @@ public abstract class ClientModule {
                 this.enabled = false;
             }
         }
+        notifyStateChange(previous);
+    }
+
+    private void notifyStateChange(boolean previous) {
+        if (previous != enabled) stateListener.accept(this);
     }
 
     public final void toggle() {

@@ -7,6 +7,7 @@ import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
+import dev.jilaton.client.setting.TextSetting;
 import dev.jilaton.client.setting.Setting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -32,11 +33,11 @@ public final class ClickGuiScreen extends Screen {
         HUD_EDITOR
     }
 
-    private static final int PANEL = 0xFF080C19;
-    private static final int SIDEBAR = 0xFF0B1020;
-    private static final int CARD = 0xFF101629;
-    private static final int CARD_HOVER = 0xFF151D34;
-    private static final int BORDER = 0xFF1B2339;
+    private static final int PANEL = 0xFF08090B;
+    private static final int SIDEBAR = 0xFF0B0C0F;
+    private static final int CARD = 0xFF111215;
+    private static final int CARD_HOVER = 0xFF191B20;
+    private static final int BORDER = 0xFF25272D;
     private final ModuleManager modules;
     private final ClientConfig config;
     private final Screen parent;
@@ -122,7 +123,7 @@ public final class ClickGuiScreen extends Screen {
         lastFrameNanos = now;
         int maxScroll = maximumScroll();
         targetScrollOffset = Math.max(0.0, Math.min(maxScroll, targetScrollOffset));
-        double animation = 1.0 - Math.exp(-frameSeconds / 0.075);
+        double animation = config.reducedMotion() ? 1.0 : 1.0 - Math.exp(-frameSeconds / 0.075);
         scrollOffset += (targetScrollOffset - scrollOffset) * animation;
         if (Math.abs(targetScrollOffset - scrollOffset) < 0.15) {
             scrollOffset = targetScrollOffset;
@@ -135,7 +136,7 @@ public final class ClickGuiScreen extends Screen {
         fillRounded(graphics, panelX, panelY, panelWidth, panelHeight, 9, PANEL);
         accent = selectedAccent();
         graphics.fill(panelX + 1, panelY + 1, panelX + panelWidth - 1, panelY + 3, accent);
-        graphics.fill(panelX + 1, panelY + 4, panelX + panelWidth - 1, panelY + panelHeight - 1, 0xFF0A0E1B);
+        graphics.fill(panelX + 1, panelY + 4, panelX + panelWidth - 1, panelY + panelHeight - 1, 0xFF090A0C);
         graphics.fill(contentX - 10, panelY + 8, contentX - 9, panelY + panelHeight - 8, BORDER);
         renderHeader(graphics);
         renderSidebar(graphics, mouseX, mouseY);
@@ -151,7 +152,7 @@ public final class ClickGuiScreen extends Screen {
 
     private void renderHeader(GuiGraphics graphics) {
         graphics.fill(panelX + 1, panelY + 4, contentX - 10, panelY + panelHeight - 1, SIDEBAR);
-        fillRounded(graphics, panelX + 17, panelY + 15, 22, 22, 6, 0xFF252044);
+        fillRounded(graphics, panelX + 17, panelY + 15, 22, 22, 6, 0xFF1D2025);
         graphics.drawString(font, "J", panelX + 24, panelY + 22, accent);
         graphics.drawString(font, "JILATON", panelX + 46, panelY + 18, 0xFFF1F3FC);
         graphics.drawString(font, "CLIENT  /  0.1", panelX + 46, panelY + 32, 0xFF7F879B);
@@ -189,7 +190,7 @@ public final class ClickGuiScreen extends Screen {
         graphics.drawString(font, subtitle, contentX, panelY + 38, 0xFF8791A9);
 
         if (page == Page.MODULES || page == Page.KEYBINDS) {
-            fillRounded(graphics, searchContainerX, panelY + 16, searchContainerWidth, 26, 6, 0xFF0D1425);
+            fillRounded(graphics, searchContainerX, panelY + 16, searchContainerWidth, 26, 6, 0xFF111317);
             graphics.fill(searchContainerX + 9, panelY + 24, searchContainerX + 15, panelY + 30, 0xFF8D96AD);
             graphics.fill(searchContainerX + 13, panelY + 29, searchContainerX + 17, panelY + 31, 0xFF8D96AD);
         }
@@ -207,7 +208,7 @@ public final class ClickGuiScreen extends Screen {
         int rowY = categoryRowStart();
             int rowSpacing = categoryRowSpacing();
         int rowInset = compact ? 2 : 6;
-        int rowHeight = compact ? 14 : 24;
+        int rowHeight = compact ? categoryRowSpacing() : 24;
         for (String category : categories) {
             int rowX = panelX + 12;
             boolean selected = page == Page.MODULES && selectedCategory.equals(category);
@@ -275,7 +276,7 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private int categoryRowSpacing() {
-        return compactSidebar() ? 14 : 28;
+        return compactSidebar() ? Math.min(14, Math.max(12, (panelHeight - 62 - 76) / 6)) : 28;
     }
 
     private int sidebarLinkY(Page target) {
@@ -430,7 +431,7 @@ public final class ClickGuiScreen extends Screen {
             graphics.drawString(font, module.description(), cardX + 14, cardY + 28, 0xFF8993AA);
             drawToggle(graphics, cardX + cardWidth - 40, cardY + 13, module.enabled());
             fillRounded(graphics, cardX + cardWidth - 108, cardY + 10, 48, 20, 5,
-                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1A2236);
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1D2025);
             String keyName = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS" : keyName(module.keyCode());
             if (keyName.length() > 6) {
                 keyName = keyName.substring(0, 5) + "…";
@@ -441,7 +442,7 @@ public final class ClickGuiScreen extends Screen {
             if (!compactCards) {
                 String category = module.category().displayName().toUpperCase(Locale.ROOT);
                 int pillWidth = font.width(category) + 12;
-                fillRounded(graphics, cardX + 14, cardY + 48, pillWidth, 14, 5, 0xFF171E31);
+                fillRounded(graphics, cardX + 14, cardY + 48, pillWidth, 14, 5, 0xFF18191D);
                 graphics.drawString(font, category, cardX + 20, cardY + 51, 0xFF8995AF);
             }
 
@@ -476,13 +477,13 @@ public final class ClickGuiScreen extends Screen {
 
     private void renderToolbar(GuiGraphics graphics, int mouseX, int mouseY) {
         int y = panelY + 65;
-        fillRounded(graphics, contentX, y, 64, 22, 6, showEnabledOnly ? 0xFF171E31 : 0xFF292445);
+        fillRounded(graphics, contentX, y, 64, 22, 6, showEnabledOnly ? 0xFF18191D : 0xFF282B31);
         graphics.drawString(font, "ALL", contentX + 13, y + 7, showEnabledOnly ? 0xFF8993AA : 0xFFD8D2FF);
-        fillRounded(graphics, contentX + 70, y, 90, 22, 6, showEnabledOnly ? 0xFF292445 : 0xFF171E31);
+        fillRounded(graphics, contentX + 70, y, 90, 22, 6, showEnabledOnly ? 0xFF282B31 : 0xFF18191D);
         graphics.drawString(font, "ENABLED", contentX + 80, y + 7, showEnabledOnly ? 0xFFD8D2FF : 0xFF8993AA);
 
         int densityX = contentX + contentWidth - 82;
-        fillRounded(graphics, densityX, y, 78, 22, 6, 0xFF11182A);
+        fillRounded(graphics, densityX, y, 78, 22, 6, 0xFF14161A);
         graphics.drawString(font, compactCards ? "COMPACT" : "ROOMY", densityX + 9, y + 7,
                 compactCards ? 0xFFB8ADFF : 0xFF9CA6BC);
         if (mouseX >= densityX && mouseX <= densityX + 78 && mouseY >= y && mouseY <= y + 22) {
@@ -536,7 +537,7 @@ public final class ClickGuiScreen extends Screen {
             graphics.drawString(font, module.name(), contentX + 13, rowY + 8, 0xFFE9EDF7);
             graphics.drawString(font, module.category().displayName(), contentX + 13, rowY + 25, 0xFF7F8AA2);
             fillRounded(graphics, contentX + contentWidth - 122, rowY + 10, 108, 24, 6,
-                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1A2236);
+                    bindingModuleId != null && bindingModuleId.equals(module.id()) ? accentSurface() : 0xFF1D2025);
             String binding = bindingModuleId != null && bindingModuleId.equals(module.id()) ? "PRESS A KEY" : keyName(module.keyCode());
             int bindingWidth = font.width(binding);
             graphics.drawString(font, binding, contentX + contentWidth - 122 + (108 - bindingWidth) / 2,
@@ -631,9 +632,9 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private int accentSurface() {
-        int red = 10 + Math.round((((accent >> 16) & 0xFF) - 10) * 0.18F);
-        int green = 14 + Math.round((((accent >> 8) & 0xFF) - 14) * 0.18F);
-        int blue = 27 + Math.round(((accent & 0xFF) - 27) * 0.18F);
+        int red = 12 + Math.round((((accent >> 16) & 0xFF) - 12) * 0.12F);
+        int green = 13 + Math.round((((accent >> 8) & 0xFF) - 13) * 0.12F);
+        int blue = 14 + Math.round(((accent & 0xFF) - 14) * 0.12F);
         return 0xFF000000 | (red << 16) | (green << 8) | blue;
     }
 
@@ -794,7 +795,7 @@ public final class ClickGuiScreen extends Screen {
         } else if (setting instanceof ChoiceSetting choiceSetting) {
             int controlX = x + width - 112;
             boolean hovered = mouseX >= controlX && mouseX <= controlX + 104;
-            fillRounded(graphics, controlX, y - 1, 104, 20, 6, hovered ? accentSurface() : 0xFF1A2236);
+            fillRounded(graphics, controlX, y - 1, 104, 20, 6, hovered ? accentSurface() : 0xFF1D2025);
             graphics.drawString(font, "‹", controlX + 8, y + 4, 0xFFC5C9D7);
             String choice = choiceSetting.value();
             int availableWidth = 64;
@@ -806,6 +807,11 @@ public final class ClickGuiScreen extends Screen {
             }
             graphics.drawString(font, choice, controlX + (104 - font.width(choice)) / 2, y + 4, 0xFFE6E8F2);
             graphics.drawString(font, "›", controlX + 91, y + 4, 0xFFC5C9D7);
+        } else if (setting instanceof TextSetting textSetting) {
+            int controlX = x + width - 112;
+            fillRounded(graphics, controlX, y - 1, 104, 20, 6, 0xFF1D2025);
+            String label = textSetting.value().isEmpty() ? "Edit list…" : textSetting.value();
+            graphics.drawString(font, font.plainSubstrByWidth(label, 90), controlX + 7, y + 4, 0xFFE6E8F2);
         } else if (setting instanceof NumberSetting numberSetting) {
             int sliderX = x + width - 124;
             int sliderWidth = 76;
@@ -874,7 +880,7 @@ public final class ClickGuiScreen extends Screen {
         int dividerX = contentX - 20;
         boolean compact = compactSidebar();
         int rowInset = compact ? 2 : 6;
-        int rowHeight = compact ? 14 : 24;
+        int rowHeight = compact ? categoryRowSpacing() : 24;
         String[] categories = {"All", "Combat", "Movement", "Player", "Visuals", "Client"};
         int rowY = categoryRowStart();
         for (String category : categories) {
@@ -1044,6 +1050,12 @@ public final class ClickGuiScreen extends Screen {
                             int controlX = cardX + cardWidth - 14 - 112;
                             if (mouseX >= controlX && mouseX <= controlX + 104) {
                                 choiceSetting.cycle(mouseX < controlX + 52 ? -1 : 1);
+                            }
+                        } else if (setting instanceof TextSetting textSetting) {
+                            int controlX = cardX + cardWidth - 14 - 112;
+                            if (mouseX >= controlX && mouseX <= controlX + 104) {
+                                minecraft.setScreen(new TextSettingScreen(this, textSetting, modules, config));
+                                return true;
                             }
                         } else if (setting instanceof NumberSetting numberSetting) {
                             int sliderX = cardX + 14 + cardWidth - 28 - 124;

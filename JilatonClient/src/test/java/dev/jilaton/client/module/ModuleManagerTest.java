@@ -1,6 +1,7 @@
 package dev.jilaton.client.module;
 
 import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.FlightModule;
 import dev.jilaton.client.module.impl.AimAssistModule;
 import dev.jilaton.client.module.impl.AntiBotModule;
 import dev.jilaton.client.module.impl.CrystalAuraModule;
@@ -15,6 +16,7 @@ import dev.jilaton.client.module.impl.AutoRodModule;
 import dev.jilaton.client.module.impl.AutoShootModule;
 import dev.jilaton.client.module.impl.AutoWeaponModule;
 import dev.jilaton.client.module.impl.AutoBuffRefillModule;
+import dev.jilaton.client.module.impl.AutoReplenishModule;
 import dev.jilaton.client.module.impl.BowAimModule;
 import dev.jilaton.client.module.impl.AnchorAuraModule;
 import dev.jilaton.client.module.impl.WTapModule;
@@ -27,6 +29,8 @@ import dev.jilaton.client.module.impl.SpeedModule;
 import dev.jilaton.client.module.impl.HitboxModule;
 import dev.jilaton.client.module.impl.InventoryMoveModule;
 import dev.jilaton.client.module.impl.KillAuraModule;
+import dev.jilaton.client.module.impl.ClickPatternDistribution;
+import dev.jilaton.client.module.impl.TeamsModule;
 import dev.jilaton.client.module.impl.NoFallModule;
 import dev.jilaton.client.module.impl.NoJumpDelayModule;
 import dev.jilaton.client.module.impl.StepModule;
@@ -38,6 +42,7 @@ import dev.jilaton.client.module.impl.LongJumpModule;
 import dev.jilaton.client.module.impl.ReachModule;
 import dev.jilaton.client.module.impl.VelocityModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import org.junit.jupiter.api.Test;
@@ -51,6 +56,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModuleManagerTest {
+    @Test
+    void teamsExposeScoreboardAndNameColorMatching() {
+        TeamsModule module = new ModuleManager().get("teams") instanceof TeamsModule teams ? teams : null;
+
+        assertTrue(module != null);
+        assertTrue(module.enabledByDefault());
+        assertTrue(module.ignoreTeammates());
+        assertTrue(module.matchNameColor().value());
+        assertTrue(module.settings().stream().filter(setting -> setting.id().equals("armor_head"))
+                .map(BooleanSetting.class::cast).findFirst().orElseThrow().value());
+        assertFalse(module.settings().stream().filter(setting -> setting.id().equals("armor_chest"))
+                .map(BooleanSetting.class::cast).findFirst().orElseThrow().value());
+    }
+
     @Test
     void aimAssistExposesFactorSmoothingAndIndependentAxes() {
         AimAssistModule module = new ModuleManager().get("aim_assist") instanceof AimAssistModule aimAssist
@@ -103,7 +122,23 @@ class ModuleManagerTest {
 
         assertTrue(velocity instanceof VelocityModule);
         assertEquals(ModuleCategory.COMBAT, velocity.category());
-        assertEquals(19, velocity.settings().size());
+        assertEquals(21, velocity.settings().size());
+        assertFalse(velocity.settings().stream().filter(setting -> setting.id().equals("strafe_only_facing"))
+                .map(BooleanSetting.class::cast).findFirst().orElseThrow().value());
+        assertEquals(3.5, velocity.settings().stream().filter(setting -> setting.id().equals("strafe_facing_range"))
+                .map(NumberSetting.class::cast).findFirst().orElseThrow().value(), 1.0E-9);
+    }
+
+    @Test
+    void flightRegistersRealCreativeModeControls() {
+        FlightModule flight = new ModuleManager().get("flight") instanceof FlightModule module ? module : null;
+
+        assertTrue(flight != null);
+        assertEquals(ModuleCategory.MOVEMENT, flight.category());
+        assertEquals(0.1, flight.speed().value(), 1.0E-9);
+        assertEquals(4.0, flight.maxVelocity().value(), 1.0E-9);
+        assertTrue(flight.forceFlight().value());
+        assertTrue(flight.bypassVanillaCheck().value());
     }
 
     @Test
@@ -124,6 +159,11 @@ class ModuleManagerTest {
         assertTrue(autoShoot instanceof AutoShootModule);
         assertEquals(ModuleCategory.COMBAT, autoShoot.category());
         assertEquals(18, autoShoot.settings().size());
+        ChoiceSetting clickPattern = autoShoot.settings().stream()
+                .filter(setting -> setting.id().equals("click_pattern"))
+                .map(ChoiceSetting.class::cast)
+                .findFirst().orElseThrow();
+        assertTrue(clickPattern.choices().containsAll(ClickPatternDistribution.OPTIONS));
         assertFalse(autoShoot.enabled());
     }
 
@@ -305,6 +345,17 @@ class ModuleManagerTest {
     }
 
     @Test
+    void autoReplenishIsRegisteredWithThresholdModesAndOffhandControl() {
+        ModuleManager manager = new ModuleManager();
+        ClientModule replenish = manager.get("auto_replenish");
+
+        assertTrue(replenish instanceof AutoReplenishModule);
+        assertEquals(ModuleCategory.PLAYER, replenish.category());
+        assertFalse(replenish.enabled());
+        assertEquals(4, replenish.settings().size());
+    }
+
+    @Test
     void bowAimIsRegisteredWithProjectileAndTargetControls() {
         ModuleManager manager = new ModuleManager();
         ClientModule bowAim = manager.get("bow_aim");
@@ -423,9 +474,17 @@ class ModuleManagerTest {
         assertTrue(module.priority().choices().containsAll(java.util.List.of("Distance", "Health", "Angle")));
         assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("players")));
         assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("hostiles")));
+        ChoiceSetting raycastMode = module.settings().stream()
+                .filter(setting -> setting.id().equals("raycast_mode"))
+                .map(ChoiceSetting.class::cast)
+                .findFirst().orElseThrow();
+        assertEquals(java.util.List.of("None", "Enemy", "All"), raycastMode.choices());
+        assertEquals("None", raycastMode.value());
         assertEquals(6.0, module.minimumClicksPerSecond().value());
         assertEquals(8.0, module.clicksPerSecond().value());
         assertEquals("Normal distribution", module.clickPattern().value());
+        assertTrue(module.clickPattern().choices().containsAll(ClickPatternDistribution.OPTIONS));
+        assertTrue(module.respectAttackCooldown().value());
     }
 
     @Test
@@ -512,6 +571,8 @@ class ModuleManagerTest {
         assertTrue(module != null);
         assertEquals(8.0, module.minimumClicksPerSecond().value());
         assertEquals(8.0, module.clicksPerSecond().value());
+        assertEquals("Enemy", module.objective().value());
+        assertTrue(module.objective().choices().containsAll(java.util.List.of("Enemy", "Entity", "Block", "Any")));
         assertTrue(module.requireAttackKey().value());
         assertTrue(module.respectAttackCooldown().value());
         assertTrue(module.pauseWhileUsingItem().value());

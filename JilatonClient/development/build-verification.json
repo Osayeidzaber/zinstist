@@ -1,0 +1,10 @@
+{
+  "tests": 259,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "artifact": "build/libs/jilaton-client-0.1.0.jar",
+  "size_bytes": 427662,
+  "sha256": "2e620bf823b24e76bc472d412e89a80d164b8a3a8e6b8197fd9602f727fe64bf",
+  "packaging_checks": "Zoom and new remapped Mixins present; no reference client classes bundled"
+}

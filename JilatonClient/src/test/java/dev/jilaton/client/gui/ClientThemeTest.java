@@ -12,8 +12,8 @@ class ClientThemeTest {
     }
 
     @Test
-    void invalidThemeOrColorFallsBackToJilatonViolet() {
-        assertEquals(ClientTheme.VIOLET.accent(), ClientTheme.resolveAccent("missing", "000000"));
-        assertEquals(ClientTheme.VIOLET.accent(), ClientTheme.resolveAccent("custom", "bad"));
+    void invalidThemeOrColorFallsBackToJilatonObsidian() {
+        assertEquals(ClientTheme.OBSIDIAN.accent(), ClientTheme.resolveAccent("missing", "000000"));
+        assertEquals(ClientTheme.OBSIDIAN.accent(), ClientTheme.resolveAccent("custom", "bad"));
     }
 }

@@ -17,6 +17,7 @@
     "ConnectionPacketSendMixin",
     "NoMissCooldownMixin",
     "ServerboundMovePlayerPacketAccessor",
+    "LocalPlayerFlightAccessor",
     "VelocityPacketMixin",
     "AutoTotemPacketMixin",
     "WTapAttackMixin",
@@ -26,7 +27,14 @@
     "LivingEntityTravelMixin",
     "KeepSprintMixin",
     "HighJumpMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "HudMouseInputMixin",
+    "ZoomFovMixin",
+    "ZoomMouseMixin",
+    "OverlayPipelineAccess",
+    "OverlayRenderTypeAccess",
+    "EntityGlowMixin",
+    "EntityGlowColorMixin"
   ],
   "injectors": {
     "defaultRequire": 1

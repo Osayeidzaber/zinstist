@@ -19,4 +19,12 @@ class CrystalSafetyPolicyTest {
         assertFalse(CrystalSafetyPolicy.friendDamageIsSafe(Float.NaN, 8.0F, 20.0F));
         assertFalse(CrystalSafetyPolicy.friendDamageIsSafe(1.0F, -1.0F, 20.0F));
     }
+
+    @Test
+    void protectsExplicitFriendsAndScoreboardAlliesButNotSelfOrUnrelatedPlayers() {
+        assertTrue(CrystalSafetyPolicy.shouldProtectExplosionVictim(false, true, false));
+        assertTrue(CrystalSafetyPolicy.shouldProtectExplosionVictim(false, false, true));
+        assertFalse(CrystalSafetyPolicy.shouldProtectExplosionVictim(false, false, false));
+        assertFalse(CrystalSafetyPolicy.shouldProtectExplosionVictim(true, true, true));
+    }
 }

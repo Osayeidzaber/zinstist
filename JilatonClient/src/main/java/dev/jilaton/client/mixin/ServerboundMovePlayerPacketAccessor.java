@@ -10,4 +10,8 @@ public interface ServerboundMovePlayerPacketAccessor {
     @Mutable
     @Accessor("onGround")
     void jilaton$setOnGround(boolean onGround);
+
+    @Mutable
+    @Accessor("y")
+    void jilaton$setY(double y);
 }

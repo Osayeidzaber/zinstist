@@ -18,7 +18,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 /** A target-aware throw module for eggs and snowballs, with an opt-in generic held-item mode. */
 public final class AutoShootModule extends ClientModule {
@@ -45,7 +44,7 @@ public final class AutoShootModule extends ClientModule {
     private int originalSlot = -1;
     private int ownedSlot = -1;
     private boolean manualSlotOverride;
-    private long nextThrowAtNanos;
+    private final ClickSchedule throwSchedule = new ClickSchedule();
 
     public AutoShootModule() {
         super("auto_shoot", "AutoShoot", "Aims and throws configured projectiles at visible players.",
@@ -69,14 +68,14 @@ public final class AutoShootModule extends ClientModule {
         minimumCps = addSetting(new NumberSetting("minimum_cps", "Minimum throws per second", 1.0, 20.0, 1.0, 5.0));
         maximumCps = addSetting(new NumberSetting("maximum_cps", "Maximum throws per second", 1.0, 20.0, 1.0, 8.0));
         clickPattern = addSetting(new ChoiceSetting("click_pattern", "Throw timing",
-                List.of("Steady", "Normal distribution"), "Normal distribution"));
+                ClickPatternDistribution.OPTIONS, "Normal distribution"));
         requiresKillAura = addSetting(new BooleanSetting("requires_kill_aura", "Require KillAura enabled", false));
     }
 
     @Override
     protected void onEnable(Minecraft client) {
         currentTarget = null;
-        nextThrowAtNanos = 0L;
+        throwSchedule.reset();
         manualSlotOverride = false;
     }
 
@@ -84,12 +83,14 @@ public final class AutoShootModule extends ClientModule {
     protected void onDisable(Minecraft client) {
         restoreOwnedSlot(client.player);
         currentTarget = null;
-        nextThrowAtNanos = 0L;
+        throwSchedule.reset();
         manualSlotOverride = false;
     }
 
     @Override
     protected void onTick(Minecraft client) {
+        int scheduledThrows = throwSchedule.advanceClicks(
+                minimumCps.value(), maximumCps.value(), clickPattern.value());
         Player player = client.player;
         if (player == null || client.level == null || client.gameMode == null || client.screen != null
                 || player.isUsingItem() || !killAuraRequirementMet() || shouldYieldToOtherActions(client)) {
@@ -126,18 +127,27 @@ public final class AutoShootModule extends ClientModule {
                 new RotationAngles(solution.yaw(), solution.pitch()));
         boolean ready = AutoShootPolicy.canShoot(new AutoShootPolicy.Conditions(
                 client.screen == null && !player.isUsingItem(), target.isAlive(), !choice.stack().isEmpty(),
-                solution != null, System.nanoTime() >= nextThrowAtNanos,
+                solution != null, scheduledThrows > 0,
                 aimError <= aimTolerance.value() && !player.getCooldowns().isOnCooldown(choice.stack())));
         if (!ready) {
             return;
         }
 
-        InteractionResult result = client.gameMode.useItem(player, choice.hand());
-        if (result.consumesAction()) {
+        int throwsThisTick = AutoShootPolicy.throwsThisTick(scheduledThrows);
+        boolean consumedAction = false;
+        for (int attempt = 0; attempt < throwsThisTick; attempt++) {
+            if (player.isUsingItem() || choice.stack().isEmpty()
+                    || player.getCooldowns().isOnCooldown(choice.stack())) {
+                break;
+            }
+            InteractionResult result = client.gameMode.useItem(player, choice.hand());
+            if (!result.consumesAction()) {
+                break;
+            }
             player.swing(choice.hand());
-            nextThrowAtNanos = System.nanoTime() + ClickTiming.intervalNanos(
-                    ClickTiming.sampleCps(minimumCps.value(), maximumCps.value(), clickPattern.value(),
-                            ThreadLocalRandom.current().nextGaussian()));
+            consumedAction = true;
+        }
+        if (consumedAction) {
             restoreOwnedSlot(player);
         }
     }

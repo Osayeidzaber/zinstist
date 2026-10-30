@@ -7,6 +7,7 @@ import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
+import dev.jilaton.client.setting.TextSetting;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,13 +27,18 @@ import java.util.Properties;
 public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
-    private static final Set<String> THEME_IDS = Set.of("violet", "blue", "cyan", "rose", "amber", "custom");
-    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target");
+    private static final Set<String> THEME_IDS = Set.of("obsidian", "violet", "blue", "cyan", "rose", "amber", "custom");
+    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target", "armor", "effects", "cps", "notifications");
     private final Path path;
     private final Path profilesDirectory;
     private final Map<String, HudPosition> hudPositions = new HashMap<>();
-    private String themeId = "violet";
+    private final Map<String, HudStyle> hudStyles = new HashMap<>();
+    private String themeId = "obsidian";
     private String customAccent = "8878FF";
+    private boolean reducedMotion;
+
+    public boolean reducedMotion() { return reducedMotion; }
+    public void setReducedMotion(boolean reducedMotion) { this.reducedMotion = reducedMotion; }
 
     public ClientConfig(Path configDirectory) {
         this.path = configDirectory.resolve("jilaton.properties");
@@ -82,6 +88,21 @@ public final class ClientConfig {
         hudPositions.remove(widgetId);
     }
 
+    public HudStyle hudStyle(String widgetId) {
+        requireHudWidgetId(widgetId);
+        return hudStyles.getOrDefault(widgetId, HudStyle.DEFAULT);
+    }
+
+    public void setHudStyle(String widgetId, HudStyle style) {
+        requireHudWidgetId(widgetId);
+        hudStyles.put(widgetId, java.util.Objects.requireNonNull(style));
+    }
+
+    public void resetHudWidget(String widgetId) {
+        clearHudPosition(widgetId);
+        hudStyles.remove(widgetId);
+    }
+
     public void setCustomAccent(String customAccent) {
         if (customAccent == null || !customAccent.matches("[0-9A-Fa-f]{6}")) {
             throw new IllegalArgumentException("Accent color must be six hexadecimal digits");
@@ -126,6 +147,8 @@ public final class ClientConfig {
 
     private void apply(Properties values, ModuleManager modules) {
         hudPositions.clear();
+        hudStyles.clear();
+        reducedMotion = Boolean.parseBoolean(values.getProperty("ui.reduced_motion", "false"));
         String configuredFriends = values.getProperty("friends.names");
         if (configuredFriends != null) {
             FriendManager.replace(List.of(configuredFriends.split(",")));
@@ -148,6 +171,26 @@ public final class ClientConfig {
         }
 
         for (String widgetId : HUD_WIDGET_IDS) {
+            String stylePrefix = "hud.style." + widgetId + ".";
+            try {
+                HudStyle defaults = HudStyle.DEFAULT;
+                String accent = values.getProperty(stylePrefix + "accent", "theme");
+                if (!accent.equals("theme") && !accent.matches("[0-9a-fA-F]{6}")) {
+                    throw new IllegalArgumentException("Invalid HUD accent");
+                }
+                String visible = values.getProperty(stylePrefix + "visible", "true");
+                if (!visible.equals("true") && !visible.equals("false")) {
+                    throw new IllegalArgumentException("Invalid HUD visibility");
+                }
+                setHudStyle(widgetId, new HudStyle(
+                        Double.parseDouble(values.getProperty(stylePrefix + "scale", Double.toString(defaults.scale()))),
+                        Double.parseDouble(values.getProperty(stylePrefix + "panel_opacity", Double.toString(defaults.panelOpacity()))),
+                        accent.equals("theme") ? null : Integer.parseInt(accent, 16),
+                        HudStyle.Alignment.valueOf(values.getProperty(stylePrefix + "alignment", "FREE")),
+                        Boolean.parseBoolean(visible)));
+            } catch (IllegalArgumentException exception) {
+                System.err.println("Jilaton ignored invalid HUD appearance for " + widgetId);
+            }
             String prefix = "hud.position." + widgetId + ".";
             String x = values.getProperty(prefix + "x");
             String y = values.getProperty(prefix + "y");
@@ -182,6 +225,8 @@ public final class ClientConfig {
                         numberSetting.setValue(Double.parseDouble(value));
                     } else if (setting instanceof ChoiceSetting choiceSetting) {
                         choiceSetting.setValue(value);
+                    } else if (setting instanceof TextSetting textSetting) {
+                        textSetting.setValue(value);
                     }
                 } catch (IllegalArgumentException exception) {
                     System.err.println("Jilaton ignored invalid setting " + key);
@@ -213,8 +258,17 @@ public final class ClientConfig {
         Properties values = new Properties();
         values.setProperty("ui.theme", themeId);
         values.setProperty("ui.custom_accent", customAccent);
+        values.setProperty("ui.reduced_motion", Boolean.toString(reducedMotion));
         values.setProperty("friends.names", String.join(",", FriendManager.names()));
         for (String widgetId : HUD_WIDGET_IDS) {
+            HudStyle style = hudStyle(widgetId);
+            String stylePrefix = "hud.style." + widgetId + ".";
+            values.setProperty(stylePrefix + "scale", Double.toString(style.scale()));
+            values.setProperty(stylePrefix + "panel_opacity", Double.toString(style.panelOpacity()));
+            values.setProperty(stylePrefix + "accent", style.accent() == null ? "theme"
+                    : String.format(java.util.Locale.ROOT, "%06X", style.accent()));
+            values.setProperty(stylePrefix + "alignment", style.alignment().name());
+            values.setProperty(stylePrefix + "visible", Boolean.toString(style.visible()));
             HudPosition position = hudPositions.get(widgetId);
             if (position != null) {
                 String prefix = "hud.position." + widgetId + ".";
@@ -232,6 +286,8 @@ public final class ClientConfig {
                     values.setProperty(settingKey(module, setting), Double.toString(numberSetting.value()));
                 } else if (setting instanceof ChoiceSetting choiceSetting) {
                     values.setProperty(settingKey(module, setting), choiceSetting.value());
+                } else if (setting instanceof TextSetting textSetting) {
+                    values.setProperty(settingKey(module, setting), textSetting.value());
                 }
             }
         }

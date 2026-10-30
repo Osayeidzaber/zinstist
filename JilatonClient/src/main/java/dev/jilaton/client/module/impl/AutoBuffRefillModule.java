@@ -41,6 +41,10 @@ public final class AutoBuffRefillModule extends ClientModule {
 
     @Override
     protected void onTick(Minecraft client) {
+        ClientModule replenish = JilatonClient.moduleManager().get("auto_replenish");
+        if (replenish instanceof AutoReplenishModule autoReplenish && autoReplenish.busy()) {
+            return;
+        }
         Player player = client.player;
         if (player == null || client.level == null || client.gameMode == null) {
             return;

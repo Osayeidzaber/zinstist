@@ -13,8 +13,10 @@ import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
@@ -32,6 +34,8 @@ public final class VelocityModule extends ClientModule {
     private final NumberSetting strafeDelay;
     private final NumberSetting strafeStrength;
     private final BooleanSetting untilGround;
+    private final BooleanSetting strafeOnlyFacing;
+    private final NumberSetting strafeFacingRange;
     private final BooleanSetting jumpReset;
     private final NumberSetting jumpChance;
     private final ChoiceSetting jumpCooldownMode;
@@ -63,6 +67,8 @@ public final class VelocityModule extends ClientModule {
         strafeDelay = addSetting(new NumberSetting("strafe_delay", "Strafe delay", 0.0, 10.0, 1.0, 2.0));
         strafeStrength = addSetting(new NumberSetting("strafe_strength", "Strafe strength", 10.0, 200.0, 5.0, 100.0));
         untilGround = addSetting(new BooleanSetting("until_ground", "Continue until grounded", false));
+        strafeOnlyFacing = addSetting(new BooleanSetting("strafe_only_facing", "Strafe only while facing a target", false));
+        strafeFacingRange = addSetting(new NumberSetting("strafe_facing_range", "Facing target range", 0.1, 6.0, 0.1, 3.5));
         jumpReset = addSetting(new BooleanSetting("jump_reset", "Jump reset", false));
         jumpChance = addSetting(new NumberSetting("jump_chance", "Jump chance", 0.0, 100.0, 1.0, 100.0));
         jumpCooldownMode = addSetting(new ChoiceSetting("jump_cooldown_mode", "Jump cooldown mode",
@@ -161,14 +167,16 @@ public final class VelocityModule extends ClientModule {
                 pendingStrafeTicks--;
             }
             if (pendingStrafeTicks == 0) {
-                applyStrafe(player);
+                if (shouldApplyStrafe(client, player)) {
+                    applyStrafe(player);
+                }
                 pendingStrafeTicks = -1;
                 strafeUntilGround = untilGround.value() && !player.onGround();
             }
         } else if (responseMode.value().equals("Strafe") && strafeUntilGround) {
             if (!untilGround.value() || player.onGround()) {
                 strafeUntilGround = false;
-            } else {
+            } else if (shouldApplyStrafe(client, player)) {
                 applyStrafe(player);
             }
         }
@@ -222,6 +230,26 @@ public final class VelocityModule extends ClientModule {
                 velocity.x, velocity.z, player.getYRot(), forward, backward, left, right,
                 Math.hypot(velocity.x, velocity.z) * strafeStrength.value() / 100.0);
         player.setDeltaMovement(horizontal.x(), velocity.y, horizontal.z());
+    }
+
+    private boolean shouldApplyStrafe(Minecraft client, LocalPlayer player) {
+        if (!strafeOnlyFacing.value() || client.level == null) {
+            return true;
+        }
+        Vec3 origin = player.getEyePosition();
+        Vec3 direction = player.getViewVector(1.0F);
+        double range = strafeFacingRange.value();
+        for (Player candidate : client.level.players()) {
+            if (candidate == player || !candidate.isAlive() || candidate.isSpectator()
+                    || !PlayerTargetFilters.allowsPlayer(client, player, candidate)) {
+                continue;
+            }
+            AABB targetBox = candidate.getBoundingBox().inflate(candidate.getPickRadius());
+            if (VelocityFacingPolicy.rayIntersectsTarget(origin, direction, range, targetBox)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void applyReversal(LocalPlayer player) {

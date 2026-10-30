@@ -23,6 +23,6 @@ public final class PlayerTargetFilters {
 
         ClientModule teamsModule = JilatonClient.moduleManager().get("teams");
         return !(teamsModule instanceof TeamsModule teams && teams.enabled() && teams.ignoreTeammates()
-                && self.isAlliedTo(candidate));
+                && teams.matches(self, candidate));
     }
 }

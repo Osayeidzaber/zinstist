@@ -307,6 +307,10 @@ public final class AutoRodModule extends ClientModule {
         pullDeadline = 0L;
     }
 
+    public boolean isManagingHotbar() {
+        return originalSlot >= 0 || offhandRod || pendingTarget != null;
+    }
+
     static float aimErrorDegrees(Player self, Player target) {
         RotationAngles desired = aimRotation(self, target);
         return RotationPolicy.angularError(self.getYRot(), self.getXRot(), desired);

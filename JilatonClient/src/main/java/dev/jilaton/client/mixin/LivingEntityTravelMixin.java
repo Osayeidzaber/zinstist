@@ -16,7 +16,8 @@ import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityTravelMixin {
     @ModifyArgs(
-            method = "travel",
+            method = {"travelFlying", "travelInWater", "travelInLava", "travelFallFlying",
+                    "handleRelativeFrictionAndCalculateMovement"},
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/world/entity/LivingEntity;move(Lnet/minecraft/world/entity/MoverType;Lnet/minecraft/world/phys/Vec3;)V"

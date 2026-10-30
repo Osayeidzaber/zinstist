@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(Entity.class)
 public abstract class StepMixin {
-    @Redirect(method = "move", at = @At(value = "INVOKE",
+    @Redirect(method = "collide", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/Entity;maxUpStep()F"))
     private float jilaton$useConfiguredStepHeight(Entity entity) {
         float vanillaHeight = entity.maxUpStep();

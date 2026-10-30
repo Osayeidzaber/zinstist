@@ -8,9 +8,11 @@ import dev.jilaton.client.module.impl.AutoArmorModule;
 import dev.jilaton.client.module.impl.AutoLeaveModule;
 import dev.jilaton.client.module.impl.AutoBuffRefillModule;
 import dev.jilaton.client.module.impl.AutoClickerModule;
+import dev.jilaton.client.module.impl.AutoEatModule;
 import dev.jilaton.client.module.impl.AutoGappleModule;
 import dev.jilaton.client.module.impl.AutoHeadModule;
 import dev.jilaton.client.module.impl.AutoPotModule;
+import dev.jilaton.client.module.impl.AutoReplenishModule;
 import dev.jilaton.client.module.impl.AutoSoupModule;
 import dev.jilaton.client.module.impl.AutoRodModule;
 import dev.jilaton.client.module.impl.AutoShootModule;
@@ -21,6 +23,8 @@ import dev.jilaton.client.module.impl.CrystalAuraModule;
 import dev.jilaton.client.module.impl.ElytraTargetModule;
 import dev.jilaton.client.module.impl.CriticalsModule;
 import dev.jilaton.client.module.impl.FullbrightModule;
+import dev.jilaton.client.module.impl.FlightModule;
+import dev.jilaton.client.module.impl.FastFallModule;
 import dev.jilaton.client.module.impl.HighJumpModule;
 import dev.jilaton.client.module.impl.FriendsModule;
 import dev.jilaton.client.module.impl.HitboxModule;
@@ -66,6 +70,10 @@ public final class ModuleManager {
     private final Collection<ClientModule> modulesView = Collections.unmodifiableCollection(modules.values());
     private final Map<String, Boolean> previousKeyStates = new HashMap<>();
     private final RotationManager rotationManager = new RotationManager();
+    private final dev.jilaton.client.notification.NotificationCenter notifications =
+            new dev.jilaton.client.notification.NotificationCenter();
+
+    public dev.jilaton.client.notification.NotificationCenter notifications() { return notifications; }
 
     public ModuleManager() {
         register(new AntiBotModule());
@@ -91,12 +99,14 @@ public final class ModuleManager {
         register(new TargetStrafeModule());
         register(new AutoClickerModule());
         register(new AutoTotemModule());
+        register(new AutoReplenishModule());
         register(new AutoWeaponModule());
         register(new AutoPotModule());
         register(new AutoRodModule());
         register(new AutoGappleModule());
         register(new AutoSoupModule());
         register(new AutoHeadModule());
+        register(new AutoEatModule());
         register(new AutoBuffRefillModule());
         register(new AutoArmorModule());
         register(new SprintModule());
@@ -109,15 +119,23 @@ public final class ModuleManager {
         register(new StepModule());
         register(new HighJumpModule());
         register(new LongJumpModule());
+        register(new FlightModule());
         register(new NoFallModule());
         register(new NoSlowModule());
+        register(new FastFallModule());
         register(new FullbrightModule());
         register(new SwingAnimationsModule());
         register(new NoBobModule());
+        register(new dev.jilaton.client.module.impl.ZoomModule());
+        register(new dev.jilaton.client.module.impl.PlayerEspModule());
+        register(new dev.jilaton.client.module.impl.ItemEspModule());
+        register(new dev.jilaton.client.module.impl.TracersModule());
         register(new HudModule());
     }
 
     private void register(ClientModule module) {
+        module.setStateListener(changed -> notifications.push(changed.id(), changed.name()
+                + (changed.enabled() ? " enabled" : " disabled"), changed.enabled(), System.nanoTime()));
         if (modules.putIfAbsent(module.id(), module) != null) {
             throw new IllegalStateException("Duplicate module id: " + module.id());
         }
@@ -191,6 +209,8 @@ public final class ModuleManager {
 
     private void updateKeybinds(Minecraft client) {
         if (client.screen != null || client.getWindow() == null) {
+            modules.values().stream().filter(module -> module.holdKey() && module.keyCode() >= 0)
+                    .forEach(module -> module.setEnabled(false));
             previousKeyStates.replaceAll((id, wasDown) -> false);
             return;
         }
@@ -200,7 +220,9 @@ public final class ModuleManager {
             int keyCode = module.keyCode();
             boolean down = keyCode >= 0 && GLFW.glfwGetKey(window, keyCode) == GLFW.GLFW_PRESS;
             boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
-            if (down && !wasDown) {
+            if (module.holdKey() && keyCode >= 0) {
+                module.setEnabled(down && client.isWindowActive());
+            } else if (down && !wasDown) {
                 module.toggle();
             }
             previousKeyStates.put(module.id(), down);

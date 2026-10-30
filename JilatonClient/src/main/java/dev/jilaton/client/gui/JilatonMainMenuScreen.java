@@ -14,8 +14,8 @@ import java.util.List;
 
 /** Original, lightweight title screen for Jilaton. */
 public final class JilatonMainMenuScreen extends Screen {
-    private static final int INK = 0xFF080A12;
-    private static final int PANEL = 0xF20D101B;
+    private static final int INK = 0xFF050506;
+    private static final int PANEL = 0xF20A0B0D;
     private static final int MUTED = 0xFF838BA0;
     private final List<MenuAction> actions = new ArrayList<>(5);
     private int panelX;
@@ -43,9 +43,11 @@ public final class JilatonMainMenuScreen extends Screen {
         if (compact) {
             int buttonWidth = Math.min(panelWidth - 36, 390);
             int buttonX = (width - buttonWidth) / 2;
-            int buttonHeight = height < 360 ? 28 : 36;
             int gap = height < 360 ? 4 : 7;
             int buttonY = panelY + Math.min(116, Math.max(76, panelHeight / 3));
+            int availableHeight = panelY + panelHeight - 24 - buttonY;
+            int buttonHeight = Math.min(height < 360 ? 28 : 36,
+                    Math.max(12, (availableHeight - gap * 4) / 5));
             addAction("Singleplayer", "Open a local world", buttonX, buttonY, buttonWidth, buttonHeight,
                     false, () -> minecraft.setScreen(new SelectWorldScreen(this)));
             addAction("Multiplayer", "Join a server", buttonX, buttonY += buttonHeight + gap,
@@ -92,7 +94,7 @@ public final class JilatonMainMenuScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        double time = System.nanoTime() / 1_000_000_000.0;
+        double time = JilatonClient.clientConfig().reducedMotion() ? 0.0 : System.nanoTime() / 1_000_000_000.0;
         renderBackdrop(graphics, time);
         renderPanel(graphics);
         if (compact) {

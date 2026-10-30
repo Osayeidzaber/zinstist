@@ -12,4 +12,9 @@ public final class CrystalSafetyPolicy {
         }
         return damage <= 0.0F || damage <= maximumDamage && damage * 1.15F + 2.0F < effectiveHealth;
     }
+
+    public static boolean shouldProtectExplosionVictim(boolean self, boolean explicitlyFriended,
+                                                        boolean scoreboardAlly) {
+        return !self && (explicitlyFriended || scoreboardAlly);
+    }
 }

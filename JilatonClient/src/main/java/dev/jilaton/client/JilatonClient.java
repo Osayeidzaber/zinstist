@@ -55,6 +55,7 @@ public final class JilatonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
+        MODULES.notifications().clear();
         JilatonCommands.register(CONFIG);
         AttackEntityCallback.EVENT.register((attacker, world, hand, target, hitResult) -> {
             ClientModule criticals = MODULES.get("criticals");
@@ -79,6 +80,7 @@ public final class JilatonClient implements ClientModInitializer {
         HudRenderer hudRenderer = new HudRenderer(MODULES, CONFIG);
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("jilaton", "hud"), hudRenderer::render);
         FriendHatRenderer.register();
+        new dev.jilaton.client.render.EntityOverlayRenderer(MODULES, CONFIG).register();
         Category category = Category.register(Identifier.fromNamespaceAndPath("jilaton", "main"));
         openGui = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.jilaton.open_gui",

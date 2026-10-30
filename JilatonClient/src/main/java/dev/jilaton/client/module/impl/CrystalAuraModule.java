@@ -177,6 +177,9 @@ public final class CrystalAuraModule extends ClientModule {
                     || !self.hasLineOfSight(crystal)) {
                 continue;
             }
+            if (targetDamage.upperBound(crystal.position()) < requiredTargetDamage(target, true)) {
+                continue;
+            }
             float damageToTarget = targetDamage.estimate(crystal.position());
             float damageToSelf = selfDamage.estimate(crystal.position());
             if (!isSafe(damageToTarget, damageToSelf, self, target, true, crystal.position(), friends)) {
@@ -215,6 +218,9 @@ public final class CrystalAuraModule extends ClientModule {
                         continue;
                     }
 
+                    if (targetDamage.upperBound(center) < requiredTargetDamage(target, false)) {
+                        continue;
+                    }
                     float damageToTarget = targetDamage.estimate(center);
                     float damageToSelf = selfDamage.estimate(center);
                     if (!isSafe(damageToTarget, damageToSelf, self, target, false, center, friends)) {
@@ -240,10 +246,14 @@ public final class CrystalAuraModule extends ClientModule {
             return false;
         }
         for (FriendRisk friend : friends) {
+            float friendEffectiveHealth = friend.player().getHealth() + friend.player().getAbsorptionAmount();
+            float maximumFriendDamage = (float) maximumSelfDamage.value();
+            if (CrystalSafetyPolicy.friendDamageIsSafe(friend.estimator().upperBound(explosionCenter),
+                    maximumFriendDamage, friendEffectiveHealth)) {
+                continue;
+            }
             float friendDamage = friend.estimator().estimate(explosionCenter);
-            float friendHealth = friend.player().getHealth() + friend.player().getAbsorptionAmount();
-            if (!CrystalSafetyPolicy.friendDamageIsSafe(friendDamage, (float) maximumSelfDamage.value(),
-                    friendHealth)) {
+            if (!CrystalSafetyPolicy.friendDamageIsSafe(friendDamage, maximumFriendDamage, friendEffectiveHealth)) {
                 return false;
             }
         }
@@ -253,7 +263,8 @@ public final class CrystalAuraModule extends ClientModule {
     private static List<FriendRisk> friendRisks(Minecraft client, Player self) {
         List<FriendRisk> friends = new ArrayList<>();
         for (Player player : client.level.players()) {
-            if (player != self && player.isAlive() && FriendManager.contains(player)) {
+            if (player.isAlive() && CrystalSafetyPolicy.shouldProtectExplosionVictim(player == self,
+                    FriendManager.contains(player), self.isAlliedTo(player))) {
                 friends.add(new FriendRisk(player, new CrystalDamageEstimator(client.level, player)));
             }
         }

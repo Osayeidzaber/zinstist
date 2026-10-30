@@ -12,7 +12,7 @@ import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
@@ -24,13 +24,14 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
 
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 public final class AutoClickerModule extends ClientModule {
     private final NumberSetting clicksPerSecond;
     private final NumberSetting minimumClicksPerSecond;
+    private final ChoiceSetting objective;
     private final BooleanSetting playersOnly;
     private final BooleanSetting requireAttackKey;
     private final BooleanSetting respectAttackCooldown;
@@ -44,8 +45,8 @@ public final class AutoClickerModule extends ClientModule {
     private final ChoiceSetting weaponFilter;
     private final BooleanSetting delayOnBlockBreak;
     private final NumberSetting delayPostUseTicks;
-    private long nextAttackAt;
-    private long nextUseAt;
+    private final ClickSchedule attackSchedule = new ClickSchedule();
+    private final ClickSchedule useSchedule = new ClickSchedule();
     private volatile long lastBlockBreakAtNanos = Long.MIN_VALUE;
     private long attackResumeTick = Long.MIN_VALUE;
     private boolean wasUsingItem;
@@ -55,6 +56,8 @@ public final class AutoClickerModule extends ClientModule {
         minimumClicksPerSecond = addSetting(new NumberSetting("minimum_cps", "Minimum CPS", 1.0, 20.0, 1.0, 8.0));
         // Keep the original "cps" setting id so existing user configurations remain valid.
         clicksPerSecond = addSetting(new NumberSetting("cps", "Maximum CPS", 1.0, 20.0, 1.0, 8.0));
+        objective = addSetting(new ChoiceSetting("objective", "Attack objective",
+                List.of("Enemy", "Entity", "Block", "Any"), "Enemy"));
         playersOnly = addSetting(new BooleanSetting("players_only", "Players only", true));
         requireAttackKey = addSetting(new BooleanSetting("require_attack_key", "Require attack key", true));
         respectAttackCooldown = addSetting(new BooleanSetting("respect_attack_cooldown", "Respect attack cooldown", true));
@@ -64,7 +67,7 @@ public final class AutoClickerModule extends ClientModule {
         rightClickRequiresInput = addSetting(new BooleanSetting("right_click_requires_input", "Require use key", true));
         rightClickBlockOnly = addSetting(new BooleanSetting("right_click_block_only", "Blocks only", false));
         ignoreSpecialUseItems = addSetting(new BooleanSetting("ignore_special_use_items", "Ignore pearls and buckets", true));
-        pattern = addSetting(new ChoiceSetting("pattern", "Click pattern", List.of("Steady", "Normal distribution"),
+        pattern = addSetting(new ChoiceSetting("pattern", "Click pattern", ClickPatternDistribution.OPTIONS,
                 "Steady"));
         weaponFilter = addSetting(new ChoiceSetting("weapon_filter", "Weapon filter",
                 List.of("Any", "Sword", "Axe", "Mace", "Spear / Trident", "Knockback", "Fire Aspect", "Any weapon"),
@@ -76,8 +79,8 @@ public final class AutoClickerModule extends ClientModule {
 
     @Override
     protected void onEnable(Minecraft client) {
-        nextAttackAt = 0L;
-        nextUseAt = 0L;
+        attackSchedule.reset();
+        useSchedule.reset();
         lastBlockBreakAtNanos = Long.MIN_VALUE;
         attackResumeTick = Long.MIN_VALUE;
         wasUsingItem = false;
@@ -85,8 +88,8 @@ public final class AutoClickerModule extends ClientModule {
 
     @Override
     protected void onDisable(Minecraft client) {
-        nextAttackAt = 0L;
-        nextUseAt = 0L;
+        attackSchedule.reset();
+        useSchedule.reset();
         lastBlockBreakAtNanos = Long.MIN_VALUE;
         attackResumeTick = Long.MIN_VALUE;
         wasUsingItem = false;
@@ -94,14 +97,17 @@ public final class AutoClickerModule extends ClientModule {
 
     @Override
     protected void onTick(Minecraft client) {
+        int attackScheduled = attackSchedule.advanceClicks(minimumClicksPerSecond.value(),
+                clicksPerSecond.value(), pattern.value());
+        boolean useScheduled = useSchedule.advance(rightClickCps.value(), rightClickCps.value(), "Steady");
         if (client.player == null || client.gameMode == null || client.screen != null) {
             return;
         }
 
         updatePostUseDelay(client);
 
-        tickRightClick(client);
-        tickAttack(client);
+        tickRightClick(client, useScheduled);
+        tickAttack(client, attackScheduled);
     }
 
     @Override
@@ -112,23 +118,38 @@ public final class AutoClickerModule extends ClientModule {
         }
     }
 
-    private void tickAttack(Minecraft client) {
+    private void tickAttack(Minecraft client, int scheduledClicks) {
+        if ((requireAttackKey.value() && !client.options.keyAttack.isDown())
+                || (pauseWhileUsingItem.value() && client.player.isUsingItem())
+                || scheduledClicks <= 0) {
+            return;
+        }
+
+        if (client.hitResult instanceof EntityHitResult hit) {
+            tickEntityAttack(client, hit, scheduledClicks);
+        } else if (isBlockHit(client)
+                && AutoClickerPolicy.clicksBlock(objective.value())) {
+            for (int click = 0; click < scheduledClicks; click++) {
+                KeyMapping.click(((KeyMappingAccessor) client.options.keyAttack).jilaton$getBoundKey());
+            }
+        }
+    }
+
+    private void tickEntityAttack(Minecraft client, EntityHitResult hit, int scheduledClicks) {
+        Entity target = hit.getEntity();
+        boolean playerTarget = target instanceof Player;
+        boolean playerAllowed = playerTarget
+                ? PlayerTargetFilters.allowsPlayer(client, client.player, (Player) target)
+                : !client.player.isAlliedTo(target);
+        if (target == client.player || !AutoClickerPolicy.allowsEntity(objective.value(), playerTarget,
+                playerAllowed, playersOnly.value())) {
+            return;
+        }
+
         ClientModule criticalsModule = JilatonClient.moduleManager().get("criticals");
         if (criticalsModule instanceof CriticalsModule criticals && criticals.hasPendingAttack()) {
             return;
         }
-
-        if ((requireAttackKey.value() && !client.options.keyAttack.isDown())
-                || (pauseWhileUsingItem.value() && client.player.isUsingItem())
-                || !(client.hitResult instanceof EntityHitResult hit)) {
-            return;
-        }
-
-        if (!(hit.getEntity() instanceof LivingEntity target) || target == client.player
-                || (playersOnly.value() && !(target instanceof Player))
-                || (target instanceof Player candidate
-                    ? !PlayerTargetFilters.allowsPlayer(client, client.player, candidate)
-                    : client.player.isAlliedTo(target))) return;
 
         if (!weaponAllowed(client, client.player.getMainHandItem())) {
             return;
@@ -144,43 +165,47 @@ public final class AutoClickerModule extends ClientModule {
                     && client.level.getGameTime() < attackResumeTick)) {
             return;
         }
-        if (now < nextAttackAt) {
+        if (scheduledClicks <= 0) {
             return;
         }
 
-        client.gameMode.attack(client.player, target);
-        if (criticalsModule instanceof CriticalsModule criticals && criticals.hasPendingAttack()) {
-            return;
+        for (int click = 0; click < scheduledClicks; click++) {
+            if (respectAttackCooldown.value() && client.player.getAttackStrengthScale(0.0F) < 1.0F) {
+                break;
+            }
+            client.gameMode.attack(client.player, target);
+            if (criticalsModule instanceof CriticalsModule criticals && criticals.hasPendingAttack()) {
+                return;
+            }
+            client.player.swing(InteractionHand.MAIN_HAND);
         }
-        client.player.swing(InteractionHand.MAIN_HAND);
-        double cps = ClickTiming.sampleCps(minimumClicksPerSecond.value(), clicksPerSecond.value(),
-                pattern.value(), ThreadLocalRandom.current().nextGaussian());
-        nextAttackAt = now + ClickTiming.intervalNanos(cps);
     }
 
     /**
      * Queue a vanilla use-key click, rather than calling an item directly. Minecraft then
      * applies its normal block/entity/item interaction rules and per-action cooldowns.
      */
-    private void tickRightClick(Minecraft client) {
+    private void tickRightClick(Minecraft client, boolean clickScheduled) {
         if (!rightClickEnabled.value()
+                || !clickScheduled
                 || (rightClickRequiresInput.value() && !client.options.keyUse.isDown())
                 || (pauseWhileUsingItem.value() && client.player.isUsingItem())
-                || (rightClickBlockOnly.value() && !(client.hitResult instanceof BlockHitResult))
+                || (rightClickBlockOnly.value() && !isBlockHit(client))
                 || (ignoreSpecialUseItems.value() && isSpecialUseItem(client.player.getMainHandItem().getItem()))) {
             return;
         }
 
-        long now = System.nanoTime();
-        if (now < nextUseAt) return;
-
         KeyMapping.click(((KeyMappingAccessor) client.options.keyUse).jilaton$getBoundKey());
-        nextUseAt = now + ClickTiming.intervalNanos(rightClickCps.value());
     }
 
     private static boolean isSpecialUseItem(net.minecraft.world.item.Item item) {
         return item == Items.ENDER_PEARL || item == Items.ENDER_EYE
                 || item == Items.WATER_BUCKET || item == Items.LAVA_BUCKET;
+    }
+
+    private static boolean isBlockHit(Minecraft client) {
+        return client.hitResult instanceof BlockHitResult blockHit
+                && blockHit.getType() == HitResult.Type.BLOCK;
     }
 
     private void updatePostUseDelay(Minecraft client) {
@@ -221,6 +246,10 @@ public final class AutoClickerModule extends ClientModule {
 
     public NumberSetting minimumClicksPerSecond() {
         return minimumClicksPerSecond;
+    }
+
+    public ChoiceSetting objective() {
+        return objective;
     }
 
     public NumberSetting clicksPerSecond() {

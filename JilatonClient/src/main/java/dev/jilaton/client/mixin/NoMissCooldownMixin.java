@@ -31,7 +31,7 @@ public abstract class NoMissCooldownMixin {
     }
 
     @Redirect(method = "startAttack", at = @At(value = "FIELD",
-            target = "Lnet/minecraft/client/Minecraft;missTime:I", opcode = Opcodes.PUTFIELD, ordinal = 1))
+            target = "Lnet/minecraft/client/Minecraft;missTime:I", opcode = Opcodes.PUTFIELD))
     private void jilaton$preventMissCooldownWrite(Minecraft client, int missTime) {
         NoMissCooldownModule module = noMissCooldownModule();
         if (NoMissCooldownPolicy.allowMissTimeWrite(module != null && module.enabled(),

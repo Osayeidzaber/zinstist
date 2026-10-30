@@ -1,0 +1,36 @@
+# Downloaded toolchains, decompiled references, and local investigation output
+/analysis/
+/JilatonClient/analysis/
+/JilatonClient/reference/
+
+# Reproducible build output and local game data
+.gradle/
+build/
+run/
+logs/
+out/
+*.log
+*.class
+*.jar
+*.zip
+*.7z
+*.tar.gz
+!JilatonClient/gradle/wrapper/gradle-wrapper.jar
+
+# Editor and operating system files
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks

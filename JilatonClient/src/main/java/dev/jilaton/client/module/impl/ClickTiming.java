@@ -1,5 +1,7 @@
 package dev.jilaton.client.module.impl;
 
+import java.util.Random;
+
 public final class ClickTiming {
     private static final double NANOS_PER_SECOND = 1_000_000_000.0;
 
@@ -27,6 +29,20 @@ public final class ClickTiming {
     public static long intervalNanos(double cps) {
         double boundedCps = clamp(Double.isFinite(cps) ? cps : 1.0, 1.0, 20.0);
         return Math.round(NANOS_PER_SECOND / boundedCps);
+    }
+
+    public static int sampleIntegerCps(double minimumCps, double maximumCps, Random random) {
+        if (random == null) {
+            throw new IllegalArgumentException("random source is required");
+        }
+        int lower = (int) Math.round(clamp(Double.isFinite(minimumCps) ? minimumCps : 1.0, 1.0, 20.0));
+        int upper = (int) Math.round(clamp(Double.isFinite(maximumCps) ? maximumCps : 20.0, 1.0, 20.0));
+        if (lower > upper) {
+            int swap = lower;
+            lower = upper;
+            upper = swap;
+        }
+        return random.nextInt(lower, upper + 1);
     }
 
     private static double clamp(double value, double minimum, double maximum) {

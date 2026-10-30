@@ -40,11 +40,13 @@ class ClientConfigTest {
         aimAssist.setKeyCode(65);
 
         ClientModule autoClicker = source.get("auto_clicker");
+        setting(autoClicker, "objective", ChoiceSetting.class).setValue("Any");
         BooleanSetting playersOnly = setting(autoClicker, "players_only", BooleanSetting.class);
         playersOnly.setValue(false);
         setting(autoClicker, "right_click_enabled", BooleanSetting.class).setValue(true);
         setting(autoClicker, "right_click_cps", NumberSetting.class).setValue(12.0);
         setting(autoClicker, "right_click_block_only", BooleanSetting.class).setValue(true);
+        setting(autoClicker, "pattern", ChoiceSetting.class).setValue("Butterfly");
         setting(autoClicker, "weapon_filter", ChoiceSetting.class).setValue("Mace");
         setting(autoClicker, "delay_on_broken", BooleanSetting.class).setValue(false);
         setting(autoClicker, "delay_post_use", NumberSetting.class).setValue(6.0);
@@ -83,6 +85,9 @@ class ClientConfigTest {
         setting(source.get("bow_aim"), "aim_threshold", NumberSetting.class).setValue(1.2);
         setting(source.get("auto_buff_refill"), "potions", BooleanSetting.class).setValue(false);
         setting(source.get("auto_buff_refill"), "delay_ticks", NumberSetting.class).setValue(3.0);
+        setting(source.get("auto_replenish"), "mode", ChoiceSetting.class).setValue("Legit");
+        setting(source.get("auto_replenish"), "threshold", NumberSetting.class).setValue(12.0);
+        setting(source.get("auto_replenish"), "offhand", BooleanSetting.class).setValue(false);
         setting(source.get("auto_weapon"), "preference", ChoiceSetting.class).setValue("Axe");
         setting(source.get("auto_weapon"), "mace_smash", BooleanSetting.class).setValue(false);
         setting(source.get("auto_weapon"), "switch_back_delay", NumberSetting.class).setValue(4.0);
@@ -94,6 +99,7 @@ class ClientConfigTest {
         setting(source.get("kill_aura"), "hostiles", BooleanSetting.class).setValue(true);
         setting(source.get("kill_aura"), "priority", ChoiceSetting.class).setValue("Health");
         setting(source.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).setValue(false);
+        setting(source.get("kill_aura"), "raycast_mode", ChoiceSetting.class).setValue("All");
         setting(source.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).setValue(true);
         setting(source.get("auto_totem"), "refill_delay", NumberSetting.class).setValue(7.0);
         setting(source.get("crystal_aura"), "face_place", BooleanSetting.class).setValue(false);
@@ -116,6 +122,11 @@ class ClientConfigTest {
         setting(source.get("auto_head"), "max_absorption", NumberSetting.class).setValue(2.5);
         setting(source.get("auto_head"), "cooldown_seconds", NumberSetting.class).setValue(1.5);
         setting(source.get("auto_head"), "consider_absorption", BooleanSetting.class).setValue(false);
+        setting(source.get("auto_eat"), "hunger_threshold", NumberSetting.class).setValue(12.0);
+        setting(source.get("auto_eat"), "health_threshold", NumberSetting.class).setValue(7.5);
+        setting(source.get("auto_eat"), "use_offhand", BooleanSetting.class).setValue(false);
+        setting(source.get("fast_fall"), "downward_speed", NumberSetting.class).setValue(1.35);
+        setting(source.get("fast_fall"), "require_sneak", BooleanSetting.class).setValue(false);
         setting(source.get("keep_sprint"), "motion_min", NumberSetting.class).setValue(72.0);
         setting(source.get("keep_sprint"), "motion_max", NumberSetting.class).setValue(88.0);
         setting(source.get("keep_sprint"), "motion_when_hurt_min", NumberSetting.class).setValue(45.0);
@@ -128,11 +139,17 @@ class ClientConfigTest {
         setting(source.get("no_jump_delay"), "cooldown", NumberSetting.class).setValue(4.0);
         setting(source.get("no_jump_delay"), "variance", NumberSetting.class).setValue(2.0);
         setting(source.get("step"), "height", NumberSetting.class).setValue(1.8);
+        setting(source.get("flight"), "speed", NumberSetting.class).setValue(2.5);
+        setting(source.get("flight"), "max_velocity", NumberSetting.class).setValue(7.5);
+        setting(source.get("flight"), "force_flight", BooleanSetting.class).setValue(false);
+        setting(source.get("flight"), "bypass_vanilla_check", BooleanSetting.class).setValue(false);
         setting(source.get("velocity"), "jump_cooldown_mode", ChoiceSetting.class).setValue("Received hits");
         setting(source.get("velocity"), "jump_cooldown", NumberSetting.class).setValue(4.0);
         setting(source.get("velocity"), "reverse_delay", NumberSetting.class).setValue(3.0);
         setting(source.get("velocity"), "reverse_z", NumberSetting.class).setValue(75.0);
         setting(source.get("velocity"), "reverse_only_moving", BooleanSetting.class).setValue(true);
+        setting(source.get("velocity"), "strafe_only_facing", BooleanSetting.class).setValue(true);
+        setting(source.get("velocity"), "strafe_facing_range", NumberSetting.class).setValue(4.2);
         setting(source.get("auto_leave"), "health_threshold", NumberSetting.class).setValue(7.0);
         setting(source.get("auto_leave"), "minimum_delay", NumberSetting.class).setValue(2.0);
         setting(source.get("auto_leave"), "maximum_delay", NumberSetting.class).setValue(5.0);
@@ -143,9 +160,14 @@ class ClientConfigTest {
         setting(source.get("auto_armor"), "durability_threshold", NumberSetting.class).setValue(32.0);
         setting(source.get("kill_aura"), "minimum_cps", NumberSetting.class).setValue(4.0);
         setting(source.get("kill_aura"), "click_pattern", ChoiceSetting.class).setValue("Steady");
+        setting(source.get("auto_shoot"), "click_pattern", ChoiceSetting.class).setValue("Butterfly");
+        setting(source.get("kill_aura"), "respect_attack_cooldown", BooleanSetting.class).setValue(false);
         setting(source.get("criticals"), "mode", ChoiceSetting.class).setValue("Wait");
         setting(source.get("aim_assist"), "angle_factor", NumberSetting.class).setValue(0.6);
         setting(source.get("aim_assist"), "horizontal", BooleanSetting.class).setValue(false);
+        setting(source.get("teams"), "match_name_color", BooleanSetting.class).setValue(false);
+        setting(source.get("teams"), "armor_head", BooleanSetting.class).setValue(false);
+        setting(source.get("teams"), "armor_chest", BooleanSetting.class).setValue(true);
 
         ClientConfig config = new ClientConfig(temporaryDirectory);
         config.setThemeId("blue");
@@ -168,7 +190,11 @@ class ClientConfigTest {
         assertEquals("Mace", setting(restored.get("auto_clicker"), "weapon_filter", ChoiceSetting.class).value());
         assertFalse(setting(restored.get("auto_clicker"), "delay_on_broken", BooleanSetting.class).value());
         assertEquals(6.0, setting(restored.get("auto_clicker"), "delay_post_use", NumberSetting.class).value());
+        assertFalse(setting(restored.get("teams"), "match_name_color", BooleanSetting.class).value());
+        assertFalse(setting(restored.get("teams"), "armor_head", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("teams"), "armor_chest", BooleanSetting.class).value());
         assertEquals(67, restored.get("auto_clicker").keyCode());
+        assertEquals("Any", setting(restored.get("auto_clicker"), "objective", ChoiceSetting.class).value());
         assertEquals(7.5, setting(restored.get("auto_gapple"), "health_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_gapple"), "enchanted_apples", BooleanSetting.class).value());
         assertFalse(setting(restored.get("auto_gapple"), "consider_absorption", BooleanSetting.class).value());
@@ -201,6 +227,9 @@ class ClientConfigTest {
         assertEquals(1.2, setting(restored.get("bow_aim"), "aim_threshold", NumberSetting.class).value(), 0.000001);
         assertFalse(setting(restored.get("auto_buff_refill"), "potions", BooleanSetting.class).value());
         assertEquals(3.0, setting(restored.get("auto_buff_refill"), "delay_ticks", NumberSetting.class).value(), 0.000001);
+        assertEquals("Legit", setting(restored.get("auto_replenish"), "mode", ChoiceSetting.class).value());
+        assertEquals(12.0, setting(restored.get("auto_replenish"), "threshold", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("auto_replenish"), "offhand", BooleanSetting.class).value());
         assertEquals("Axe", setting(restored.get("auto_weapon"), "preference", ChoiceSetting.class).value());
         assertFalse(setting(restored.get("auto_weapon"), "mace_smash", BooleanSetting.class).value());
         assertEquals(4.0, setting(restored.get("auto_weapon"), "switch_back_delay", NumberSetting.class).value(), 0.000001);
@@ -212,6 +241,7 @@ class ClientConfigTest {
         assertTrue(setting(restored.get("kill_aura"), "hostiles", BooleanSetting.class).value());
         assertEquals("Health", setting(restored.get("kill_aura"), "priority", ChoiceSetting.class).value());
         assertFalse(setting(restored.get("kill_aura"), "avoid_wasted_shield_attacks", BooleanSetting.class).value());
+        assertEquals("All", setting(restored.get("kill_aura"), "raycast_mode", ChoiceSetting.class).value());
         assertTrue(setting(restored.get("auto_totem"), "use_hotbar_totems", BooleanSetting.class).value());
         assertEquals(7.0, setting(restored.get("auto_totem"), "refill_delay", NumberSetting.class).value());
         assertFalse(setting(restored.get("crystal_aura"), "face_place", BooleanSetting.class).value());
@@ -234,6 +264,11 @@ class ClientConfigTest {
         assertEquals(2.5, setting(restored.get("auto_head"), "max_absorption", NumberSetting.class).value());
         assertEquals(1.5, setting(restored.get("auto_head"), "cooldown_seconds", NumberSetting.class).value());
         assertFalse(setting(restored.get("auto_head"), "consider_absorption", BooleanSetting.class).value());
+        assertEquals(12.0, setting(restored.get("auto_eat"), "hunger_threshold", NumberSetting.class).value());
+        assertEquals(7.5, setting(restored.get("auto_eat"), "health_threshold", NumberSetting.class).value());
+        assertFalse(setting(restored.get("auto_eat"), "use_offhand", BooleanSetting.class).value());
+        assertEquals(1.35, setting(restored.get("fast_fall"), "downward_speed", NumberSetting.class).value());
+        assertFalse(setting(restored.get("fast_fall"), "require_sneak", BooleanSetting.class).value());
         assertEquals(72.0, setting(restored.get("keep_sprint"), "motion_min", NumberSetting.class).value());
         assertEquals(88.0, setting(restored.get("keep_sprint"), "motion_max", NumberSetting.class).value());
         assertEquals(45.0, setting(restored.get("keep_sprint"), "motion_when_hurt_min", NumberSetting.class).value());
@@ -246,11 +281,17 @@ class ClientConfigTest {
         assertEquals(4.0, setting(restored.get("no_jump_delay"), "cooldown", NumberSetting.class).value());
         assertEquals(2.0, setting(restored.get("no_jump_delay"), "variance", NumberSetting.class).value());
         assertEquals(1.8, setting(restored.get("step"), "height", NumberSetting.class).value(), 0.000001);
+        assertEquals(2.5, setting(restored.get("flight"), "speed", NumberSetting.class).value(), 0.000001);
+        assertEquals(7.5, setting(restored.get("flight"), "max_velocity", NumberSetting.class).value(), 0.000001);
+        assertFalse(setting(restored.get("flight"), "force_flight", BooleanSetting.class).value());
+        assertFalse(setting(restored.get("flight"), "bypass_vanilla_check", BooleanSetting.class).value());
         assertEquals("Received hits", setting(restored.get("velocity"), "jump_cooldown_mode", ChoiceSetting.class).value());
         assertEquals(4.0, setting(restored.get("velocity"), "jump_cooldown", NumberSetting.class).value());
         assertEquals(3.0, setting(restored.get("velocity"), "reverse_delay", NumberSetting.class).value());
         assertEquals(75.0, setting(restored.get("velocity"), "reverse_z", NumberSetting.class).value());
         assertTrue(setting(restored.get("velocity"), "reverse_only_moving", BooleanSetting.class).value());
+        assertTrue(setting(restored.get("velocity"), "strafe_only_facing", BooleanSetting.class).value());
+        assertEquals(4.2, setting(restored.get("velocity"), "strafe_facing_range", NumberSetting.class).value());
         assertEquals(7.0, setting(restored.get("auto_leave"), "health_threshold", NumberSetting.class).value());
         assertEquals(2.0, setting(restored.get("auto_leave"), "minimum_delay", NumberSetting.class).value());
         assertEquals(5.0, setting(restored.get("auto_leave"), "maximum_delay", NumberSetting.class).value());
@@ -261,6 +302,9 @@ class ClientConfigTest {
         assertEquals(32.0, setting(restored.get("auto_armor"), "durability_threshold", NumberSetting.class).value());
         assertEquals(4.0, setting(restored.get("kill_aura"), "minimum_cps", NumberSetting.class).value());
         assertEquals("Steady", setting(restored.get("kill_aura"), "click_pattern", ChoiceSetting.class).value());
+        assertEquals("Butterfly", setting(restored.get("auto_shoot"), "click_pattern", ChoiceSetting.class).value());
+        assertFalse(setting(restored.get("kill_aura"), "respect_attack_cooldown", BooleanSetting.class).value());
+        assertEquals("Butterfly", setting(restored.get("auto_clicker"), "pattern", ChoiceSetting.class).value());
         assertEquals("Wait", setting(restored.get("criticals"), "mode", ChoiceSetting.class).value());
         assertEquals(0.6, setting(restored.get("aim_assist"), "angle_factor", NumberSetting.class).value(), 1.0e-9);
         assertFalse(setting(restored.get("aim_assist"), "horizontal", BooleanSetting.class).value());
