@@ -29,8 +29,7 @@ public final class TargetEspModule extends ClientModule {
     private static final double VANISH_SECONDS = 0.38;
     private static final double MAX_DISTANCE_SQR = 128 * 128;
     private final ChoiceSetting style = addSetting(new ChoiceSetting("style", "Style",
-            List.of(TargetEspGeometry.HALO, TargetEspGeometry.ORBIT, TargetEspGeometry.HELIX, TargetEspGeometry.BRACKETS),
-            TargetEspGeometry.HALO));
+            TargetEspGeometry.STYLES, TargetEspGeometry.HALO));
     private final ChoiceSetting source = addSetting(new ChoiceSetting("source", "Target source",
             List.of("Combat", "Last hit", "Crosshair"), "Combat"));
     private final ChoiceSetting colorMode = addSetting(EffectPalette.modeSetting("color_mode", "Color"));
@@ -43,6 +42,12 @@ public final class TargetEspModule extends ClientModule {
     private final NumberSetting memory = addSetting(new NumberSetting("memory", "Memory (seconds)", 0.5, 15, 0.5, 4));
     private final BooleanSetting playersOnly = addSetting(new BooleanSetting("players_only", "Players only", false));
     private final BooleanSetting throughWalls = addSetting(new BooleanSetting("through_walls", "Through walls", true));
+    private final BooleanSetting customHalo = addSetting(new BooleanSetting("custom_halo", "Custom: halo rings", true));
+    private final BooleanSetting customOrbit = addSetting(new BooleanSetting("custom_orbit", "Custom: orbital comets", true));
+    private final BooleanSetting customHelix = addSetting(new BooleanSetting("custom_helix", "Custom: double helix", false));
+    private final BooleanSetting customGround = addSetting(new BooleanSetting("custom_ground", "Custom: ground aura", false));
+    private final BooleanSetting customCyber = addSetting(new BooleanSetting("custom_cyber", "Custom: cyber brackets", true));
+    private final BooleanSetting customReticle = addSetting(new BooleanSetting("custom_reticle", "Custom: lock reticle", true));
     private Mark current = new Mark();
     private Mark previous = new Mark();
     private Object boundLevel;
@@ -50,8 +55,19 @@ public final class TargetEspModule extends ClientModule {
     private double phase;
 
     public TargetEspModule() {
-        super("target_esp", "TargetESP", "Animated 3D marker on your combat target: halo, orbit, helix or brackets.",
+        super("target_esp", "TargetESP", "Animated 3D combat target marker: minimal, orbital, helix, ground aura, cyber target, cinematic or custom.",
                 ModuleCategory.RENDER);
+    }
+
+    public int customMask() {
+        int mask = 0;
+        if (customHalo.value()) mask |= TargetEspGeometry.COMP_HALO;
+        if (customOrbit.value()) mask |= TargetEspGeometry.COMP_ORBIT;
+        if (customHelix.value()) mask |= TargetEspGeometry.COMP_HELIX;
+        if (customGround.value()) mask |= TargetEspGeometry.COMP_GROUND;
+        if (customCyber.value()) mask |= TargetEspGeometry.COMP_CYBER;
+        if (customReticle.value()) mask |= TargetEspGeometry.COMP_RETICLE;
+        return mask;
     }
 
     @Override
@@ -136,7 +152,7 @@ public final class TargetEspModule extends ClientModule {
         int tint = EffectBatch.mixRgb(rgb, flashRgb, flash * 0.8);
         TargetEspGeometry.emit(batch, style.value(), new TargetEspGeometry.Marker(
                 mark.x - camera.x, mark.y - camera.y, mark.z - camera.z, mark.height * Math.min(1.2, size),
-                radius, phase, tint, opacity.value() * visible, flash, throughWalls.value()));
+                radius, phase, tint, opacity.value() * visible, flash, throughWalls.value()), customMask());
     }
 
     private static final class Mark {

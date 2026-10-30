@@ -79,12 +79,22 @@ public final class FxFrame {
     /**
      * Half a texel, pulled in from every cell edge. Sampling the cells at their exact borders blends each
      * face's outermost pixel with the neighbouring cell, which shows up as a faint line wherever two cube faces
-     * meet; the inset removes that atlas bleed. It is measured per texture (the bundled set mixes 2048x1365
-     * and 1024x683 atlases); these are only the fallback until the texture has been uploaded.
+     * meet; the inset removes that atlas bleed. Dimensions are measured dynamically per texture from the GPU
+     * texture or PNG IHDR header (covering 2048x1365, 1024x683, 3072x2048, or any custom sky pack).
      */
-    private static final float SKY_UV_INSET_U = 0.5F / 1024F;
-    private static final float SKY_UV_INSET_V = 0.5F / 683F;
-    private static final java.util.Map<Identifier, float[]> SKY_INSETS = new java.util.HashMap<>();
+    private static final float FALLBACK_INSET_U = 0.5F / 1024F;
+    private static final float FALLBACK_INSET_V = 0.5F / 683F;
+    private static final java.util.Map<Identifier, float[]> SKY_INSETS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void recordSkyTextureSize(Identifier texture, int width, int height) {
+        if (texture != null && width > 0 && height > 0) {
+            SKY_INSETS.put(texture, halfTexel(width, height));
+        }
+    }
+
+    public static void clearSkyInsets() {
+        SKY_INSETS.clear();
+    }
 
     /**
      * Adds one textured sky-cube layer centred on the eye. {@code yaw} spins the box about the vertical
@@ -113,22 +123,58 @@ public final class FxFrame {
         }
     }
 
-    /** Half a texel of {@code texture} in UV units, cached once the texture is on the GPU. */
+    /** Half a texel of {@code texture} in UV units, measured dynamically from the GPU texture or PNG header. */
     private float[] texelInset(Identifier texture) {
+        if (texture == null) return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
         float[] known = SKY_INSETS.get(texture);
         if (known != null) return known;
-        try {
-            var gpu = client.getTextureManager().getTexture(texture).getTexture();
-            float[] measured = halfTexel(gpu.getWidth(0), gpu.getHeight(0));
+        if (client != null) {
+            try {
+                var gpu = client.getTextureManager().getTexture(texture).getTexture();
+                int w = gpu.getWidth(0);
+                int h = gpu.getHeight(0);
+                if (w > 0 && h > 0) {
+                    float[] measured = halfTexel(w, h);
+                    SKY_INSETS.put(texture, measured);
+                    return measured;
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+        int[] dims = readClasspathPngDimensions("assets/" + texture.getNamespace() + "/" + texture.getPath());
+        if (dims != null && dims[0] > 0 && dims[1] > 0) {
+            float[] measured = halfTexel(dims[0], dims[1]);
             SKY_INSETS.put(texture, measured);
             return measured;
-        } catch (RuntimeException notReady) {
-            return new float[]{SKY_UV_INSET_U, SKY_UV_INSET_V};
+        }
+        return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
+    }
+
+    /** Reads width and height from the 24-byte PNG IHDR header of a classpath resource without full decoding. */
+    static int[] readClasspathPngDimensions(String resourcePath) {
+        if (resourcePath == null || resourcePath.isEmpty()) return null;
+        String normalized = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+        try (java.io.InputStream in = FxFrame.class.getClassLoader().getResourceAsStream(normalized)) {
+            return readPngDimensions(in);
+        } catch (java.io.IOException ignored) {
+            return null;
         }
     }
 
+    static int[] readPngDimensions(java.io.InputStream in) throws java.io.IOException {
+        if (in == null) return null;
+        byte[] header = in.readNBytes(24);
+        if (header.length < 24) return null;
+        if ((header[0] & 0xFF) != 0x89 || header[1] != 0x50 || header[2] != 0x4E || header[3] != 0x47) return null;
+        int width = ((header[16] & 0xFF) << 24) | ((header[17] & 0xFF) << 16)
+                | ((header[18] & 0xFF) << 8) | (header[19] & 0xFF);
+        int height = ((header[20] & 0xFF) << 24) | ((header[21] & 0xFF) << 16)
+                | ((header[22] & 0xFF) << 8) | (header[23] & 0xFF);
+        return width > 0 && height > 0 ? new int[]{width, height} : null;
+    }
+
     static float[] halfTexel(int width, int height) {
-        if (width <= 0 || height <= 0) return new float[]{SKY_UV_INSET_U, SKY_UV_INSET_V};
+        if (width <= 0 || height <= 0) return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
         return new float[]{0.5F / width, 0.5F / height};
     }
 

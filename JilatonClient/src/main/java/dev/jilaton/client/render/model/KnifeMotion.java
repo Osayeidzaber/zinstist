@@ -12,7 +12,22 @@ package dev.jilaton.client.render.model;
 public final class KnifeMotion {
     public static final double SLASH_SECONDS = 0.42;
     public static final double INSPECT_SECONDS = 2.6;
+    public static final double UNEQUIP_SECONDS = 0.28;
     static final double INERTIA_LIMIT = 7;
+
+    public enum State {
+        IDLE,
+        WALKING,
+        SPRINTING,
+        JUMPING,
+        FALLING,
+        CROUCHING,
+        ATTACKING,
+        SWITCHING,
+        INSPECTING,
+        EQUIPPING,
+        UNEQUIPPING
+    }
 
     public record Pose(double x, double y, double z, double pitch, double yaw, double roll, double spin) {
         static final Pose REST = new Pose(0, 0, 0, 0, 0, 0, 0);
@@ -27,15 +42,33 @@ public final class KnifeMotion {
     }
 
     private long drawStart = -1;
+    private long unequipStart = -1;
+    private boolean switchedItem;
     private long slashStart = -1;
     private int slashDir = 1;
     private long inspectStart = -1;
     private double inertiaYaw, inertiaPitch;
+    private double sprintWeight, crouchWeight, airOffset;
     private float lastYaw, lastPitch;
     private boolean hasLook;
+    private long lastPoseNanos;
 
     public void startDraw(long now) {
         drawStart = now;
+        unequipStart = -1;
+        switchedItem = false;
+        inspectStart = -1;
+    }
+
+    public void startSwitch(long now) {
+        drawStart = now;
+        unequipStart = -1;
+        switchedItem = true;
+        inspectStart = -1;
+    }
+
+    public void startUnequip(long now) {
+        unequipStart = now;
         inspectStart = -1;
     }
 
@@ -48,12 +81,26 @@ public final class KnifeMotion {
 
     /** Inspect only starts from rest, like the games: never mid-slash or mid-draw. */
     public boolean startInspect(long now, double drawSeconds) {
-        if (active(slashStart, now, SLASH_SECONDS) || active(drawStart, now, drawSeconds)) return false;
+        if (active(slashStart, now, SLASH_SECONDS) || active(drawStart, now, drawSeconds)
+                || active(unequipStart, now, UNEQUIP_SECONDS)) return false;
         inspectStart = now;
         return true;
     }
 
     public int slashDirection() { return slashDir; }
+
+    public State classifyState(long now, double drawSeconds, boolean sprinting, boolean crouching,
+                               boolean onGround, double verticalVelocity, double moving) {
+        if (active(unequipStart, now, UNEQUIP_SECONDS)) return State.UNEQUIPPING;
+        if (active(slashStart, now, SLASH_SECONDS)) return State.ATTACKING;
+        if (active(drawStart, now, drawSeconds)) return switchedItem ? State.SWITCHING : State.EQUIPPING;
+        if (active(inspectStart, now, INSPECT_SECONDS)) return State.INSPECTING;
+        if (!onGround) return verticalVelocity >= 0 ? State.JUMPING : State.FALLING;
+        if (crouching) return State.CROUCHING;
+        if (sprinting && moving > 0.15) return State.SPRINTING;
+        if (moving > 0.05) return State.WALKING;
+        return State.IDLE;
+    }
 
     /** Feeds the camera angles once per frame; turning drags the arm the other way, then it springs back. */
     public void look(float yaw, float pitch, double dtSeconds, double amount) {
@@ -78,17 +125,52 @@ public final class KnifeMotion {
      */
     public Pose pose(long now, double drawSeconds, double idle, double walk, double walkPhase, double moving,
                      boolean reducedMotion) {
+        return pose(now, drawSeconds, idle, walk, walkPhase, moving, false, false, true, 0.0, reducedMotion);
+    }
+
+    /**
+     * Full state-blended first-person pose including sprint cant, crouch tuck, jump/fall vertical inertia,
+     * equip/switch draw, unequip lower, alternating slash, and inspect.
+     */
+    public Pose pose(long now, double drawSeconds, double idle, double walk, double walkPhase, double moving,
+                     boolean sprinting, boolean crouching, boolean onGround, double verticalVelocity,
+                     boolean reducedMotion) {
         if (reducedMotion) return Pose.REST;
+        double dt = lastPoseNanos == 0L ? 0.016 : Math.max(0.0, Math.min(0.1, (now - lastPoseNanos) / 1e9));
+        lastPoseNanos = now;
+        double blend = 1.0 - Math.exp(-dt * 12.0);
+        sprintWeight += ((sprinting && moving > 0.15 ? 1.0 : 0.0) - sprintWeight) * blend;
+        crouchWeight += ((crouching ? 1.0 : 0.0) - crouchWeight) * blend;
+        double targetAir = onGround ? 0.0 : clamp(-verticalVelocity * 0.065, 0.055);
+        airOffset += (targetAir - airOffset) * blend;
+
         double seconds = now / 1e9;
         Pose pose = new Pose(0, Math.sin(seconds * 1.5) * 0.005 * idle, 0,
                 Math.sin(seconds * 1.5 + 1) * 0.6 * idle, inertiaYaw * idle, Math.sin(seconds * 1.1) * 0.8 * idle, 0)
                 .plus(new Pose(inertiaYaw * 0.004 * idle, 0, 0, inertiaPitch * idle, 0, 0, 0));
         double step = Math.PI * walkPhase;
-        pose = pose.plus(new Pose(Math.sin(step) * 0.012, -Math.abs(Math.cos(step)) * 0.014, 0,
-                0, 0, Math.sin(step) * 1.4, 0).times(walk * clamp01(moving)));
-        if (active(drawStart, now, drawSeconds)) pose = pose.plus(draw(progress(drawStart, now, drawSeconds)));
-        if (active(slashStart, now, SLASH_SECONDS)) pose = pose.plus(slash(progress(slashStart, now, SLASH_SECONDS), slashDir));
-        else if (active(inspectStart, now, INSPECT_SECONDS)) pose = pose.plus(inspect(progress(inspectStart, now, INSPECT_SECONDS)));
+        double sprintBoost = 1.0 + sprintWeight * 0.55;
+        pose = pose.plus(new Pose(Math.sin(step) * 0.012 * sprintBoost, -Math.abs(Math.cos(step)) * 0.014 * sprintBoost, 0,
+                sprintWeight * -8.0, sprintWeight * 6.0, Math.sin(step) * 1.4 * sprintBoost - sprintWeight * 5.0, 0)
+                .times(walk * clamp01(moving)));
+        if (crouchWeight > 1e-4) {
+            pose = pose.plus(new Pose(-0.018, -0.028, -0.015, 6.0, -5.0, -8.0, 0).times(crouchWeight));
+        }
+        if (Math.abs(airOffset) > 1e-4) {
+            pose = pose.plus(new Pose(0, airOffset, 0, airOffset * 180.0, 0, airOffset * 90.0, 0));
+        }
+        if (active(unequipStart, now, UNEQUIP_SECONDS)) {
+            double u = progress(unequipStart, now, UNEQUIP_SECONDS);
+            double ease = u * u * (3 - 2 * u);
+            pose = pose.plus(new Pose(0.02 * ease, -0.48 * ease, 0.04 * ease, 45 * ease, 0, -18 * ease, 0));
+        } else if (active(drawStart, now, drawSeconds)) {
+            pose = pose.plus(draw(progress(drawStart, now, drawSeconds)));
+        }
+        if (active(slashStart, now, SLASH_SECONDS)) {
+            pose = pose.plus(slash(progress(slashStart, now, SLASH_SECONDS), slashDir));
+        } else if (active(inspectStart, now, INSPECT_SECONDS)) {
+            pose = pose.plus(inspect(progress(inspectStart, now, INSPECT_SECONDS)));
+        }
         return pose;
     }
 

@@ -95,6 +95,7 @@ public final class ClickGuiScreen extends Screen {
     private final Motion.Transition closeTransition = new Motion.Transition(0.16, Motion.STANDARD);
     private final Motion.Transition revealTransition = new Motion.Transition(0.14, Motion.STANDARD);
     private final List<String> visualOrder = new ArrayList<>();
+    private final List<String> moduleOrder = new ArrayList<>();
     private final Map<String, AnimatedValue> motion = new HashMap<>();
     private ShellLayout layout = ShellLayout.compute(427, 240);
     private EditBox search;
@@ -144,20 +145,43 @@ public final class ClickGuiScreen extends Screen {
         this.allModules = List.copyOf(modules.all());
         this.accent = selectedAccent();
         this.visualOrder.addAll(config.visualOrder());
-        Resume last = resume;
-        if (last != null) {
-            page = last.page();
-            selectedCategory = last.category();
-            selectedId = modules.get(last.selectedId() == null ? "" : last.selectedId()) != null ? last.selectedId() : null;
-            expandedId = modules.get(last.expandedId() == null ? "" : last.expandedId()) != null ? last.expandedId() : null;
-            enabledOnly = last.enabledOnly();
-            scroll = targetScroll = last.scroll();
-            restoredQuery = last.query();
+        this.moduleOrder.addAll(config.moduleOrder());
+        try {
+            this.page = Page.valueOf(config.guiPage());
+        } catch (IllegalArgumentException ignored) {
+            this.page = Page.MODULES;
+        }
+        this.selectedCategory = config.guiCategory();
+        String cfgSelected = config.guiSelectedModule();
+        this.selectedId = !cfgSelected.isEmpty() && modules.get(cfgSelected) != null ? cfgSelected : null;
+        String cfgExpanded = config.guiExpandedModule();
+        this.expandedId = !cfgExpanded.isEmpty() && modules.get(cfgExpanded) != null ? cfgExpanded : null;
+        this.enabledOnly = config.guiEnabledOnly();
+        double catScroll = config.categoryScroll(this.selectedCategory);
+        this.scroll = this.targetScroll = catScroll > 0.0 ? catScroll : config.guiScroll();
+        this.restoredQuery = config.guiSearchQuery();
+        String cfgProfile = config.guiSelectedProfile();
+        this.selectedProfile = cfgProfile.isEmpty() ? null : cfgProfile;
+    }
+
+    private void syncStateToConfig() {
+        config.setGuiPage(page.name());
+        config.setGuiCategory(selectedCategory);
+        config.setGuiSelectedModule(selectedId == null ? "" : selectedId);
+        config.setGuiExpandedModule(expandedId == null ? "" : expandedId);
+        config.setGuiEnabledOnly(enabledOnly);
+        config.setGuiSearchQuery(search == null ? restoredQuery : search.getValue());
+        config.setGuiSelectedProfile(selectedProfile == null ? "" : selectedProfile);
+        config.setGuiScroll(targetScroll);
+        if (page == Page.MODULES) {
+            config.setCategoryScroll(selectedCategory, targetScroll);
         }
     }
 
     @Override
     public void removed() {
+        syncStateToConfig();
+        config.save(modules);
         resume = new Resume(page, selectedCategory, selectedId, expandedId, enabledOnly, targetScroll,
                 search == null ? "" : search.getValue());
         super.removed();
@@ -507,13 +531,15 @@ public final class ClickGuiScreen extends Screen {
                         : hover > 0.02 ? ShellPalette.STROKE_HOVER : ShellPalette.STROKE);
 
         int toggleX = x + width - 14 - 36;
-        int textWidth = width - 28 - 36 - 24;
+        int textWidth = width - 28 - 36 - 40;
         drawScaled(graphics, fit(module.name(), Math.round(textWidth / CARD_TITLE)), x + 14, y + 18,
                 CARD_TITLE, ShellPalette.TEXT);
         graphics.drawString(font, "KeyBind: ", x + 14, y + 38, ShellPalette.TEXT_3, false);
         graphics.drawString(font, fit(keyLabel(module), width - 28 - 90), x + 14 + font.width("KeyBind: "),
                 y + 38, binding ? accent : ShellPalette.TEXT_2, false);
         int gearX = toggleX - 20;
+        ShellChrome.grip(graphics, gearX - 16, y + 26,
+                hover > 0.05 ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3);
         ShellChrome.gear(graphics, gearX, y + 27, expanded ? accent
                 : gearHover > 0.05 ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3);
         drawToggle(graphics, toggleX, y + 22, module.enabled(), module.id());
@@ -880,10 +906,11 @@ public final class ClickGuiScreen extends Screen {
                 visible.add(module);
             }
         }
-        if (visual && !visualOrder.isEmpty()) {
+        List<String> activeOrder = visual && !visualOrder.isEmpty() ? visualOrder : moduleOrder;
+        if (!activeOrder.isEmpty()) {
             List<String> ids = new ArrayList<>();
             for (ClientModule module : visible) ids.add(module.id());
-            List<String> ordered = ModuleOrder.apply(visualOrder, ids);
+            List<String> ordered = ModuleOrder.apply(activeOrder, ids);
             List<ClientModule> sorted = new ArrayList<>();
             for (String id : ordered) {
                 for (ClientModule module : visible) {
@@ -1110,18 +1137,34 @@ public final class ClickGuiScreen extends Screen {
         for (int index = 0; index < CATEGORIES.length; index++) {
             if (inside(mouseX, mouseY, x, layout.navY(index), width, rowHeight)) {
                 boolean same = page == Page.MODULES && selectedCategory.equals(CATEGORIES[index]);
+                if (page == Page.MODULES) {
+                    config.setCategoryScroll(selectedCategory, targetScroll);
+                }
                 openPage(Page.MODULES);
                 selectedCategory = CATEGORIES[index];
+                double savedScroll = config.categoryScroll(selectedCategory);
+                scroll = targetScroll = savedScroll;
                 if (!same) {
-                    selectedId = null;
-                    expandedId = null;
+                    ClientModule sel = selectedId != null ? modules.get(selectedId) : null;
+                    if (sel != null && !categoryMatches(sel)) {
+                        selectedId = null;
+                    }
+                    ClientModule exp = expandedId != null ? modules.get(expandedId) : null;
+                    if (exp != null && !categoryMatches(exp)) {
+                        expandedId = null;
+                    }
                 }
+                syncStateToConfig();
                 return true;
             }
         }
         for (int index = 0; index < GENERAL.length; index++) {
             if (inside(mouseX, mouseY, x, layout.generalY(index), width, rowHeight)) {
+                if (page == Page.MODULES) {
+                    config.setCategoryScroll(selectedCategory, targetScroll);
+                }
                 openPage(index == 0 ? Page.SETTINGS : index == 1 ? Page.CONFIGS : Page.THEME);
+                syncStateToConfig();
                 return true;
             }
         }
@@ -1220,14 +1263,23 @@ public final class ClickGuiScreen extends Screen {
             }
             selectedId = module.id();
             expandedId = module.id().equals(expandedId) ? null : module.id();
+            syncStateToConfig();
             return true;
         }
-        if (inside(mouseX, mouseY, toggleX - 20, y + 22, 20, 20)) {
+        int gearX = toggleX - 20;
+        if (inside(mouseX, mouseY, gearX - 20, y + 22, 18, 20)) {
+            drag = DragKind.REORDER;
+            dragModule = module;
+            return true;
+        }
+        if (inside(mouseX, mouseY, gearX, y + 22, 20, 20)) {
             expandedId = module.id().equals(expandedId) ? null : module.id();
+            syncStateToConfig();
             return true;
         }
         selectedId = module.id();
         expandedId = module.id().equals(expandedId) ? null : module.id();
+        syncStateToConfig();
         return true;
     }
 
@@ -1395,13 +1447,29 @@ public final class ClickGuiScreen extends Screen {
         if (drag == DragKind.REORDER && dragModule != null) {
             List<String> current = new ArrayList<>();
             for (ClientModule module : view().modules()) current.add(module.id());
-            List<String> base = visualOrder.isEmpty() ? current : ModuleOrder.apply(visualOrder, current);
+            boolean visual = selectedCategory.equals("Visuals");
+            List<String> activeOrder = visual && !visualOrder.isEmpty() ? visualOrder : moduleOrder;
+            List<String> base = activeOrder.isEmpty() ? current : ModuleOrder.apply(activeOrder, current);
             int target = reorderTarget(event.x(), event.y());
             String moved = dragModule.id();
             List<String> next = ModuleOrder.move(base, moved, target);
-            visualOrder.clear();
-            visualOrder.addAll(next);
-            config.setVisualOrder(next);
+            List<String> allIds = new ArrayList<>();
+            for (ClientModule module : allModules) allIds.add(module.id());
+            List<String> mergedFull = ModuleOrder.apply(next, ModuleOrder.apply(moduleOrder, allIds));
+            moduleOrder.clear();
+            moduleOrder.addAll(mergedFull);
+            config.setModuleOrder(moduleOrder);
+            if (visual || dragModule.category() == ModuleCategory.RENDER) {
+                List<String> renderIds = new ArrayList<>();
+                for (ClientModule module : allModules) {
+                    if (module.category() == ModuleCategory.RENDER) renderIds.add(module.id());
+                }
+                List<String> nextVisual = ModuleOrder.apply(next, ModuleOrder.apply(visualOrder, renderIds));
+                visualOrder.clear();
+                visualOrder.addAll(nextVisual);
+                config.setVisualOrder(visualOrder);
+            }
+            syncStateToConfig();
             config.save(modules);
             drag = DragKind.NONE;
             dragModule = null;
@@ -1412,6 +1480,7 @@ public final class ClickGuiScreen extends Screen {
             dragChannel = -1;
             dragModule = null;
             dragSetting = null;
+            syncStateToConfig();
             config.save(modules);
             return true;
         }
@@ -1510,6 +1579,7 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private void finishClose() {
+        syncStateToConfig();
         config.save(modules);
         if (parent != null) {
             minecraft.setScreen(parent);

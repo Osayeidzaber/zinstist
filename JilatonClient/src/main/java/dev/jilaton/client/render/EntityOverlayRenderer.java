@@ -108,7 +108,7 @@ public final class EntityOverlayRenderer implements AutoCloseable {
         long now = System.nanoTime();
         EffectBatch effects = new EffectBatch();
         if (modules.get("trails") instanceof TrailsModule trails) trails.emit(effects, client, partial, camera, accent, now);
-        if (modules.get("jump_circles") instanceof JumpCirclesModule circles) circles.emit(effects, camera, accent, now);
+        if (modules.get("jump_circles") instanceof JumpCirclesModule circles) circles.emit(effects, client.level, camera, accent, now);
         if (modules.get("target_esp") instanceof TargetEspModule targetEsp)
             targetEsp.emit(effects, client, partial, camera, accent, now, config.reducedMotion());
         Quaternionf rotation = new Quaternionf(context.camera().rotation());

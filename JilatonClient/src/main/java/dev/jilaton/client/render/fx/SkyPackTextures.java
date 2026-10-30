@@ -170,6 +170,7 @@ public final class SkyPackTextures {
                 source = null;
             }
             Identifier id = Identifier.fromNamespaceAndPath("jilaton", "dynamic/sky/" + layer);
+            FxFrame.recordSkyTextureSize(id, image.getWidth(), image.getHeight());
             Minecraft.getInstance().getTextureManager().register(id,
                     new DynamicTexture(() -> "jilaton sky " + layer, image));
             LOGGER.info("[Sky] Loaded override layer {} ({}x{}) from {}", layer, width, height, source());

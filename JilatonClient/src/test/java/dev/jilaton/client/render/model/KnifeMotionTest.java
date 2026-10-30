@@ -75,6 +75,36 @@ class KnifeMotionTest {
         assertRest(motion.pose(S / 10, 0.5, 1, 1, 0.5, 1, true));
     }
 
+    @Test
+    void classifiesAndBlendsAllElevenCosmeticAnimationStates() {
+        KnifeMotion motion = new KnifeMotion();
+        assertEquals(KnifeMotion.State.IDLE, motion.classifyState(0, 0.5, false, false, true, 0.0, 0.0));
+        assertEquals(KnifeMotion.State.WALKING, motion.classifyState(0, 0.5, false, false, true, 0.0, 0.6));
+        assertEquals(KnifeMotion.State.SPRINTING, motion.classifyState(0, 0.5, true, false, true, 0.0, 0.9));
+        assertEquals(KnifeMotion.State.CROUCHING, motion.classifyState(0, 0.5, false, true, true, 0.0, 0.2));
+        assertEquals(KnifeMotion.State.JUMPING, motion.classifyState(0, 0.5, false, false, false, 0.42, 0.5));
+        assertEquals(KnifeMotion.State.FALLING, motion.classifyState(0, 0.5, false, false, false, -0.55, 0.5));
+
+        motion.startDraw(S);
+        assertEquals(KnifeMotion.State.EQUIPPING, motion.classifyState(S + S / 10, 0.5, false, false, true, 0.0, 0.0));
+
+        motion.startSwitch(2 * S);
+        assertEquals(KnifeMotion.State.SWITCHING, motion.classifyState(2 * S + S / 10, 0.5, false, false, true, 0.0, 0.0));
+
+        motion.startInspect(3 * S, 0.5);
+        assertEquals(KnifeMotion.State.INSPECTING, motion.classifyState(3 * S + S / 2, 0.5, false, false, true, 0.0, 0.0));
+
+        motion.startSlash(4 * S);
+        assertEquals(KnifeMotion.State.ATTACKING, motion.classifyState(4 * S + S / 10, 0.5, false, false, true, 0.0, 0.0));
+
+        motion.startUnequip(5 * S);
+        assertEquals(KnifeMotion.State.UNEQUIPPING, motion.classifyState(5 * S + S / 10, 0.5, false, false, true, 0.0, 0.0));
+
+        KnifeMotion.Pose jumping = motion.pose(6 * S, 0.5, 1, 1, 0.5, 0.5, false, false, false, 0.42, false);
+        KnifeMotion.Pose falling = motion.pose(6 * S + S / 10, 0.5, 1, 1, 0.5, 0.5, false, false, false, -0.60, false);
+        assertTrue(jumping.y() < falling.y(), "jumping lags downward while falling lifts upward");
+    }
+
     private static void assertRest(KnifeMotion.Pose pose) {
         assertEquals(0, pose.x(), 1e-9);
         assertEquals(0, pose.y(), 1e-9);

@@ -153,9 +153,13 @@ public final class ModuleManager {
         register(new dev.jilaton.client.module.impl.PharaohHeaddressModule());
         register(new dev.jilaton.client.module.impl.PearlTrajectoryModule());
         register(new dev.jilaton.client.module.impl.BlockOutlineModule());
+        register(new dev.jilaton.client.module.impl.BlockPlacementModule());
         register(new dev.jilaton.client.module.impl.LowFireModule());
         register(new dev.jilaton.client.module.impl.RadianceModule());
         register(new dev.jilaton.client.module.impl.AfterglowModule());
+        register(new dev.jilaton.client.module.impl.CyberspaceModule());
+        register(new dev.jilaton.client.module.impl.GlassMaterialModule());
+        register(new dev.jilaton.client.module.impl.JilatonGateModule());
         register(new dev.jilaton.client.module.impl.WeatherModule());
         register(new dev.jilaton.client.module.impl.PlayerEspModule());
         register(new dev.jilaton.client.module.impl.ItemEspModule());

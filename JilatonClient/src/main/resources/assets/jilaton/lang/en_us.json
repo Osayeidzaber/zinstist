@@ -22,5 +22,13 @@
   "jilaton.module.companion.name": "Companion",
   "jilaton.module.companion.description": "A spring-followed companion that orbits you and banks into turns.",
   "jilaton.module.character-3d.name": "3D Character",
-  "jilaton.module.character-3d.description": "Replaces your player model with a 3D character."
+  "jilaton.module.character-3d.description": "Replaces your player model with a 3D character.",
+  "jilaton.module.block_placement.name": "Block Placement",
+  "jilaton.module.block_placement.description": "Temporary wireframe outlines, smooth face glow, and expanding pulses on placed blocks.",
+  "jilaton.module.cyberspace.name": "Cyberspace",
+  "jilaton.module.cyberspace.description": "Digital world grid, sonar scan waves, block edge telemetry, and pose-accurate 3D player skeletons.",
+  "jilaton.module.glass_material.name": "Glass Material",
+  "jilaton.module.glass_material.description": "Translucent frosted, crystal, obsidian, and holographic 3D glass material shells with Fresnel rim highlights.",
+  "jilaton.module.jilaton_gate.name": "Jilaton Gate",
+  "jilaton.module.jilaton_gate.description": "3D Jilaton-branded obsidian gateway with animated vortex interior and floating 3D emblem."
 }

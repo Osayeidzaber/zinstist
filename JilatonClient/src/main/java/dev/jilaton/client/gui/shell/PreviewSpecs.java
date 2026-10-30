@@ -47,10 +47,14 @@ public final class PreviewSpecs {
             Map.entry("item_esp", PreviewSpec.Motif.BOX),
             Map.entry("tracers", PreviewSpec.Motif.BOX),
             Map.entry("block_outline", PreviewSpec.Motif.BOX),
+            Map.entry("block_placement", PreviewSpec.Motif.BOX),
             Map.entry("nametags", PreviewSpec.Motif.PANEL),
             Map.entry("floating_relics", PreviewSpec.Motif.ORBIT),
             Map.entry("player_effects", PreviewSpec.Motif.FIGURE),
             Map.entry("character-3d", PreviewSpec.Motif.FIGURE),
+            Map.entry("cyberspace", PreviewSpec.Motif.FIGURE),
+            Map.entry("glass_material", PreviewSpec.Motif.GLOW),
+            Map.entry("jilaton_gate", PreviewSpec.Motif.TOTEM),
             Map.entry("totem_spirit", PreviewSpec.Motif.TOTEM),
             Map.entry("pharaoh_headdress", PreviewSpec.Motif.CROWN),
             Map.entry("now_playing", PreviewSpec.Motif.PANEL),
@@ -99,10 +103,14 @@ public final class PreviewSpecs {
             case "item_esp" -> itemEsp((ItemEspModule) module, accent);
             case "tracers" -> tracers((TracersModule) module, accent);
             case "block_outline" -> blockOutline(module, accent);
+            case "block_placement" -> blockPlacement(module, accent);
             case "nametags" -> nametags((NametagsModule) module, accent);
             case "floating_relics" -> relics(module, accent);
             case "player_effects" -> figure(module, accent);
             case "character-3d" -> character(module, accent);
+            case "cyberspace" -> cyberspace(module, accent);
+            case "glass_material" -> glassMaterial(module, accent);
+            case "jilaton_gate" -> jilatonGate(module, accent);
             case "totem_spirit" -> totem(module, accent);
             case "pharaoh_headdress" -> crown(module, accent);
             case "now_playing" -> nowPlaying(module, accent);
@@ -428,6 +436,69 @@ public final class PreviewSpecs {
                 unit(0.6 - num(module, "fade_time", 0.2), 0, 0.6),
                 unit(num(module, "glide", 0.6), 0, 1),
                 1,
+                detail);
+    }
+
+    private static PreviewSpec blockPlacement(ClientModule module, int accent) {
+        int detail = PreviewSpec.BOX_OUTLINE
+                | (flag(module, "fill", true) ? PreviewSpec.BOX_BOXES : 0)
+                | (flag(module, "particles", true) ? PreviewSpec.BOX_GLOW : 0);
+        return new PreviewSpec(PreviewSpec.Motif.BOX, 4 + choiceIndex(module, "style"),
+                palette(module, accent, "color_mode", "color"),
+                accent, accent,
+                unit(num(module, "expand", 0.16), 0, 0.5),
+                0.5,
+                unit(num(module, "line_width", 2.2), 1, 4.5),
+                unit(2.0 - num(module, "duration", 0.65), 0.2, 2.0),
+                unit(num(module, "duration", 0.65), 0.2, 2.0),
+                num(module, "opacity", 0.88),
+                detail);
+    }
+
+    private static PreviewSpec cyberspace(ClientModule module, int accent) {
+        int primary = palette(module, accent, "color_mode", "color");
+        int secondary = hex(module, "secondary", "8878FF");
+        int detail = (flag(module, "skeleton", true) ? 1 : 0)
+                | (flag(module, "block_wireframe", true) ? 2 : 0)
+                | (flag(module, "through_walls", true) ? 4 : 0);
+        return new PreviewSpec(PreviewSpec.Motif.FIGURE, 8 + choiceIndex(module, "preset"),
+                primary, secondary, accent,
+                unit(num(module, "grid_radius", 16), 6, 36),
+                0.7,
+                unit(num(module, "line_width", 1.8), 1, 4),
+                unit(num(module, "scan_speed", 1.0), 0.2, 3.0),
+                0.65,
+                num(module, "opacity", 0.85),
+                detail);
+    }
+
+    private static PreviewSpec glassMaterial(ClientModule module, int accent) {
+        int primary = palette(module, accent, "color_mode", "color");
+        int detail = (flag(module, "specular", true) ? PreviewSpec.GLOW_PULSE : 0);
+        return new PreviewSpec(PreviewSpec.Motif.GLOW, choiceIndex(module, "preset"),
+                primary, 0xFFFFFF, accent,
+                unit(num(module, "rim_strength", 0.82), 0.1, 1.0),
+                unit(num(module, "refraction", 0.65), 0, 1.0),
+                unit(num(module, "shell_scale", 1.04), 0.9, 1.25),
+                0.5,
+                0.6,
+                num(module, "opacity", 0.48),
+                detail);
+    }
+
+    private static PreviewSpec jilatonGate(ClientModule module, int accent) {
+        int primary = palette(module, accent, "color_mode", "color");
+        int detail = (flag(module, "logo_emblem", true) ? PreviewSpec.TOTEM_CREST : 0)
+                | (flag(module, "vortex", true) ? PreviewSpec.TOTEM_SEAL : 0)
+                | (flag(module, "particles", true) ? PreviewSpec.TOTEM_POSE : 0);
+        return new PreviewSpec(PreviewSpec.Motif.TOTEM, 4 + choiceIndex(module, "style"),
+                primary, 0x0B0B10, accent,
+                unit(num(module, "scale", 1.0), 0.6, 2.0),
+                0.7,
+                unit(num(module, "distance", 4.5), 2.5, 12.0),
+                0.55,
+                0.65,
+                num(module, "opacity", 0.92),
                 detail);
     }
 
