@@ -33,7 +33,8 @@ class CustomCharactersTest {
     @Test
     void ensureFolderIsANoOpWithoutAConfigDirectory() {
         assumeTrue(CustomCharacters.folder() == null, "a config directory exists, so the null branch cannot be reached");
-        assertNull(assertDoesNotThrow(CustomCharacters::ensureFolder), "there is nowhere to create the folder");
+        Path created = assertDoesNotThrow(() -> CustomCharacters.ensureFolder(), "there is nowhere to create the folder");
+        assertNull(created, "there is nowhere to create the folder");
     }
 
     @Test

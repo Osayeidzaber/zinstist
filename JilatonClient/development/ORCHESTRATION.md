@@ -1066,6 +1066,25 @@ The audit session also reports a client run 01:18–01:30 from its own snapshot 
 
 **The one thing that has not changed:** the audit session's edits landed after the 00:46 gate, so HEAD still has no gate of its own, and no frame from any run has been inspected by O. The tree is green as of 00:46:39 and unverified since.
 
+## 02:19 (file mtimes) — SHIELD-MODEL-1 landed on the third attempt. My addendum was wrong twice, and G's finding overturns my own brief.
+
+The `finish up.` turn carried it through. On disk: `ShieldTargetPolicy.java` written **02:17:48**, `ShieldTargetPolicyTest.java` **02:19:40** with **8 tests, up from 2**. `KillAuraModule.wanted()` now reads:
+
+```
+boolean blocking = other.isBlocking();
+boolean facing   = blocking && ShieldTargetPolicy.shieldFacesAttacker(...);
+return !avoidWastedShieldAttacks.value()
+        || !ShieldTargetPolicy.shieldAbsorbsAttack(blocking, facing, facing && attackerCanDisableBlocking(client, player));
+```
+
+with `attackerCanDisableBlocking` true for an axe in hand, or for `AutoWeaponModule.canSelectShieldBreaker`. The old `shouldSkipShield` path is gone.
+
+**The important part: G disproved the premise of my brief.** I demanded a `disabledTicksRemaining` parameter and an N−1/N/N+1 cooldown boundary. G cited vanilla instead: `getItemBlockingWith` requires `isUsingItem` (`LivingEntity.java:3426-3432`), and `BlocksAttacks#disable` stops using the item and adds an item cooldown (`BlocksAttacks.java:68-78`), so **`isBlocking()` is already false for the entire disable window** and no cooldown state needs tracking at the call site. The policy correctly takes the live value. Adding the parameter I asked for would have been dead state — worth remembering that "the orchestrator asked for a field" is not evidence the field is needed.
+
+The behavioural correction is real too: the old gate skipped a facing shield even when the attacker held an axe. An axe now lands the reduced first hit (`Items.java:1564`) and is no longer treated as wasted. The 8 tests cover the hemisphere boundary (perpendicular is outside), non-finite geometry, facing-away, facing, stopped-blocking-during-the-disable-window, axe-not-wasted, and any item carrying the `BlocksAttacks` component rather than shields only.
+
+**Status: IMPLEMENTED, not BUILD_VERIFIED.** G's own test compile was blocked by a peer's `render/character/Custom…` file mid-edit, so these 8 tests have never run. Do not quote SHIELD-MODEL-1 as verified until a gate executes them.
+
 ## 02:05 — Audit session, batch 3 (user-directed visuals). Re-read before editing these files.
 
 - **Spatial lyrics — new default mode "World Trail" (A's lane).** Each new line is placed where the camera looks when it starts (in front of any block hit), then stays put in the world. Turning never moves it; you can walk around it. Older lines dim, lift if a new line lands on them, and fade after a linger time. Lines are drawn as extruded 3D lettering (depth layers). New: `render/fx/LyricTrail.java` (pure, `LyricTrailTest`), `SpatialLyricsModule.emitTrail`, plus settings `trail_lines`, `linger`, `depth`. `LyricLayout.MODES` is unchanged; the module offers "World Trail" plus those modes.
@@ -1086,3 +1105,9 @@ The audit session also reports a client run 01:18–01:30 from its own snapshot 
 ## 02:30 — GUI redesign v1 approved for build. Spec: `development/GUI_REDESIGN.md`.
 
 The user approved a 12-screen redesign drawn on a design canvas (link inside the spec; it is private to the user). The spec maps each board to the existing class, its owner (C: ClickGUI pages + Theme; E: HUD; A: Music Center; O to assign: main menu, loading, servers/worlds, pause, fonts, account manager), the tokens, motion, data sources and acceptance captures. **The account manager is new and needs the user's approval of its security design (§11) before any code.** Nobody has been messaged. Deliver to idle sessions only, per the queue policy.
+
+## 02:40 — Everything committed and pushed (user request). JA-001 closed.
+
+- Commit `5e06c6b` on the new branch **`jilaton/2026-10-31-work`**, pushed to `origin` (private repo). 436 files: all agent work since `f11bfff` plus the audit session's work. The checkout is **now on that branch**; nothing in the working tree changed, and new edits simply show as uncommitted again.
+- `.gitignore` (root) now also ignores `.isolated-build*/`, `.wrapcheck-*.txt`, `JilatonClient/run-verify/`, `JilatonClient/run-shots/` and `/ideas/assets/` (other clients' screenshots, which are never redistributed).
+- A secret scan of every committed text file found nothing. `main` is untouched; merging is the user's call.
