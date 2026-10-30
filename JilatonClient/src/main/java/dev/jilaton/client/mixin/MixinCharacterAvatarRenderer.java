@@ -36,6 +36,7 @@ public abstract class MixinCharacterAvatarRenderer<T extends Avatar & ClientAvat
    @Inject(method = "extractRenderState", at = @At("TAIL"))
    private void anubis$extractCharacter(Avatar entity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
       CharacterModule.extract(entity, state);
+      dev.jilaton.client.module.impl.GlassMaterialModule.applyGhost(entity, state);
    }
 
    @Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)

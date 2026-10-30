@@ -35,10 +35,16 @@ public final class ClientConfig {
     private final Path profilesDirectory;
     private final Map<String, HudPosition> hudPositions = new HashMap<>();
     private final Map<String, HudStyle> hudStyles = new HashMap<>();
-    private String themeId = "obsidian";
+    /** Violet is the redesign's one accent (GUI_REDESIGN.md §0); a saved theme still wins. */
+    private String themeId = "violet";
     private String customAccent = "F2F2F2";
     private boolean reducedMotion;
     private double animationIntensity = 1.0;
+    /** UI typeface: "inter" (shipped TTF) or "minecraft" (vanilla pixel font). */
+    private String uiFont = "inter";
+
+    public String uiFont() { return uiFont; }
+    public void setUiFont(String font) { uiFont = "minecraft".equals(font) ? "minecraft" : "inter"; }
     /** ClickGUI Visuals card order, as module ids; empty means registration order. */
     private final List<String> visualOrder = new ArrayList<>();
     /** ClickGUI general module order across categories; empty means registration order. */
@@ -248,6 +254,7 @@ public final class ClientConfig {
         hudStyles.clear();
         categoryScrolls.clear();
         reducedMotion = Boolean.parseBoolean(values.getProperty("ui.reduced_motion", "false"));
+        setUiFont(values.getProperty("ui.font", "inter"));
         String configuredOrder = values.getProperty("ui.visual_order", "");
         setVisualOrder(configuredOrder.isBlank() ? List.of() : List.of(configuredOrder.split(",")));
         String configuredModuleOrder = values.getProperty("ui.module_order", "");
@@ -390,6 +397,7 @@ public final class ClientConfig {
         values.setProperty("ui.custom_accent", customAccent);
         values.setProperty("ui.reduced_motion", Boolean.toString(reducedMotion));
         values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
+        values.setProperty("ui.font", uiFont);
         values.setProperty("ui.visual_order", String.join(",", visualOrder));
         values.setProperty("ui.module_order", String.join(",", moduleOrder));
         values.setProperty("ui.last_page", guiPage);

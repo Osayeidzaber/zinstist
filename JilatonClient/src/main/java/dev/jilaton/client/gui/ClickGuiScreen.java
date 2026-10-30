@@ -21,6 +21,7 @@ import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
 import dev.jilaton.client.setting.TextSetting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -39,6 +40,8 @@ import java.util.Map;
 
 /** ClickGUI shell: measured sidebar, searchable module list and a live Visuals preview grid. */
 public final class ClickGuiScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private static final int ROW_HEIGHT = ShellMetrics.MODULE_CARD_HEIGHT;
     private static final int VISUAL_HEIGHT = ShellMetrics.VISUAL_CARD_HEIGHT;
     private static final int COLUMN_GAP = ShellMetrics.COLUMN_GAP;
@@ -520,7 +523,7 @@ public final class ClickGuiScreen extends Screen {
         boolean expanded = module.id().equals(expandedId);
         boolean binding = module.id().equals(bindingModuleId);
         double hover = animate("hover:" + module.id(), hovered ? 1 : 0);
-        boolean gearPointed = inside(mouseX, mouseY, x + width - 14 - 36 - 20, y + 22, 20, 20);
+        boolean gearPointed = inside(mouseX, mouseY, x + width - 14 - 36 - 20, y + 8, 20, 20);
         double gearHover = animate("gear:" + module.id(), gearPointed ? 1 : 0);
 
         int fill = active ? ShellPalette.accentSurface(accent)
@@ -531,17 +534,23 @@ public final class ClickGuiScreen extends Screen {
                         : hover > 0.02 ? ShellPalette.STROKE_HOVER : ShellPalette.STROKE);
 
         int toggleX = x + width - 14 - 36;
+        // Grip and gear appear on hover (or while expanded) so the description gets the room at rest.
+        double tools = Math.max(hover, expanded ? 1 : 0);
         int textWidth = width - 28 - 36 - 40;
         drawScaled(graphics, fit(module.name(), Math.round(textWidth / CARD_TITLE)), x + 14, y + 18,
                 CARD_TITLE, ShellPalette.TEXT);
-        graphics.drawString(font, "KeyBind: ", x + 14, y + 38, ShellPalette.TEXT_3, false);
-        graphics.drawString(font, fit(keyLabel(module), width - 28 - 90), x + 14 + font.width("KeyBind: "),
-                y + 38, binding ? accent : ShellPalette.TEXT_2, false);
+        // "Unbound · what it does": the live keybind first, then the module's own one-line description.
+        String key = binding ? "Press a key" : module.keyCode() < 0 ? "Unbound" : keyLabel(module);
+        graphics.drawString(font, key, x + 14, y + 38, binding ? accent : ShellPalette.TEXT_2, false);
+        int restX = x + 14 + font.width(key);
+        String rest = fit(" · " + module.description(), width - 28 - (tools > 0.05 ? 90 : 52) - font.width(key));
+        if (!rest.isEmpty()) graphics.drawString(font, rest, restX, y + 38, ShellPalette.TEXT_3, false);
         int gearX = toggleX - 20;
-        ShellChrome.grip(graphics, gearX - 16, y + 26,
-                hover > 0.05 ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3);
-        ShellChrome.gear(graphics, gearX, y + 27, expanded ? accent
-                : gearHover > 0.05 ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3);
+        if (tools > 0.05) {
+            ShellChrome.grip(graphics, gearX - 16, y + 12, JilatonUi.alpha(ShellPalette.TEXT_3, tools));
+            ShellChrome.gear(graphics, gearX, y + 13, expanded ? accent
+                    : JilatonUi.alpha(gearHover > 0.05 ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3, tools));
+        }
         drawToggle(graphics, toggleX, y + 22, module.enabled(), module.id());
     }
 
@@ -830,11 +839,11 @@ public final class ClickGuiScreen extends Screen {
         if (layout.listHeight() < 90) return;
         String hint;
         if (bindingModuleId != null) {
-            hint = "PRESS A KEY   ·   DELETE UNBINDS   ·   ESC CANCELS";
+            hint = "Press a key  ·  Delete unbinds  ·  Esc cancels";
         } else if (page == Page.MODULES) {
-            hint = "UP / DOWN SELECT   ·   ENTER TOGGLE   ·   RIGHT OPEN SETTINGS   ·   / SEARCH   ·   ESC CLOSE";
+            hint = "Click to toggle  ·  Right-click for settings  ·  Drag to reorder  ·  Esc to close";
         } else {
-            hint = "ESC CLOSE   ·   / TO SEARCH MODULES";
+            hint = "Esc to close  ·  / to search modules";
         }
         String shown = fit(hint, layout.contentWidth());
         int hintX = layout.contentX() + Math.max(0, (layout.contentWidth() - font.width(shown)) / 2);
@@ -1272,7 +1281,7 @@ public final class ClickGuiScreen extends Screen {
             dragModule = module;
             return true;
         }
-        if (inside(mouseX, mouseY, gearX, y + 22, 20, 20)) {
+        if (inside(mouseX, mouseY, gearX, y + 8, 20, 20)) {
             expandedId = module.id().equals(expandedId) ? null : module.id();
             syncStateToConfig();
             return true;

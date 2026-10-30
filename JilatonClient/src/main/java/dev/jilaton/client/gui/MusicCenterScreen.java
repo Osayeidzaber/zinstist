@@ -8,6 +8,7 @@ import dev.jilaton.client.music.MusicCenter;
 import dev.jilaton.client.music.NowPlaying;
 import dev.jilaton.client.music.SpotifyConnect;
 import dev.jilaton.client.render.fx.LyricLayout;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -26,6 +27,8 @@ import java.util.List;
  * settings as the ClickGUI, so changes apply immediately and persist with the profile.
  */
 public final class MusicCenterScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private enum Tab { PLAYING("Now Playing"), LIBRARY("Library"), SPOTIFY("Spotify"), LYRICS("Lyrics");
         final String label; Tab(String label) { this.label = label; } }
 

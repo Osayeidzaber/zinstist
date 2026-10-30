@@ -5,6 +5,7 @@ import dev.jilaton.client.config.HudStyle;
 import dev.jilaton.client.gui.hud.HudPreset;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.module.impl.HudModule;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -16,6 +17,8 @@ import java.util.List;
 import java.util.Locale;
 
 public final class HudEditorScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private final ModuleManager modules;
     private final ClientConfig config;
     private final Screen parent;

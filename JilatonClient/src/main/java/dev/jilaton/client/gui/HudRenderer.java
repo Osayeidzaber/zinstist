@@ -183,7 +183,7 @@ public final class HudRenderer {
             return;
         }
 
-        Font font = client.font;
+        Font font = JilatonType.font();
         int accent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
         int guiWidth = graphics.guiWidth();
         int guiHeight = graphics.guiHeight();
@@ -445,7 +445,7 @@ public final class HudRenderer {
             int color = notice == null || notice.enabled() ? accent : 0xFFA5A5A5;
             drawPanel(graphics, x, top, width, 23);
             graphics.fill(x, top, x + 2, top + 23, color);
-            graphics.drawString(client.font, client.font.plainSubstrByWidth(label, width - 16), x + 8, top + 6, 0xFFE0E0E0);
+            graphics.drawString(JilatonType.font(), JilatonType.font().plainSubstrByWidth(label, width - 16), x + 8, top + 6, 0xFFE0E0E0);
             double remaining = notice == null ? 1.0 : Math.max(0, 1.0
                     - (now - notice.createdAt()) / (double) dev.jilaton.client.notification.NotificationCenter.LIFETIME_NANOS);
             graphics.fill(x + 2, top + 21, x + 2 + (int) Math.round((width - 2) * remaining), top + 23, color);
@@ -461,8 +461,8 @@ public final class HudRenderer {
         beginWidget(graphics, "armor", x, y, width, height, preview);
         drawPanel(graphics, x, y, width, height);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.drawString(client.font, "ARMOR", x + 6, y + 5, accent);
-        HudNumberPainter painter = numbers(client.font);
+        graphics.drawString(JilatonType.font(), "ARMOR", x + 6, y + 5, accent);
+        HudNumberPainter painter = numbers(JilatonType.font());
         int worst = worstDurabilityPercent(client);
         if (worst >= 0) {
             long now = System.nanoTime();
@@ -471,14 +471,14 @@ public final class HudRenderer {
             painter.drawSuffixedFade(graphics, armorFade, now, "%", percentRight, y + 5,
                     worst < 20 ? DANGER : TEXT_PRIMARY, TEXT_SECONDARY);
         } else {
-            graphics.drawString(client.font, "--", x + width - 6 - client.font.width("--"), y + 5,
+            graphics.drawString(JilatonType.font(), "--", x + width - 6 - JilatonType.font().width("--"), y + 5,
                     TEXT_SECONDARY);
         }
         for (int index = 0; index < ARMOR_SLOTS.length; index++) {
             ItemStack stack = client.player.getItemBySlot(ARMOR_SLOTS[index]);
             int tileX = x + 6 + index * 31;
             if (stack.isEmpty()) {
-                graphics.drawString(client.font, "--", tileX + 7, y + 20, 0xFF707070);
+                graphics.drawString(JilatonType.font(), "--", tileX + 7, y + 20, 0xFF707070);
             } else {
                 graphics.renderItem(stack, tileX + 5, y + 16);
                 if (stack.isDamageableItem()) {
@@ -488,7 +488,7 @@ public final class HudRenderer {
                             remaining < 0.2 ? 0xFFFF647C : accent);
                 }
             }
-            graphics.drawString(client.font, ARMOR_LABELS[index], tileX, y + 39, 0xFFA5A5A5);
+            graphics.drawString(JilatonType.font(), ARMOR_LABELS[index], tileX, y + 39, 0xFFA5A5A5);
         }
         graphics.pose().popMatrix();
     }
@@ -532,14 +532,14 @@ public final class HudRenderer {
         int y = widgetY("effects", 64, height, graphics.guiHeight());
         beginWidget(graphics, "effects", x, y, width, height, preview);
         drawPanel(graphics, x, y, width, height);
-        graphics.drawString(client.font, "POTION EFFECTS", x + 6, y + 6,
+        graphics.drawString(JilatonType.font(), "POTION EFFECTS", x + 6, y + 6,
                 activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent())));
-        HudNumberPainter painter = numbers(client.font);
+        HudNumberPainter painter = numbers(JilatonType.font());
         for (int index = 0; index < rowCount; index++) {
             EffectRow row = effectRows.isEmpty() ? new EffectRow("", "No active effects", "") : effectRows.get(index);
             int durationWidth = painter.width(row.duration());
-            String name = client.font.plainSubstrByWidth(row.name(), width - durationWidth - 20);
-            graphics.drawString(client.font, name, x + 6, y + 21 + index * 14, 0xFFE0E0E0);
+            String name = JilatonType.font().plainSubstrByWidth(row.name(), width - durationWidth - 20);
+            graphics.drawString(JilatonType.font(), name, x + 6, y + 21 + index * 14, 0xFFE0E0E0);
             NumericCrossfade fade = effectFades.computeIfAbsent(row.key(), key -> new NumericCrossfade());
             fade.update(row.duration(), now, config.reducedMotion());
             painter.drawFadeRight(graphics, fade, now, x + width - 6, y + 21 + index * 14, TEXT_SECONDARY);
@@ -1080,7 +1080,7 @@ public final class HudRenderer {
         graphics.fill(x, y, x + 2, y + height, accent);
         graphics.fill(x + 2, y + size, x + size, y + size + 1, HAIRLINE);
         rangeFade.update(radarRangeText.update((int) Math.round(range)), nowNanos, config.reducedMotion());
-        numbers(client.font).drawSuffixedFade(graphics, rangeFade, nowNanos, "m", x + size - 6,
+        numbers(JilatonType.font()).drawSuffixedFade(graphics, rangeFade, nowNanos, "m", x + size - 6,
                 y + size + 2, TEXT_PRIMARY, TEXT_SECONDARY);
         int centerX = x + size / 2;
         int centerY = y + size / 2;
@@ -1305,7 +1305,7 @@ public final class HudRenderer {
     }
 
     private void renderKeystrokes(GuiGraphics graphics, Minecraft client, int accent, int x, int y) {
-        Font font = client.font;
+        Font font = JilatonType.font();
         drawKey(graphics, font, client.options.keyUp, x + 24, y, 22, 19, accent);
         drawKey(graphics, font, client.options.keyLeft, x, y + 21, 22, 19, accent);
         drawKey(graphics, font, client.options.keyDown, x + 24, y + 21, 22, 19, accent);

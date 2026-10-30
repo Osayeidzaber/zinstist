@@ -3,6 +3,7 @@ package dev.jilaton.client.gui;
 import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.setting.TextSetting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -13,6 +14,8 @@ import org.lwjgl.glfw.GLFW;
 
 /** Focused text editor; invalid input stays editable and is never saved. */
 public final class TextSettingScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private final Screen parent;
     private final TextSetting setting;
     private final ClientConfig config;

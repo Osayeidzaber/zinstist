@@ -2,6 +2,7 @@ package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,6 +19,8 @@ import java.util.List;
  * time-based and scale with the configured animation intensity.
  */
 public final class JilatonMainMenuScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private static final String TICKER = "COMBAT  ✦  MOVEMENT  ✦  RENDER  ✦  PLAYER  ✦  CLIENT  ✦  ";
     private final List<MenuAction> actions = new ArrayList<>(5);
     /** Set on the first frame not covered by the loading overlay, so entrances are actually seen. */

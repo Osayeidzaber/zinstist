@@ -10,6 +10,7 @@ import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
 import dev.jilaton.client.setting.TextSetting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -25,6 +26,8 @@ import java.util.Locale;
  * settings through the normal settings objects; nothing here is a mock.
  */
 public final class VisualStudioScreen extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    private final Font font = JilatonType.font();
     private static final int SURFACE = 0xFF0B0B0C;
     private static final int CARD = 0xFF111112;
     private static final int HAIRLINE = 0xFF232323;

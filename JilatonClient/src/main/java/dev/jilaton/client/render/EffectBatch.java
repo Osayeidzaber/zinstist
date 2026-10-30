@@ -91,6 +91,19 @@ public final class EffectBatch {
 
     public int size() { return segments.size() + quads.size(); }
 
+    /**
+     * Lambert shade of {@code rgb} for a face with the given (unit) normal under a fixed key light from above-front,
+     * so solid effect geometry reads as a lit volume instead of a flat silhouette.
+     */
+    public static int shade(int rgb, double nx, double ny, double nz) {
+        double lambert = Math.max(0, nx * 0.32 + ny * 0.86 + nz * 0.40);
+        double k = 0.42 + 0.58 * lambert;
+        int r = (int) Math.round((rgb >> 16 & 0xFF) * k);
+        int g = (int) Math.round((rgb >> 8 & 0xFF) * k);
+        int b = (int) Math.round((rgb & 0xFF) * k);
+        return r << 16 | g << 8 | b;
+    }
+
     public static int withAlpha(int rgb, double opacity) {
         return (int) Math.round(Math.max(0, Math.min(1, opacity)) * 255) << 24 | rgb & 0xFFFFFF;
     }

@@ -2,6 +2,7 @@ package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -23,6 +24,8 @@ import java.util.Map;
  * action bar. Subclasses supply the items, how a card looks and what activating one does.
  */
 public abstract class JilatonCardScreen<T> extends Screen {
+    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
+    protected final Font font = JilatonType.font();
     protected static final int CARD_HEIGHT = 64;
     private static final int GAP = 8;
     private static final int TARGET_CARD_WIDTH = 236;

@@ -81,7 +81,8 @@
     "ItemInHandRendererInvoker",
     "KnifeViewmodelMixin",
     "CsKnifeMixin",
-    "GameRendererPostEffectAccess"
+    "GameRendererPostEffectAccess",
+    "FontProviderAccess"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -13,7 +13,7 @@ class OverlayConfigurationTest {
     @Test void haloAndItemFilteringSettingsUseTheExistingConfigurationAndProfileSystem() throws Exception {
         ModuleManager modules = new ModuleManager();
         ClientConfig config = new ClientConfig(directory);
-        assertEquals("obsidian", config.themeId());
+        assertEquals("violet", config.themeId());
         SettingValueEditor.apply(setting(modules,"item_esp","item_ids"),"diamond, apple");
         SettingValueEditor.apply(setting(modules,"item_esp","filter"),"whitelist");
         SettingValueEditor.apply(setting(modules,"player_esp","hostiles"),"true");

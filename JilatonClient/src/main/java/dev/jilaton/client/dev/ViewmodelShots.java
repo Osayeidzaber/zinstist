@@ -98,6 +98,10 @@ public final class ViewmodelShots {
             visuals(client);
             return;
         }
+        if (mode.contains("ui")) {
+            screens(client);
+            return;
+        }
         then(20, () -> CosmeticKnifeModule.debugViewSpace = true);
         shot(10, "debug-viewspace");
         then(1, () -> CosmeticKnifeModule.debugViewSpace = false);
@@ -196,6 +200,23 @@ public final class ViewmodelShots {
             JilatonClient.openClickGui(null);
         });
         shot(30, "ui-clickgui");
+        then(20, client::stop);
+    }
+
+    /** Every Jilaton screen in turn, for comparison with the design boards. */
+    private void screens(Minecraft client) {
+        then(5, () -> enable(true, "hud"));
+        shot(40, "ui-hud");
+        then(1, () -> JilatonClient.openClickGui(null));
+        shot(30, "ui-clickgui");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.MusicCenterScreen(null)));
+        shot(30, "ui-music");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonServersScreen(null)));
+        shot(30, "ui-servers");
+        then(1, () -> client.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+        shot(20, "ui-pause");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen()));
+        shot(60, "ui-mainmenu");
         then(20, client::stop);
     }
 
