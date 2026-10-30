@@ -41,8 +41,16 @@ public final class MediaSessionSource {
         scriptDir = configDir.resolve("jilaton");
     }
 
-    public static boolean supported() {
+    public static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+    }
+
+    public static boolean isMac() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+    }
+
+    public static boolean supported() {
+        return isWindows() || isMac();
     }
 
     public NowPlaying state() { return state; }
@@ -56,7 +64,7 @@ public final class MediaSessionSource {
 
     /** Called each client tick while selected: keeps exactly one bridge alive and restarts it if it dies. */
     public void tick() {
-        if (!supported()) { state = NowPlaying.idle("Spotify", "Windows media sessions are only available on Windows"); return; }
+        if (!supported()) { state = NowPlaying.idle("Spotify", "Desktop media sessions are only available on macOS and Windows"); return; }
         Process p = process;
         if (p != null && p.isAlive()) {
             if (lastLineNanos != 0) failedStarts = 0;
@@ -65,7 +73,7 @@ public final class MediaSessionSource {
             return;
         }
         if (System.nanoTime() < restartAfter) return;
-        // 5 s, doubling per start that never spoke, capped at 5 min: a blocked PowerShell is not respawned forever.
+        // 5 s, doubling per start that never spoke, capped at 5 min: a blocked bridge is not respawned forever.
         restartAfter = System.nanoTime() + restartDelayNanos(failedStarts);
         failedStarts++;
         start();
@@ -77,20 +85,28 @@ public final class MediaSessionSource {
 
     private void start() {
         try {
-            Path script = scriptDir.resolve("media-session.ps1");
             Files.createDirectories(scriptDir);
-            try (InputStream in = MediaSessionSource.class.getResourceAsStream("/assets/jilaton/scripts/media-session.ps1")) {
-                if (in == null) throw new IOException("bridge script missing from the mod");
-                Files.copy(in, script, StandardCopyOption.REPLACE_EXISTING);
-            }
-            Path artDir = scriptDir.resolve("art-cache");
-            Files.createDirectories(artDir);
             Path commands = scriptDir.resolve("media-command.txt");
             Files.deleteIfExists(commands);
-            ProcessBuilder builder = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                    "-File", script.toString(), "-Filter", filter, "-ArtDir", artDir.toString(), "-IntervalMs", "500",
-                    "-CommandFile", commands.toString(), "-ParentPid", Long.toString(ProcessHandle.current().pid()));
-            builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("NUL")));
+            ProcessBuilder builder;
+            if (isMac()) {
+                Path macScript = scriptDir.resolve("media-session-mac.sh");
+                Files.writeString(macScript, macBridgeScript(commands.toString()));
+                builder = new ProcessBuilder("/bin/sh", macScript.toString());
+                builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null")));
+            } else {
+                Path script = scriptDir.resolve("media-session.ps1");
+                try (InputStream in = MediaSessionSource.class.getResourceAsStream("/assets/jilaton/scripts/media-session.ps1")) {
+                    if (in == null) throw new IOException("bridge script missing from the mod");
+                    Files.copy(in, script, StandardCopyOption.REPLACE_EXISTING);
+                }
+                Path artDir = scriptDir.resolve("art-cache");
+                Files.createDirectories(artDir);
+                builder = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                        "-File", script.toString(), "-Filter", filter, "-ArtDir", artDir.toString(), "-IntervalMs", "500",
+                        "-CommandFile", commands.toString(), "-ParentPid", Long.toString(ProcessHandle.current().pid()));
+                builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("NUL")));
+            }
             builder.redirectErrorStream(false);
             builder.redirectError(ProcessBuilder.Redirect.DISCARD);
             Process p = builder.start();
@@ -104,6 +120,48 @@ public final class MediaSessionSource {
             state = NowPlaying.idle("Spotify", "Media bridge failed: " + exception.getMessage());
             LOGGER.warn("Could not start the media-session bridge", exception);
         }
+    }
+
+    private static String macBridgeScript(String cmdFile) {
+        return """
+                #!/bin/sh
+                CMD_FILE="%s"
+                while true; do
+                  if [ -f "$CMD_FILE" ]; then
+                    CMD=$(cat "$CMD_FILE" 2>/dev/null)
+                    rm -f "$CMD_FILE"
+                    case "$CMD" in
+                      playpause|toggle) osascript -e 'if application "Spotify" is running then tell application "Spotify" to playpause' 2>/dev/null ;;
+                      next) osascript -e 'if application "Spotify" is running then tell application "Spotify" to next track' 2>/dev/null ;;
+                      previous) osascript -e 'if application "Spotify" is running then tell application "Spotify" to previous track' 2>/dev/null ;;
+                    esac
+                  fi
+                  OUT=$(osascript -e '
+                    if application "Spotify" is running then
+                      tell application "Spotify"
+                        set st to player state as string
+                        if st is "playing" or st is "paused" then
+                          set t to name of current track
+                          set a to artist of current track
+                          set al to album of current track
+                          set d to duration of current track
+                          set p to (player position * 1000) as integer
+                          set sStr to "Paused"
+                          if st is "playing" then set sStr to "Playing"
+                          return "{\\"active\\":true,\\"app\\":\\"Spotify\\",\\"status\\":\\"" & sStr & "\\",\\"title\\":\\"" & t & "\\",\\"artist\\":\\"" & a & "\\",\\"album\\":\\"" & al & "\\",\\"positionMs\\":" & p & ",\\"durationMs\\":" & d & ",\\"art\\":\\"\\"}"
+                        end if
+                      end tell
+                    end if
+                    return "{\\"active\\":false}"
+                  ' 2>/dev/null)
+                  if [ -n "$OUT" ]; then
+                    echo "$OUT"
+                  else
+                    echo '{"active":false}'
+                  fi
+                  sleep 1
+                done
+                """.formatted(cmdFile.replace("\"", "\\\""));
     }
 
     private void read(Process p) {

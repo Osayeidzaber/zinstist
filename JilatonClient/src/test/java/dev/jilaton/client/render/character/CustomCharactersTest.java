@@ -25,7 +25,7 @@ class CustomCharactersTest {
     @Test
     void scanIsEmptyWithoutAConfigDirectory() {
         assumeTrue(CustomCharacters.folder() == null, "a config directory exists, so the null branch cannot be reached");
-        List<BakedDesign> designs = assertDoesNotThrow(CustomCharacters::scan, "scan() must not throw without a config dir");
+        List<BakedDesign> designs = assertDoesNotThrow(() -> CustomCharacters.scan(), "scan() must not throw without a config dir");
         assertNotNull(designs);
         assertTrue(designs.isEmpty(), "no folder should mean no custom designs");
     }

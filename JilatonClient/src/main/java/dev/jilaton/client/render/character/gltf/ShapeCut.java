@@ -19,12 +19,13 @@ final class ShapeCut {
    private final float[][][] intervals;
    private final int[][] labels;
 
+   @SuppressWarnings("unchecked")
    private ShapeCut(PosedMesh mesh) {
       this.mesh = mesh;
       this.height = mesh.bounds()[4];
       this.step = this.height / 160.0F;
       this.gap = this.height * 0.004F;
-      this.spans = new List[160];
+      this.spans = (List<float[]>[]) new List<?>[160];
 
       for (int i = 0; i < 160; i++) {
          this.spans[i] = new ArrayList<>();

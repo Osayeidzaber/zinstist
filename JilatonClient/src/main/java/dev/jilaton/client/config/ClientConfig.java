@@ -28,6 +28,8 @@ public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
     private static final Set<String> THEME_IDS = Set.of("obsidian", "graphite", "violet", "blue", "cyan", "rose", "amber", "custom");
+    private static final Set<String> GUI_PAGES = Set.of("MODULES", "SETTINGS", "CONFIGS", "THEME");
+    private static final Set<String> GUI_CATEGORIES = Set.of("All", "Combat", "Movement", "Player", "Visuals", "Client");
     private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target", "armor", "effects", "cps", "notifications", "music", "keybinds", "server", "above_head", "held_item", "staff", "radar");
     private final Path path;
     private final Path profilesDirectory;
@@ -39,11 +41,92 @@ public final class ClientConfig {
     private double animationIntensity = 1.0;
     /** ClickGUI Visuals card order, as module ids; empty means registration order. */
     private final List<String> visualOrder = new ArrayList<>();
+    /** ClickGUI general module order across categories; empty means registration order. */
+    private final List<String> moduleOrder = new ArrayList<>();
+    private String guiPage = "MODULES";
+    private String guiCategory = "All";
+    private String guiSelectedModule = "";
+    private String guiExpandedModule = "";
+    private boolean guiEnabledOnly;
+    private String guiSearchQuery = "";
+    private String guiSelectedProfile = "";
+    private double guiScroll;
+    private final Map<String, Double> categoryScrolls = new HashMap<>();
 
     public List<String> visualOrder() { return List.copyOf(visualOrder); }
     public void setVisualOrder(List<String> order) {
         visualOrder.clear();
+        if (order == null) return;
         for (String id : order) if (id != null && id.matches("[a-z0-9][a-z0-9_-]*") && !visualOrder.contains(id)) visualOrder.add(id);
+    }
+
+    public List<String> moduleOrder() {
+        return moduleOrder.isEmpty() ? List.copyOf(visualOrder) : List.copyOf(moduleOrder);
+    }
+
+    public void setModuleOrder(List<String> order) {
+        moduleOrder.clear();
+        if (order == null) return;
+        for (String id : order) if (id != null && id.matches("[a-z0-9][a-z0-9_-]*") && !moduleOrder.contains(id)) moduleOrder.add(id);
+    }
+
+    public String guiPage() { return guiPage; }
+    public void setGuiPage(String page) {
+        if (page != null && GUI_PAGES.contains(page)) {
+            this.guiPage = page;
+        }
+    }
+
+    public String guiCategory() { return guiCategory; }
+    public void setGuiCategory(String category) {
+        if (category != null && GUI_CATEGORIES.contains(category)) {
+            this.guiCategory = category;
+        }
+    }
+
+    public String guiSelectedModule() { return guiSelectedModule; }
+    public void setGuiSelectedModule(String moduleId) {
+        this.guiSelectedModule = moduleId != null && moduleId.matches("[a-z0-9][a-z0-9_-]*") ? moduleId : "";
+    }
+
+    public String guiExpandedModule() { return guiExpandedModule; }
+    public void setGuiExpandedModule(String moduleId) {
+        this.guiExpandedModule = moduleId != null && moduleId.matches("[a-z0-9][a-z0-9_-]*") ? moduleId : "";
+    }
+
+    public boolean guiEnabledOnly() { return guiEnabledOnly; }
+    public void setGuiEnabledOnly(boolean enabledOnly) { this.guiEnabledOnly = enabledOnly; }
+
+    public String guiSearchQuery() { return guiSearchQuery; }
+    public void setGuiSearchQuery(String query) {
+        if (query == null) {
+            this.guiSearchQuery = "";
+        } else {
+            String trimmed = query.strip();
+            this.guiSearchQuery = trimmed.length() > 64 ? trimmed.substring(0, 64) : trimmed;
+        }
+    }
+
+    public String guiSelectedProfile() { return guiSelectedProfile; }
+    public void setGuiSelectedProfile(String profile) {
+        this.guiSelectedProfile = isValidProfileName(profile) ? profile : "";
+    }
+
+    public double guiScroll() { return guiScroll; }
+    public void setGuiScroll(double scroll) {
+        this.guiScroll = Double.isFinite(scroll) ? Math.max(0.0, scroll) : 0.0;
+    }
+
+    public double categoryScroll(String category) {
+        if (category == null) return 0.0;
+        return categoryScrolls.getOrDefault(category, 0.0);
+    }
+
+    public void setCategoryScroll(String category, double scroll) {
+        if (category != null && GUI_CATEGORIES.contains(category)) {
+            double clamped = Double.isFinite(scroll) ? Math.max(0.0, scroll) : 0.0;
+            categoryScrolls.put(category, clamped);
+        }
     }
 
     public boolean reducedMotion() { return reducedMotion; }
@@ -163,9 +246,34 @@ public final class ClientConfig {
     private void apply(Properties values, ModuleManager modules) {
         hudPositions.clear();
         hudStyles.clear();
+        categoryScrolls.clear();
         reducedMotion = Boolean.parseBoolean(values.getProperty("ui.reduced_motion", "false"));
         String configuredOrder = values.getProperty("ui.visual_order", "");
         setVisualOrder(configuredOrder.isBlank() ? List.of() : List.of(configuredOrder.split(",")));
+        String configuredModuleOrder = values.getProperty("ui.module_order", "");
+        setModuleOrder(configuredModuleOrder.isBlank() ? List.of() : List.of(configuredModuleOrder.split(",")));
+        setGuiPage(values.getProperty("ui.last_page", "MODULES"));
+        setGuiCategory(values.getProperty("ui.last_category", "All"));
+        setGuiSelectedModule(values.getProperty("ui.selected_module", ""));
+        setGuiExpandedModule(values.getProperty("ui.expanded_module", ""));
+        setGuiEnabledOnly(Boolean.parseBoolean(values.getProperty("ui.enabled_only", "false")));
+        setGuiSearchQuery(values.getProperty("ui.search_query", ""));
+        setGuiSelectedProfile(values.getProperty("ui.selected_profile", ""));
+        try {
+            setGuiScroll(Double.parseDouble(values.getProperty("ui.scroll", "0.0")));
+        } catch (NumberFormatException exception) {
+            guiScroll = 0.0;
+        }
+        for (String category : GUI_CATEGORIES) {
+            String key = "ui.scroll." + category.toLowerCase(java.util.Locale.ROOT);
+            String rawScroll = values.getProperty(key);
+            if (rawScroll != null) {
+                try {
+                    setCategoryScroll(category, Double.parseDouble(rawScroll));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
         try {
             setAnimationIntensity(Double.parseDouble(values.getProperty("ui.animation_intensity", "1.0")));
         } catch (IllegalArgumentException exception) {
@@ -283,6 +391,21 @@ public final class ClientConfig {
         values.setProperty("ui.reduced_motion", Boolean.toString(reducedMotion));
         values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
         values.setProperty("ui.visual_order", String.join(",", visualOrder));
+        values.setProperty("ui.module_order", String.join(",", moduleOrder));
+        values.setProperty("ui.last_page", guiPage);
+        values.setProperty("ui.last_category", guiCategory);
+        values.setProperty("ui.selected_module", guiSelectedModule);
+        values.setProperty("ui.expanded_module", guiExpandedModule);
+        values.setProperty("ui.enabled_only", Boolean.toString(guiEnabledOnly));
+        values.setProperty("ui.search_query", guiSearchQuery);
+        values.setProperty("ui.selected_profile", guiSelectedProfile);
+        values.setProperty("ui.scroll", Double.toString(guiScroll));
+        for (String category : GUI_CATEGORIES) {
+            double catScroll = categoryScroll(category);
+            if (catScroll > 0.0) {
+                values.setProperty("ui.scroll." + category.toLowerCase(java.util.Locale.ROOT), Double.toString(catScroll));
+            }
+        }
         values.setProperty("friends.names", String.join(",", FriendManager.names()));
         for (String widgetId : HUD_WIDGET_IDS) {
             HudStyle style = hudStyle(widgetId);

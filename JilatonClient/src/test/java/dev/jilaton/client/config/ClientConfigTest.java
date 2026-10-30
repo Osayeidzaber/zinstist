@@ -381,6 +381,40 @@ class ClientConfigTest {
         assertThrows(IllegalArgumentException.class, () -> config.setCustomAccent("GGGGGG"));
     }
 
+    @Test
+    void persistsClickGuiNavigationStateAndModuleOrderingAcrossRestarts() {
+        ModuleManager modules = new ModuleManager();
+        ClientConfig config = new ClientConfig(temporaryDirectory);
+        config.setGuiPage("MODULES");
+        config.setGuiCategory("Visuals");
+        config.setGuiSelectedModule("target_esp");
+        config.setGuiExpandedModule("target_esp");
+        config.setGuiEnabledOnly(true);
+        config.setGuiSearchQuery("esp");
+        config.setGuiSelectedProfile("ranked_1");
+        config.setGuiScroll(142.5);
+        config.setCategoryScroll("Visuals", 142.5);
+        config.setCategoryScroll("Combat", 68.0);
+        config.setVisualOrder(java.util.List.of("target_esp", "custom_sky", "player_effects"));
+        config.setModuleOrder(java.util.List.of("kill_aura", "target_esp", "sprint", "custom_sky"));
+        config.save(modules);
+
+        ClientConfig restored = new ClientConfig(temporaryDirectory);
+        restored.load(new ModuleManager());
+        assertEquals("MODULES", restored.guiPage());
+        assertEquals("Visuals", restored.guiCategory());
+        assertEquals("target_esp", restored.guiSelectedModule());
+        assertEquals("target_esp", restored.guiExpandedModule());
+        assertTrue(restored.guiEnabledOnly());
+        assertEquals("esp", restored.guiSearchQuery());
+        assertEquals("ranked_1", restored.guiSelectedProfile());
+        assertEquals(142.5, restored.guiScroll(), 1e-6);
+        assertEquals(142.5, restored.categoryScroll("Visuals"), 1e-6);
+        assertEquals(68.0, restored.categoryScroll("Combat"), 1e-6);
+        assertEquals(java.util.List.of("target_esp", "custom_sky", "player_effects"), restored.visualOrder());
+        assertEquals(java.util.List.of("kill_aura", "target_esp", "sprint", "custom_sky"), restored.moduleOrder());
+    }
+
     private static <T extends Setting> T setting(ClientModule module, String id, Class<T> type) {
         return module.settings().stream()
                 .filter(setting -> setting.id().equals(id))

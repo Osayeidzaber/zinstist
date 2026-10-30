@@ -90,9 +90,11 @@ public final class CharacterBake {
    }
 
    private static CharacterBake.Cut still(PosedMesh mesh) {
+      int[] part = new int[mesh.vertices];
+      Arrays.fill(part, BODY);
       float[][] pivot = new float[6][];
-      pivot[1] = new float[]{0.0F, 24.0F, 0.0F};
-      return new CharacterBake.Cut(new int[mesh.vertices], pivot, new float[6][], new float[6][], new float[6][]);
+      pivot[BODY] = new float[]{0.0F, 24.0F, 0.0F};
+      return new CharacterBake.Cut(part, pivot, new float[6][], new float[6][], new float[6][]);
    }
 
    private static CharacterBake.Cut skeletonCut(PosedMesh mesh, Skeleton sk, CharacterBake.Options o) {
@@ -306,12 +308,13 @@ public final class CharacterBake {
       for (int b = 0; b < 6; b++) {
          if (has(pieces, b)) {
             out.writeByte(b);
+            float[] bonePivot = pivot[b] != null ? pivot[b] : new float[]{0.0F, 24.0F, 0.0F};
 
-            for (float f : pivot[b]) {
+            for (float f : bonePivot) {
                out.writeFloat(f);
             }
 
-            for (float f : grip[b] != null ? grip[b] : pivot[b]) {
+            for (float f : grip[b] != null ? grip[b] : bonePivot) {
                out.writeFloat(f);
             }
 

@@ -86,6 +86,10 @@ public final class JilatonClient implements ClientModInitializer {
             return InteractionResult.PASS;
         });
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (player == net.minecraft.client.Minecraft.getInstance().player
+                    && MODULES.get("block_placement") instanceof dev.jilaton.client.module.impl.BlockPlacementModule placement) {
+                placement.onUseBlock(player, world, hand, hitResult);
+            }
             ClientModule autoAnchor = MODULES.get("auto_anchor");
             if (player == net.minecraft.client.Minecraft.getInstance().player
                     && autoAnchor instanceof AutoAnchorModule module

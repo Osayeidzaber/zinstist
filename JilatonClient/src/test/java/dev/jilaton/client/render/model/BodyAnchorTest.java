@@ -76,6 +76,33 @@ class BodyAnchorTest {
         }
     }
 
+    @Test
+    void handArmTorsoAndTwoHandedAnchorsTrackPlayerPoseAndSkeletonJoints() {
+        Transform rightHand = BodyAnchor.composePose(
+                BodyAnchor.Part.RIGHT_HAND, 0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        Transform leftHand = BodyAnchor.composePose(
+                BodyAnchor.Part.LEFT_HAND, 0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        Transform bothHands = BodyAnchor.composePose(
+                BodyAnchor.Part.BOTH_HANDS, 0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        Transform torso = BodyAnchor.composePose(
+                BodyAnchor.Part.TORSO, 0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        Transform crouchedTorso = BodyAnchor.composePose(
+                BodyAnchor.Part.TORSO, 0, 0, 0, 1.8, 0, 0, 0, true, 0, 0, 0);
+
+        assertTrue(rightHand.originX() < 0, "right hand sits on -X when facing +Z");
+        assertTrue(leftHand.originX() > 0, "left hand sits on +X when facing +Z");
+        assertEquals(0.0, bothHands.originX(), 1e-9);
+        assertTrue(bothHands.originZ() > rightHand.originZ(), "two-handed grip sits forward of single hand rest");
+        assertTrue(crouchedTorso.originY() < torso.originY(), "crouching lowers torso anchor");
+
+        BodyAnchor.SkeletonJoints standing = BodyAnchor.skeleton(0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        BodyAnchor.SkeletonJoints crouched = BodyAnchor.skeleton(0, 0, 0, 1.8, 0, 0, 0, true, 1.2F, 0.8F, 0.5F);
+        assertTrue(standing.headTop()[1] > standing.neck()[1]);
+        assertTrue(standing.neck()[1] > standing.pelvis()[1]);
+        assertTrue(standing.pelvis()[1] > standing.rightAnkle()[1]);
+        assertTrue(crouched.headTop()[1] < standing.headTop()[1]);
+    }
+
     private static double length(double x, double y, double z) {
         return Math.sqrt(x * x + y * y + z * z);
     }

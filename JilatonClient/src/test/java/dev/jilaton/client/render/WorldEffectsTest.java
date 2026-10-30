@@ -49,8 +49,7 @@ class WorldEffectsTest {
 
     @Test
     void everyTargetStyleStaysNearItsTargetAndRespectsOpacity() {
-        for (String style : new String[] {TargetEspGeometry.HALO, TargetEspGeometry.ORBIT,
-                TargetEspGeometry.HELIX, TargetEspGeometry.BRACKETS}) {
+        for (String style : TargetEspGeometry.STYLES) {
             EffectBatch batch = new EffectBatch();
             TargetEspGeometry.emit(batch, style, new TargetEspGeometry.Marker(4, 1, -2, 1.8, 0.7, 3.2,
                     0xF2F2F2, 0.9, 0.5, true));
@@ -77,5 +76,67 @@ class WorldEffectsTest {
         TargetEspGeometry.emit(fallback, "Removed style", marker);
         TargetEspGeometry.emit(halo, TargetEspGeometry.HALO, marker);
         assertEquals(halo.size(), fallback.size());
+    }
+
+    @Test
+    void terrainShockwaveFollowsUnevenGroundHeights() {
+        EffectBatch batch = new EffectBatch();
+        // Stepped terrain: +1.0 block higher on the +X side than on the -X side.
+        dev.jilaton.client.module.impl.JumpCirclesModule.emitTerrainShockwave(
+                batch,
+                (wx, wz) -> wx >= 0 ? 65.0 : 64.0,
+                0, 64.0, 0,
+                0, 64.0, 0,
+                2.0, 24, 0xF2F2F2, 0.85,
+                2.0F, true, true, 0.35
+        );
+        assertTrue(batch.segments().size() > 24);
+        assertEquals(24, batch.quads().size());
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        for (EffectBatch.Segment s : batch.segments()) {
+            minY = Math.min(minY, Math.min(s.y1(), s.y2()));
+            maxY = Math.max(maxY, Math.max(s.y1(), s.y2()));
+        }
+        assertTrue(maxY - minY >= 0.95, "Shockwave vertices must follow terrain step height difference");
+    }
+
+    @Test
+    void cyberspaceSkeletonGlassBlockPlacementAndJilatonGateEmitValidGeometry() {
+        var joints = dev.jilaton.client.render.model.BodyAnchor.skeleton(
+                0, 64, 0, 25.0F, -10.0F, 35.0F, false, 0.25F, 1.0F, 0.35F
+        );
+        EffectBatch cyberBatch = new EffectBatch();
+        dev.jilaton.client.module.impl.CyberspaceModule.emitSkeleton(
+                cyberBatch, joints, 0, 64, 0, 0x4AF2EA, 0x8878FF, 0.9, 2.0F, true, true
+        );
+        assertTrue(cyberBatch.segments().size() >= 20, "Cyberspace skeleton must emit bones and target lock ring");
+
+        EffectBatch glassBatch = new EffectBatch();
+        dev.jilaton.client.module.impl.GlassMaterialModule.emitGlassShell(
+                glassBatch, 0, 64, 0, 0.6, 1.8, joints, 0, 64, 0,
+                0xC6E2F5, 0xFFFFFF, 0.5, 0.85, 0.7, true, 1.5
+        );
+        assertTrue(glassBatch.quads().size() >= 16, "Glass material shell must emit translucent facets");
+        assertTrue(glassBatch.segments().size() >= 24, "Glass material shell must emit Fresnel rim highlights");
+
+        for (String style : dev.jilaton.client.module.impl.BlockPlacementModule.STYLES) {
+            EffectBatch placeBatch = new EffectBatch();
+            dev.jilaton.client.module.impl.BlockPlacementModule.emitPlacementEffect(
+                    placeBatch, style, 2, 64, 2, 3, 65, 3, 0, 64, 0,
+                    0.35, 0.16, 0xF2F2F2, 0.88, 2.2F, true
+            );
+            assertTrue(placeBatch.segments().size() >= 4, style + " block placement must emit wireframe edges");
+        }
+
+        for (String style : dev.jilaton.client.module.impl.JilatonGateModule.STYLES) {
+            EffectBatch gateBatch = new EffectBatch();
+            dev.jilaton.client.module.impl.JilatonGateModule.emitGate(
+                    gateBatch, style, 0, 64, 4, 0.0, 0, 64, 0,
+                    1.0, 0x8878FF, 0.92, true, true, 2.0
+            );
+            assertTrue(gateBatch.quads().size() >= 20, style + " gate must emit 3D pillar and portal quads");
+            assertTrue(gateBatch.segments().size() >= 40, style + " gate must emit pillar edges, vortex, and 3D Jilaton emblem");
+        }
     }
 }

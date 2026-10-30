@@ -113,6 +113,7 @@ public final class CosmeticKnifeModule extends ClientModule {
 
     @Override
     protected void onDisable(Minecraft client) {
+        motion.startUnequip(System.nanoTime());
         heldSlot = -1;
         lastFrame = 0;
         if (engine != null) engine.deactivate();
@@ -182,7 +183,10 @@ public final class CosmeticKnifeModule extends ClientModule {
 
         int slot = player.getInventory().getSelectedSlot();
         ItemStack held = player.getMainHandItem();
-        if (slot != heldSlot || heldItem == null || !ItemStack.isSameItem(held, heldItem)) motion.startDraw(now);
+        if (slot != heldSlot || heldItem == null || !ItemStack.isSameItem(held, heldItem)) {
+            if (heldSlot < 0) motion.startDraw(now);
+            else motion.startSwitch(now);
+        }
         heldSlot = slot;
         heldItem = held.copy();
         if (slashes.value() && swing > 0 && (lastSwing == 0 || swing + 0.3F < lastSwing)) motion.startSlash(now);
@@ -192,7 +196,8 @@ public final class CosmeticKnifeModule extends ClientModule {
         // Same limb-swing phase the vanilla arms use (cos(position * 0.6662)), in half-steps.
         double walk = player.walkAnimation.position(partial) * 0.6662 / Math.PI;
         double moving = Mth.clamp(player.walkAnimation.speed(partial), 0, 1);
-        KnifeMotion.Pose m = motion.pose(now, equipSeconds.value(), sway.value(), bob.value(), walk, moving, reduced);
+        KnifeMotion.Pose m = motion.pose(now, equipSeconds.value(), sway.value(), bob.value(), walk, moving,
+                player.isSprinting(), player.isCrouching(), player.onGround(), player.getDeltaMovement().y, reduced);
         HumanoidArm arm = player.getMainArm();
         float sideSign = arm == HumanoidArm.RIGHT ? 1 : -1;
 
