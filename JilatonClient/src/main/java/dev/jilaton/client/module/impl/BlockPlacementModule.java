@@ -98,7 +98,9 @@ public final class BlockPlacementModule extends ClientModule implements FxEmitte
             return;
         }
         if (client.level != boundLevel) {
-            placements.clear();
+            // Only a real world switch drops old placements; the first frame after enabling must keep any
+            // placement recorded before it.
+            if (boundLevel != null) placements.clear();
             boundLevel = client.level;
         }
         if (placements.isEmpty()) return;

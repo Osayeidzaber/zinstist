@@ -45,11 +45,33 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
     private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "4AF2EA"));
     private final TextSetting secondaryColor = addSetting(EffectPalette.hexSetting("secondary", "Secondary RGB hex", "8878FF"));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.1, 1.0, 0.05, 0.85));
+    private final BooleanSetting screenGrade = addSetting(new BooleanSetting("screen_grade", "Screen colour grade", true));
+    private static final net.minecraft.resources.Identifier GRADE =
+            net.minecraft.resources.Identifier.fromNamespaceAndPath("jilaton", "cyberspace");
 
     public CyberspaceModule() {
         super("cyberspace", "Cyberspace",
-                "Digital world grid, sonar scan waves, block edge telemetry, and pose-accurate 3D player skeletons.",
+                "Cyber colour grade, digital world grid, sonar scan waves, block telemetry and 3D player skeletons.",
                 ModuleCategory.RENDER);
+    }
+
+    /**
+     * Keeps the full-screen grade in vanilla's post-effect slot while enabled. Vanilla resets that slot when the
+     * camera entity changes (respawn, spectating), so it is re-applied every tick rather than set once.
+     */
+    @Override
+    protected void onTick(Minecraft client) {
+        if (!(client.gameRenderer instanceof dev.jilaton.client.mixin.GameRendererPostEffectAccess post)) return;
+        boolean ours = GRADE.equals(post.jilaton$postEffectId());
+        boolean want = screenGrade.value() && client.level != null;
+        if (want && !ours && post.jilaton$postEffectId() == null) post.jilaton$setPostEffect(GRADE);
+        else if (!want && ours) client.gameRenderer.clearPostEffect();
+    }
+
+    @Override
+    protected void onDisable(Minecraft client) {
+        if (client.gameRenderer instanceof dev.jilaton.client.mixin.GameRendererPostEffectAccess post
+                && GRADE.equals(post.jilaton$postEffectId())) client.gameRenderer.clearPostEffect();
     }
 
     @Override
@@ -111,7 +133,7 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
                 double radialFade = Math.pow(1.0 - dist / maxR, 1.35);
                 double waveDelta = Math.abs(dist - scanWaveR);
                 double waveBoost = waveDelta < 1.8 ? (1.0 - waveDelta / 1.8) : 0.0;
-                double cellAlpha = baseAlpha * radialFade * (0.22 + 0.55 * waveBoost);
+                double cellAlpha = baseAlpha * radialFade * (0.42 + 0.5 * waveBoost);
                 if (cellAlpha <= 0.015) continue;
 
                 int cellRgb = EffectBatch.mixRgb(primaryRgb, secondaryRgb, waveBoost * 0.65);
@@ -156,7 +178,7 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
                     if (!level.getBlockState(pos).isAir()) continue;
                     double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                     if (dist > range || dist < 1.5) continue;
-                    double fade = (1.0 - dist / range) * baseAlpha * 0.42;
+                    double fade = (1.0 - dist / range) * baseAlpha * 0.7;
                     if (fade <= 0.02) continue;
 
                     double bx = cx + dx - f.camX;
@@ -211,13 +233,13 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
         int jointColor = EffectBatch.withAlpha(jointRgb, Math.min(1.0, alpha));
 
         // Spine & Cranium
-        bone(batch, j.headTop(), j.headCenter(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.headCenter(), j.neck(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.neck(), j.spineMid(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.spineMid(), j.pelvis(), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.headTop()), v(j.headCenter()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.headCenter()), v(j.neck()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.neck()), v(j.spine()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.spine()), v(j.pelvis()), camX, camY, camZ, boneColor, lineWidth, walls);
 
         // Cranial halo diamond around headCenter
-        Vec3 hc = j.headCenter();
+        Vec3 hc = v(j.headCenter());
         double hx = hc.x - camX, hy = hc.y - camY, hz = hc.z - camZ;
         double hr = 0.19;
         batch.glowLine(hx - hr, hy, hz, hx, hy + hr * 0.7, hz - hr, jointColor, lineWidth * 0.85F, walls);
@@ -226,43 +248,46 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
         batch.glowLine(hx, hy - hr * 0.7, hz + hr, hx - hr, hy, hz, jointColor, lineWidth * 0.85F, walls);
 
         // Clavicles & Arms
-        bone(batch, j.neck(), j.leftShoulder(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.leftShoulder(), j.leftElbow(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.leftElbow(), j.leftWrist(), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.neck()), v(j.leftShoulder()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.leftShoulder()), v(j.leftElbow()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.leftElbow()), v(j.leftWrist()), camX, camY, camZ, boneColor, lineWidth, walls);
 
-        bone(batch, j.neck(), j.rightShoulder(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.rightShoulder(), j.rightElbow(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.rightElbow(), j.rightWrist(), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.neck()), v(j.rightShoulder()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.rightShoulder()), v(j.rightElbow()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.rightElbow()), v(j.rightWrist()), camX, camY, camZ, boneColor, lineWidth, walls);
 
         // Ribcage cross-brace
-        bone(batch, j.leftShoulder(), j.spineMid(), camX, camY, camZ,
+        bone(batch, v(j.leftShoulder()), v(j.spine()), camX, camY, camZ,
                 EffectBatch.withAlpha(secondaryRgb, alpha * 0.45), lineWidth * 0.7F, walls);
-        bone(batch, j.rightShoulder(), j.spineMid(), camX, camY, camZ,
+        bone(batch, v(j.rightShoulder()), v(j.spine()), camX, camY, camZ,
                 EffectBatch.withAlpha(secondaryRgb, alpha * 0.45), lineWidth * 0.7F, walls);
 
         // Pelvis & Legs
-        bone(batch, j.pelvis(), j.leftHip(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.leftHip(), j.leftKnee(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.leftKnee(), j.leftAnkle(), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.pelvis()), v(j.leftHip()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.leftHip()), v(j.leftKnee()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.leftKnee()), v(j.leftAnkle()), camX, camY, camZ, boneColor, lineWidth, walls);
 
-        bone(batch, j.pelvis(), j.rightHip(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.rightHip(), j.rightKnee(), camX, camY, camZ, boneColor, lineWidth, walls);
-        bone(batch, j.rightKnee(), j.rightAnkle(), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.pelvis()), v(j.rightHip()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.rightHip()), v(j.rightKnee()), camX, camY, camZ, boneColor, lineWidth, walls);
+        bone(batch, v(j.rightKnee()), v(j.rightAnkle()), camX, camY, camZ, boneColor, lineWidth, walls);
 
         // Joint nodes at key articulations
-        for (Vec3 node : new Vec3[]{j.neck(), j.leftShoulder(), j.rightShoulder(),
-                j.leftElbow(), j.rightElbow(), j.leftWrist(), j.rightWrist(),
-                j.pelvis(), j.leftKnee(), j.rightKnee()}) {
+        for (Vec3 node : new Vec3[]{v(j.neck()), v(j.leftShoulder()), v(j.rightShoulder()),
+                v(j.leftElbow()), v(j.rightElbow()), v(j.leftWrist()), v(j.rightWrist()),
+                v(j.pelvis()), v(j.leftKnee()), v(j.rightKnee())}) {
             jointNode(batch, node, camX, camY, camZ, 0.045, jointColor, walls);
         }
 
         if (targetLocked) {
-            Vec3 sm = j.spineMid();
+            Vec3 sm = v(j.spine());
             double tx = sm.x - camX, ty = sm.y - camY, tz = sm.z - camZ;
             int lockColor = EffectBatch.withAlpha(0xFF5E7E, Math.min(1.0, alpha));
             batch.ring(tx, ty, tz, 0.42, 16, lockColor, lineWidth, walls, 0, 0);
         }
     }
+
+    /** Joint positions are solved as {@code double[]{x, y, z}} by {@link BodyAnchor}; this draws them as points. */
+    private static Vec3 v(double[] p) { return new Vec3(p[0], p[1], p[2]); }
 
     private static void bone(EffectBatch batch, Vec3 a, Vec3 b,
                              double camX, double camY, double camZ,

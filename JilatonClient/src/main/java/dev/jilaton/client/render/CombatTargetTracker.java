@@ -21,6 +21,15 @@ public final class CombatTargetTracker {
         return (now - lastAttackNanos) / 1_000_000_000.0 <= windowSeconds ? target : null;
     }
 
+    /**
+     * Entity id of the current combat target for target-aware visuals: what you hit in the last few seconds, or
+     * -1 when there is none.
+     */
+    public static int targetId() {
+        LivingEntity target = lastHit(4.0, System.nanoTime());
+        return target == null ? -1 : target.getId();
+    }
+
     public static void clear() {
         lastTarget = null;
         lastAttackNanos = 0L;

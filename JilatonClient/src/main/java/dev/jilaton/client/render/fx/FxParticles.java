@@ -76,6 +76,24 @@ public final class FxParticles {
         shape[i] = (byte) s.shape.ordinal(); glow[i] = s.glow; walls[i] = s.walls;
     }
 
+    private final Spec addSpec = new Spec();
+
+    /**
+     * One-call spawn for modules that describe a particle inline. {@code dampingPerSecond} is a rate (0 = none,
+     * ~1-2 = gentle), converted to this simulation's per-tick drag factor; values here are never a raw factor, so a
+     * caller can never make particles accelerate.
+     */
+    public void add(double x, double y, double z, double vx, double vy, double vz, double gravity,
+                    double dampingPerSecond, double floor, double life, double size0, double size1, int color,
+                    int color1, double alpha, Shape shape, boolean glow, boolean walls, double spin, int owner) {
+        Spec s = addSpec.reset();
+        s.x = x; s.y = y; s.z = z; s.vx = vx; s.vy = vy; s.vz = vz; s.gravity = gravity;
+        s.drag = Math.exp(-Math.max(0, dampingPerSecond) / 20.0);
+        s.floor = floor; s.life = life; s.size0 = size0; s.size1 = size1; s.color = color; s.color1 = color1;
+        s.alpha = alpha; s.shape = shape; s.glow = glow; s.walls = walls; s.spin = spin; s.owner = owner;
+        spawn(s);
+    }
+
     private int oldest() {
         int best = 0;
         double bestRatio = -1;

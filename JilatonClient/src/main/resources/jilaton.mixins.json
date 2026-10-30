@@ -80,7 +80,8 @@
     "AccessorHandItemLayer",
     "ItemInHandRendererInvoker",
     "KnifeViewmodelMixin",
-    "CsKnifeMixin"
+    "CsKnifeMixin",
+    "GameRendererPostEffectAccess"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -104,7 +104,7 @@ class WorldEffectsTest {
     @Test
     void cyberspaceSkeletonGlassBlockPlacementAndJilatonGateEmitValidGeometry() {
         var joints = dev.jilaton.client.render.model.BodyAnchor.skeleton(
-                0, 64, 0, 25.0F, -10.0F, 35.0F, false, 0.25F, 1.0F, 0.35F
+                0, 64, 0, 1.8, 25.0F, -10.0F, 35.0F, false, 0.25F, 1.0F, 0.35F
         );
         EffectBatch cyberBatch = new EffectBatch();
         dev.jilaton.client.module.impl.CyberspaceModule.emitSkeleton(

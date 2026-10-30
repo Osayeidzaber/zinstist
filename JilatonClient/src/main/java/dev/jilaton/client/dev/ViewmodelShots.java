@@ -60,8 +60,12 @@ public final class ViewmodelShots {
         then(delay, () -> {
             Minecraft client = Minecraft.getInstance();
             Screenshot.grab(client.gameDirectory, "vm-" + name + ".png", client.getMainRenderTarget(), 1,
-                    message -> LOGGER.info("[JilatonShots] {}: {} (hand frames {}, holding {}, slot {})", name,
-                            message.getString(), CosmeticKnifeModule.framesDrawn,
+                    message -> LOGGER.info("[JilatonShots] {}: {} (fps {}, post {}, hud {}, placed {}, hand frames {}, holding {}, slot {})", name,
+                            message.getString(), client.getFps(),
+                            ((dev.jilaton.client.mixin.GameRendererPostEffectAccess) client.gameRenderer).jilaton$postEffectId(),
+                            JilatonClient.moduleManager().get("hud") != null && JilatonClient.moduleManager().get("hud").enabled(),
+                            JilatonClient.moduleManager().get("block_placement") instanceof dev.jilaton.client.module.impl.BlockPlacementModule bp ? bp.activeCount() : -1,
+                            CosmeticKnifeModule.framesDrawn,
                             client.player.getMainHandItem(), client.player.getInventory().getSelectedSlot()));
         });
     }
@@ -90,6 +94,10 @@ public final class ViewmodelShots {
             if (client.getConnection() != null)
                 client.getConnection().send(new net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket(0));
         });
+        if (mode.contains("visuals")) {
+            visuals(client);
+            return;
+        }
         then(20, () -> CosmeticKnifeModule.debugViewSpace = true);
         shot(10, "debug-viewspace");
         then(1, () -> CosmeticKnifeModule.debugViewSpace = false);
@@ -141,6 +149,68 @@ public final class ViewmodelShots {
         shot(14, "inspect-2");
         shot(14, "inspect-3");
         then(40, client::stop);
+    }
+
+    /** One scene per world visual: gate, glass, cyberspace, block placement, jump shockwave, then the ClickGUI. */
+    private void visuals(Minecraft client) {
+        then(5, () -> enable(false, "cosmetic_knife"));
+        shot(60, "fx-baseline");
+        then(10, () -> { client.player.setXRot(4); enable(true, "jilaton_gate"); });
+        shot(40, "fx-gate");
+        then(1, () -> {
+            enable(false, "jilaton_gate");
+            client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            enable(true, "glass_material");
+        });
+        shot(30, "fx-glass");
+        then(1, () -> { enable(false, "glass_material"); enable(true, "cyberspace"); });
+        shot(30, "fx-cyberspace");
+        then(1, () -> client.options.setCameraType(CameraType.FIRST_PERSON));
+        shot(20, "fx-cyberspace-fp");
+        then(1, () -> {
+            enable(false, "cyberspace");
+            client.player.setXRot(35);
+            if (JilatonClient.moduleManager().get("block_placement") instanceof dev.jilaton.client.module.impl.BlockPlacementModule placing) {
+                placing.setEnabled(true);
+                net.minecraft.core.BlockPos feet = client.player.blockPosition();
+                net.minecraft.core.Direction facing = client.player.getDirection();
+                long now = System.nanoTime();
+                for (int i = 2; i <= 4; i++) placing.recordPlacement(feet.relative(facing, i), now);
+            }
+        });
+        shot(4, "fx-place-early");
+        shot(10, "fx-place-late");
+        then(30, () -> {
+            enable(false, "block_placement");
+            client.player.setXRot(20);
+            client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            setChoice("jump_circles", "style", "Shockwave");
+            enable(true, "jump_circles");
+        });
+        then(10, () -> client.player.jumpFromGround());
+        shot(14, "fx-shockwave-land");
+        shot(8, "fx-shockwave-spread");
+        then(10, () -> {
+            enable(false, "jump_circles");
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            JilatonClient.openClickGui(null);
+        });
+        shot(30, "ui-clickgui");
+        then(20, client::stop);
+    }
+
+    private static void enable(boolean on, String id) {
+        ClientModule module = JilatonClient.moduleManager().get(id);
+        if (module != null) module.setEnabled(on);
+        else LOGGER.warn("[JilatonShots] no module {}", id);
+    }
+
+    private static void setChoice(String moduleId, String settingId, String value) {
+        ClientModule module = JilatonClient.moduleManager().get(moduleId);
+        if (module == null) return;
+        for (var setting : module.settings())
+            if (setting.id().equals(settingId) && setting instanceof dev.jilaton.client.setting.ChoiceSetting choice)
+                choice.setValue(value);
     }
 
     private static void command(Minecraft client, String command) {

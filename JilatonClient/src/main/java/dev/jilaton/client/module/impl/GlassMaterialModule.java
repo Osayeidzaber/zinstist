@@ -190,10 +190,10 @@ public final class GlassMaterialModule extends ClientModule implements FxEmitter
 
         // Articulated internal refraction prism around head & shoulders if skeleton is present
         if (joints != null && refraction > 0.1) {
-            Vec3 hc = joints.headCenter();
-            Vec3 ls = joints.leftShoulder();
-            Vec3 rs = joints.rightShoulder();
-            Vec3 pel = joints.pelvis();
+            Vec3 hc = v(joints.headCenter());
+            Vec3 ls = v(joints.leftShoulder());
+            Vec3 rs = v(joints.rightShoulder());
+            Vec3 pel = v(joints.pelvis());
             int innerCol = EffectBatch.withAlpha(rimRgb, alpha * 0.52 * refraction);
             batch.glowLine(hc.x - camX, hc.y - camY, hc.z - camZ,
                     ls.x - camX, ls.y - camY, ls.z - camZ, innerCol, 1.3F, false);
@@ -205,4 +205,6 @@ public final class GlassMaterialModule extends ClientModule implements FxEmitter
                     pel.x - camX, pel.y - camY, pel.z - camZ, innerCol, 1.2F, false);
         }
     }
+
+    private static Vec3 v(double[] p) { return new Vec3(p[0], p[1], p[2]); }
 }
