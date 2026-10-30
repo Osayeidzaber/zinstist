@@ -19,16 +19,25 @@ def main():
         for key in totals:
             totals[key] += int(suite.get(key, 0))
     assert totals["failures"] == totals["errors"] == totals["skipped"] == 0
+    newest_source = max(p.stat().st_mtime for p in (ROOT / "src").rglob("*") if p.is_file())
+    assert min(p.stat().st_mtime for p in reports) >= newest_source, "Tests predate source changes; rerun tests"
     with zipfile.ZipFile(jar) as archive:
         names = archive.namelist()
+        metadata = json.loads(archive.read("fabric.mod.json"))
+        assert metadata["icon"] in names
+        assert archive.read(metadata["icon"]).startswith(b"\x89PNG\r\n\x1a\n")
         assert not any(name.startswith(("net/anubis/", "net/ccbluex/", "imgui/")) for name in names)
-        assert "dev/jilaton/client/module/impl/ZoomModule.class" in names
+        for module in ("Zoom", "FreeLook", "Freecam", "ViewModel", "CustomCrosshair", "DamageParticles", "HitParticles", "Nametags", "CustomFov"):
+            assert f"dev/jilaton/client/module/impl/{module}Module.class" in names
         mappings = json.loads(archive.read("jilaton.refmap.json"))["mappings"]
-        for mixin in ("ZoomFovMixin", "ZoomMouseMixin", "HudMouseInputMixin"):
+        for mixin in ("ZoomFovMixin", "ZoomMouseMixin", "HudMouseInputMixin", "FreeLookCameraMixin",
+                      "ViewModelMixin", "CustomCrosshairMixin", "GameRendererFovAccess", "HitParticleAttackMixin", "NametagMixin", "FovScreenEffectMixin",
+                      "FreecamCameraMixin", "FreecamLocalPlayerMixin", "FreecamRenderMixin", "FreecamBodyMixin", "FreecamHandsMixin", "FreecamCrosshairMixin"):
             assert any(mixin in key for key in mappings)
     digest = hashlib.sha256(jar.read_bytes()).hexdigest()
     summary = dict(**totals, artifact=jar.relative_to(ROOT).as_posix(), size_bytes=jar.stat().st_size,
-                   sha256=digest, packaging_checks="Zoom and new remapped Mixins present; no reference client classes bundled")
+                   sha256=digest, packaging_checks="Zoom and eight new render modules/remapped Mixins present; no reference client classes bundled",
+                   runtime_scope="See CHECKPOINT.md; latest rendering modules are not gameplay-verified")
     (ROOT / "development/build-verification.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     inventory = ROOT / "IMPLEMENTATION_INVENTORY.md"
     text = inventory.read_text(encoding="utf-8")

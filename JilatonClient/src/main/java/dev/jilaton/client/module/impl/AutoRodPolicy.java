@@ -1,7 +1,15 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.rotation.RotationAngles;
+import dev.jilaton.client.rotation.RotationPolicy;
+
 public final class AutoRodPolicy {
     private AutoRodPolicy() {
+    }
+
+    /** Shortest-path angular error from the current view to the target angles, in degrees. */
+    public static float aimError(float viewYaw, float viewPitch, float targetYaw, float targetPitch) {
+        return RotationPolicy.angularError(viewYaw, viewPitch, new RotationAngles(targetYaw, targetPitch));
     }
 
     public static boolean targetEligible(double distanceSquared, double minimumRange, double maximumRange,

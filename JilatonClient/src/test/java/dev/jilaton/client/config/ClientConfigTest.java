@@ -22,6 +22,28 @@ class ClientConfigTest {
     Path temporaryDirectory;
 
     @Test
+    void animationIntensityAndMotionPreferencesRoundTripAndClamp() {
+        ModuleManager modules = new ModuleManager();
+        ClientConfig config = new ClientConfig(temporaryDirectory);
+        assertEquals(1.0, config.animationIntensity(), 1e-9);
+        assertEquals("F2F2F2", config.customAccent());
+        config.setAnimationIntensity(0.62);
+        config.setReducedMotion(true);
+        config.save(modules);
+
+        ClientConfig restored = new ClientConfig(temporaryDirectory);
+        restored.load(new ModuleManager());
+        assertEquals(0.6, restored.animationIntensity(), 1e-9);
+        assertTrue(restored.reducedMotion());
+
+        restored.setAnimationIntensity(9);
+        assertEquals(1.5, restored.animationIntensity(), 1e-9);
+        restored.setAnimationIntensity(-1);
+        assertEquals(0, restored.animationIntensity(), 1e-9);
+        assertThrows(IllegalArgumentException.class, () -> restored.setAnimationIntensity(Double.NaN));
+    }
+
+    @Test
     void missingConfigStartsModulesWithTheirDeclaredDefaults() {
         ModuleManager modules = new ModuleManager();
 

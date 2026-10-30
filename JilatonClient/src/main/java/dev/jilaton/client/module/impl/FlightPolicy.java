@@ -25,4 +25,14 @@ public final class FlightPolicy {
     public static boolean shouldSendOpenAirHeartbeat(int tickCount, boolean hasBlockBelow) {
         return tickCount % 40 == 0 && !hasBlockBelow;
     }
+
+    /** Restores the replaced speed unless something else has since taken ownership of the field. */
+    public static float restoredFlyingSpeed(float current, float applied, float previous) {
+        return Float.compare(current, applied) == 0 ? previous : current;
+    }
+
+    /** Puts a replaced ability flag back, but never resurrects one the game has cleared. */
+    public static boolean restoredFlag(boolean current, boolean previous) {
+        return current ? previous : current;
+    }
 }

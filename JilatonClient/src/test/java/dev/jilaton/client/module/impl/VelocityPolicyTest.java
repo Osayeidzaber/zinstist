@@ -23,4 +23,10 @@ class VelocityPolicyTest {
         assertEquals(1.0, VelocityPolicy.applyAxis(4.0, 2.0, 0.0, 50.0), 1.0E-9);
         assertEquals(-2.0, VelocityPolicy.applyAxis(4.0, 2.0, -50.0, 50.0), 1.0E-9);
     }
+
+    @Test
+    void scalePercentWinsOverMotionPercentWhenBothAreSet() {
+        assertEquals(3.0, VelocityPolicy.applyAxis(6.0, 2.0, 50.0, 100.0), 1.0E-9);
+        assertEquals(2.0, VelocityPolicy.applyAxis(6.0, 2.0, 0.0, 100.0), 1.0E-9);
+    }
 }

@@ -45,4 +45,19 @@ class KillAuraRaycastPolicyTest {
         assertFalse(KillAuraRaycastPolicy.targetIsFirstOnRay(ORIGIN, DIRECTION, Double.NaN, TARGET,
                 Double.POSITIVE_INFINITY, List.of(TARGET)));
     }
+
+    @Test
+    void treatsCoincidentBlockAndFurtherEntityHitsAsNotBlocking() {
+        assertTrue(KillAuraRaycastPolicy.targetIsFirstOnRay(ORIGIN, DIRECTION, 5.0, TARGET,
+                3.0, List.of(TARGET)));
+        AABB behindTarget = new AABB(3.5, -0.5, -0.5, 4.5, 0.5, 0.5);
+        assertTrue(KillAuraRaycastPolicy.targetIsFirstOnRay(ORIGIN, DIRECTION, 5.0, TARGET,
+                Double.POSITIVE_INFINITY, List.of(behindTarget, TARGET)));
+    }
+
+    @Test
+    void rejectsABlockHitSlightlyInFrontOfTheTarget() {
+        assertFalse(KillAuraRaycastPolicy.targetIsFirstOnRay(ORIGIN, DIRECTION, 5.0, TARGET,
+                2.99, List.of(TARGET)));
+    }
 }

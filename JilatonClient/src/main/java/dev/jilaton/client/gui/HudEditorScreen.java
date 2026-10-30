@@ -2,7 +2,9 @@ package dev.jilaton.client.gui;
 
 import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.config.HudStyle;
+import dev.jilaton.client.gui.hud.HudPreset;
 import dev.jilaton.client.module.ModuleManager;
+import dev.jilaton.client.module.impl.HudModule;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -23,8 +25,11 @@ public final class HudEditorScreen extends Screen {
     private double dragOffsetX;
     private double dragOffsetY;
     private boolean changed;
-    private static final Integer[] ACCENTS = {null, 0x8878FF, 0x58AEFF, 0x51D6CB, 0xF080A5, 0xE9B65B};
+    private static final Integer[] ACCENTS = {null, 0xF2F2F2, 0x9C9C9C, 0x8878FF, 0x58AEFF, 0x51D6CB, 0xF080A5, 0xE9B65B};
     private static final String[] ACTIONS = {"Scale -", "Scale +", "Panel -", "Panel +", "Color", "Align", "Visible", "Reset"};
+    private static final String HINT = "Drag · TAB select · P preset · M motion · ESC back";
+    private static final int PRESET_Y = 12;
+    private static final int PRESET_HEIGHT = 14;
 
     public HudEditorScreen(ModuleManager modules, ClientConfig config, Screen parent) {
         super(Component.literal("Jilaton HUD Editor"));
@@ -36,29 +41,44 @@ public final class HudEditorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, width, height, 0x4404070F);
+        graphics.fill(0, 0, width, height, 0x44070707);
         renderer.renderForEditor(graphics);
         if (minecraft.player == null) {
             String hint = "Enter a world to preview and edit HUD widgets";
-            graphics.drawCenteredString(font, hint, width / 2, height / 2, 0xFFB6BED0);
+            graphics.drawCenteredString(font, hint, width / 2, height / 2, 0xFFBEBEBE);
         }
         List<HudRenderer.WidgetBounds> widgets = renderer.lastBounds();
         for (HudRenderer.WidgetBounds widget : widgets) {
             int color = !config.hudStyle(widget.id()).visible() ? 0xFF765362
-                    : widget.id().equals(selectedWidget) ? 0xFFE0D8FF : 0xFF8792AB;
+                    : widget.id().equals(selectedWidget) ? 0xFFDDDDDD : 0xFF919191;
             drawOutline(graphics, widget.x() - 2, widget.y() - 2, widget.width() + 4, widget.height() + 4, color);
             if (widget.id().equals(selectedWidget)) {
                 graphics.fill(widget.x() - 2, widget.y() - 14, widget.x() + font.width(widget.id().toUpperCase()) + 6,
-                        widget.y() - 3, 0xEE161B2B);
+                        widget.y() - 3, 0xEE1B1B1B);
                 graphics.drawString(font, widget.id().toUpperCase(), widget.x() + 1, widget.y() - 12, color);
             }
         }
 
-        int toolbarWidth = Math.min(Math.max(180, font.width("Drag · TAB select · M motion · ESC back") + 18), Math.max(0, width - 16));
-        int toolbarX = (width - toolbarWidth) / 2;
-        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 42, 0xB0101118);
-        graphics.drawString(font, "HUD EDITOR" + (config.reducedMotion() ? " · Reduced motion" : ""), toolbarX + 9, 15, ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.drawString(font, "Drag · TAB select · M motion · ESC back", toolbarX + 9, 28, 0xFFB6BED0);
+        int toolbarWidth = toolbarWidth();
+        int toolbarX = toolbarX();
+        int toolbarAccent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
+        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 42, 0xB0111111);
+        String title = font.plainSubstrByWidth("HUD EDITOR" + (config.reducedMotion() ? " · Reduced motion" : ""),
+                Math.max(0, presetButtonX(0) - toolbarX - 16));
+        graphics.drawString(font, title, toolbarX + 9, 15, toolbarAccent);
+        graphics.drawString(font, font.plainSubstrByWidth(HINT, toolbarWidth - 18), toolbarX + 9, 28, 0xFFBEBEBE);
+        HudModule hud = (HudModule) modules.get("hud");
+        for (int index = 0; index < HudPreset.CHOICES.size(); index++) {
+            boolean active = hud.preset().equals(HudPreset.CHOICES.get(index));
+            int left = presetButtonX(index);
+            int buttonWidth = presetButtonWidth();
+            graphics.fill(left, PRESET_Y, left + buttonWidth, PRESET_Y + PRESET_HEIGHT,
+                    active ? 0xFF2A2338 : 0xFF1C1C1C);
+            graphics.fill(left, PRESET_Y + PRESET_HEIGHT - 2, left + buttonWidth, PRESET_Y + PRESET_HEIGHT,
+                    active ? toolbarAccent : 0x00000000);
+            graphics.drawString(font, HudPreset.CHOICES.get(index).toUpperCase(Locale.ROOT), left + 6,
+                    PRESET_Y + 3, active ? toolbarAccent : 0xFFB0B0B0);
+        }
         if (selectedWidget != null) {
             renderInspector(graphics, mouseX, mouseY);
         }
@@ -72,6 +92,11 @@ public final class HudEditorScreen extends Screen {
         }
         if (event.button() != 0) {
             return false;
+        }
+        int preset = presetAt(event.x(), event.y());
+        if (preset >= 0) {
+            applyPreset(preset);
+            return true;
         }
         if (selectedWidget != null && inspectorContains(event.x(), event.y())) {
             int cellWidth = inspectorWidth() / 4;
@@ -159,6 +184,12 @@ public final class HudEditorScreen extends Screen {
             }
             return true;
         }
+        if (event.key() == GLFW.GLFW_KEY_P) {
+            HudModule hud = (HudModule) modules.get("hud");
+            int current = HudPreset.CHOICES.indexOf(hud.preset());
+            applyPreset((current + 1) % HudPreset.CHOICES.size());
+            return true;
+        }
         if (event.key() == GLFW.GLFW_KEY_M) {
             config.setReducedMotion(!config.reducedMotion());
             config.save(modules);
@@ -202,6 +233,43 @@ public final class HudEditorScreen extends Screen {
         draggingWidget = null;
     }
 
+    private int toolbarWidth() {
+        return Math.min(Math.max(300, font.width(HINT) + 18), Math.max(0, width - 16));
+    }
+
+    private int toolbarX() {
+        return (width - toolbarWidth()) / 2;
+    }
+
+    private int presetButtonWidth() {
+        return Math.max(46, Math.max(font.width("Minimal"), font.width("Full")) + 12);
+    }
+
+    private int presetButtonX(int index) {
+        return toolbarX() + toolbarWidth() - 7 - presetButtonWidth() * 2 - 4
+                + index * (presetButtonWidth() + 4);
+    }
+
+    private int presetAt(double mouseX, double mouseY) {
+        if (mouseY < PRESET_Y || mouseY >= PRESET_Y + PRESET_HEIGHT) {
+            return -1;
+        }
+        for (int index = 0; index < HudPreset.CHOICES.size(); index++) {
+            int left = presetButtonX(index);
+            if (mouseX >= left && mouseX < left + presetButtonWidth()) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private void applyPreset(int index) {
+        if (modules.get("hud") instanceof HudModule hud) {
+            hud.selectPreset(HudPreset.CHOICES.get(index));
+            config.save(modules);
+        }
+    }
+
     private int inspectorWidth() { return Math.min(320, Math.max(4, width - 16)); }
     private int inspectorX() { return (width - inspectorWidth()) / 2; }
 
@@ -215,21 +283,21 @@ public final class HudEditorScreen extends Screen {
         int y = height - 73;
         int panelWidth = inspectorWidth();
         int accent = style.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.fill(x, y, x + panelWidth, height - 7, 0xF211131F);
+        graphics.fill(x, y, x + panelWidth, height - 7, 0xF2131313);
         String label = selectedWidget.toUpperCase(Locale.ROOT) + String.format(Locale.ROOT,
                 "  %.2fx  Panel %d%%  %s", style.scale(), Math.round(style.panelOpacity() * 100), style.alignment());
         graphics.drawString(font, font.plainSubstrByWidth(label, panelWidth - 12), x + 6, y + 5, accent);
         String color = style.accent() == null ? "Theme" : String.format(Locale.ROOT, "#%06X", style.accent());
         graphics.drawString(font, "Color " + color + "  ·  " + (style.visible() ? "Visible" : "Hidden") + "  ·  TAB select",
-                x + 6, y + 17, 0xFF9CA6BC);
+                x + 6, y + 17, 0xFFA5A5A5);
         int cellWidth = panelWidth / 4;
         for (int index = 0; index < ACTIONS.length; index++) {
             int left = x + index % 4 * cellWidth;
             int top = height - 43 + index / 4 * 18;
             boolean hover = mouseX >= left && mouseX < left + cellWidth && mouseY >= top && mouseY < top + 17;
-            graphics.fill(left + 2, top, left + cellWidth - 2, top + 16, hover ? 0xFF302943 : 0xFF1C1D2A);
+            graphics.fill(left + 2, top, left + cellWidth - 2, top + 16, hover ? 0xFF2C2C2C : 0xFF1E1E1E);
             graphics.drawString(font, font.plainSubstrByWidth(ACTIONS[index], cellWidth - 10), left + 6, top + 4,
-                    hover ? accent : 0xFFE1DEEC);
+                    hover ? accent : 0xFFE0E0E0);
         }
     }
 

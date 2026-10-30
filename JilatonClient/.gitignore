@@ -3,3 +3,6 @@ build/
 run/
 .idea/
 *.iml
+run-verify/
+.isolated-build*/
+.wrapcheck-*.txt

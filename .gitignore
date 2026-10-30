@@ -2,6 +2,14 @@
 /analysis/
 /JilatonClient/analysis/
 /JilatonClient/reference/
+# Screenshots of other clients used as layout references: never redistributed
+/ideas/assets/
+
+# Isolated per-agent build directories and scratch output
+.isolated-build*/
+.wrapcheck-*.txt
+/JilatonClient/run-verify/
+/JilatonClient/run-shots/
 
 # Reproducible build output and local game data
 .gradle/

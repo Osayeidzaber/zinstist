@@ -26,8 +26,10 @@ Jilaton brings module settings, profiles, keybinds, theme controls, and HUD edit
 - **Searchable ClickGUI** with categories, expandable settings, configurable keybinds, and saved profiles.
 - **Custom title screen** with a dark theme, animated backdrop, and original vector J mark.
 - **HUD editor** with draggable widgets and saved scale, alignment, accent, panel opacity, and visibility.
+- **Optional video-inspired presentation:** set NameTags → Presentation to **Compact**; set HUD → Target card style to **Compact** and Target card position to **Follow target**. Equipment nametags and the saved HUD layout remain available. These new native modes are build-tested and await in-game appearance checks.
 - **Gameplay widgets** for FPS/ping, coordinates, keystrokes, CPS, armor, potion effects, module activity, and target information.
 - **Zoom** with hold/toggle activation, smoothing, scroll adjustment, and proportional mouse sensitivity.
+- **FreeLook**, independent hand transforms, custom crosshair, floating health-change text and nine-type attack particles are implemented in source. Their automated checks pass; detailed in-game behavior remains unverified.
 
 ### Configure how you play
 
@@ -36,7 +38,7 @@ Jilaton brings module settings, profiles, keybinds, theme controls, and HUD edit
 | Combat and targeting | AimAssist, KillAura, BowAim, AutoShoot, Triggerbot, Criticals, CrystalAura, AutoAnchor, AnchorAura |
 | Inventory and survival | AutoTotem, AutoArmor, AutoReplenish, AutoEat, AutoPot, AutoRod, AutoWeapon, AutoLeave |
 | Movement | Sprint, Strafe, Speed, Step, SafeWalk, InventoryMove, HighJump, LongJump, Flight, NoSlow, FastFall |
-| Visuals and client | Fullbright, Zoom, PlayerESP, ItemESP, Tracers, SwingAnimations, HUD |
+| Visuals and client | Fullbright, Zoom, FreeLook, CustomFOV, NameTags, PlayerESP, ItemESP, Tracers, ViewModel, CustomCrosshair, HitParticles, DamageParticles, SwingAnimations, HUD |
 
 These are source features, not a promise of complete mode parity or verified multiplayer behavior. See the [implementation inventory](JilatonClient/IMPLEMENTATION_INVENTORY.md) for behavior, dependencies, and remaining work.
 
@@ -97,6 +99,7 @@ On Linux/macOS, use `sh ./gradlew runClient --no-daemon`. The development instan
 | Open HUD editor | `/jilaton hud` |
 | Toggle a module | `/jilaton toggle <module_id>`; module IDs have suggestions |
 | Zoom | Hold **C** by default; configure hold/toggle behavior in settings |
+| FreeLook | Hold **Left Alt** by default; configure front/back perspective and hold/toggle behavior |
 | Toggle a friend | **Middle-click** a targeted player while Friends is enabled |
 
 In the HUD editor, drag widgets to position them. Keyboard controls:

@@ -1,4 +1,26 @@
 {
   "key.category.jilaton.main": "Jilaton",
-  "key.jilaton.open_gui": "Open ClickGUI"
+  "key.jilaton.inspect": "Inspect knife",
+  "key.jilaton.open_gui": "Open ClickGUI",
+  "key.jilaton.music_center": "Open Music Center",
+  "jilaton.module.block_outline.name": "Block Outline",
+  "jilaton.module.block_outline.description": "Violet glowing outline of the targeted block, gliding between blocks.",
+  "jilaton.module.low_fire.name": "Low Fire",
+  "jilaton.module.low_fire.description": "Violet fire overlay that sits lower so the view and hotbar stay clear.",
+  "jilaton.module.radiance.name": "Radiance",
+  "jilaton.module.radiance.description": "Soft blurred glow around players, mobs and items.",
+  "jilaton.module.afterglow.name": "Afterglow",
+  "jilaton.module.afterglow.description": "Entities dissolve into rising texel shards when they die.",
+  "jilaton.module.weather.name": "Weather",
+  "jilaton.module.weather.description": "Glassy rain, settling snow or an ember shower around the player.",
+  "jilaton.module.wings.name": "Wings",
+  "jilaton.module.wings.description": "Layered 3D wings on the upper back with a trailing feather flap.",
+  "jilaton.module.halo.name": "Halo",
+  "jilaton.module.halo.description": "A slow-spinning ring above the head with a glowing seal, kept clear of name tags.",
+  "jilaton.module.cosmetic_knife.name": "Knife",
+  "jilaton.module.cosmetic_knife.description": "First-person knife with idle sway, walk bob and an equip animation.",
+  "jilaton.module.companion.name": "Companion",
+  "jilaton.module.companion.description": "A spring-followed companion that orbits you and banks into turns.",
+  "jilaton.module.character-3d.name": "3D Character",
+  "jilaton.module.character-3d.description": "Replaces your player model with a 3D character."
 }

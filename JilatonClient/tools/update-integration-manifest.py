@@ -32,11 +32,25 @@ def settings(text):
             escaped = char == '\\' and not escaped
             end += 1
         args = text[start:end - 1]
+        if not re.match(r'\s*"', args):
+            continue  # Parameterized helper declarations are expanded separately.
         strings = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', args)
         if len(strings) >= 2:
             found.append(dict(type=match.group(1), id=strings[0], label=strings[1],
                               declaration=args.strip(), modes=strings[2:] if match.group(1) == "Choice" else []))
     return found
+
+
+def hand_settings(text):
+    """Expand ViewModel's parameterized HandOptions groups without executing Java."""
+    result = []
+    for prefix, label in re.findall(r'new HandOptions\("([^"]+)", "([^"]+)"\)', text):
+        result.append(dict(type="Boolean", id=prefix + "_enabled", label=label + " transform",
+                           declaration="true", modes=[]))
+        for suffix, title, numeric in re.findall(r'number\(id \+ "([^"]+)", label \+ "([^"]+)", ([^)]+)\)', text):
+            result.append(dict(type="Number", id=prefix + suffix, label=label + title,
+                               declaration=numeric, modes=[]))
+    return result
 
 
 def main():
@@ -57,7 +71,7 @@ def main():
                             source_path=relative(path), target_path=relative(path),
                             source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                             provenance="See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
-                            settings=settings(text) + (settings((MAIN / "dev/jilaton/client/render/LivingOverlayOptions.java").read_text(encoding="utf-8")) if "new LivingOverlayOptions(" in text else []), dependencies=dependencies,
+                            settings=settings(text) + hand_settings(text) + (settings((MAIN / "dev/jilaton/client/render/LivingOverlayOptions.java").read_text(encoding="utf-8")) if "new LivingOverlayOptions(" in text else []), dependencies=dependencies,
                             dependency_coverage="Direct project imports only; dependency closure is not yet audited",
                             settings_coverage="Declared constructor settings; GUI/config use the shared Setting framework",
                             supported_minecraft="1.21.11", tests=related_tests,
@@ -89,6 +103,21 @@ def main():
                                "Detailed reference-to-target behavior mappings remain in the markdown inventories"],
                   counts=dict(registered=len(modules), reference_sources=len(references), verified=0),
                   modules=modules, references=references)
+    ports_file = OUT / "render-ports.json"
+    if ports_file.exists():
+        ports = json.loads(ports_file.read_text(encoding="utf-8"))["ports"]
+        for port in ports:
+            matches = [ref for ref in references if ref["source_path"].endswith(port["source_suffix"])]
+            assert len(matches) == 1, (port["source_suffix"], len(matches))
+            ref = matches[0]
+            for key in ("state", "modes", "settings_coverage", "dependencies", "evidence", "compatibility_issues"):
+                ref[key] = port[key]
+            ref["target_paths"] = [module["target_path"] for module in modules if module["id"] in port["targets"]]
+            ref["target_path"] = ref["target_paths"][0]
+            for module in modules:
+                if module["id"] in port["targets"]:
+                    module.setdefault("source_ports", []).append(ref["source_path"])
+                    module["compatibility_issues"] = port["compatibility_issues"]
     (OUT / "integration-manifest.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report["counts"]))
 

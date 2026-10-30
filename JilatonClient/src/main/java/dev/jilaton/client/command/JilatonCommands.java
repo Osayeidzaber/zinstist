@@ -55,6 +55,11 @@ public final class JilatonCommands {
                     context.getSource().getClient().execute(() -> JilatonClient.openClickGui(null));
                     return 1;
                 }))
+                .then(ClientCommandManager.literal("music").executes(context -> {
+                    var client = net.minecraft.client.Minecraft.getInstance();
+                    client.execute(() -> client.setScreen(new dev.jilaton.client.gui.MusicCenterScreen(null)));
+                    return 1;
+                }))
                 .then(ClientCommandManager.literal("hud").executes(context -> {
                     context.getSource().getClient().execute(() -> context.getSource().getClient().setScreen(
                             new HudEditorScreen(JilatonClient.moduleManager(), config, null)));

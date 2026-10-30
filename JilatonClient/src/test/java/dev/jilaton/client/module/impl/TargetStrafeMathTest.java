@@ -57,4 +57,18 @@ class TargetStrafeMathTest {
         assertEquals(Vec3.ZERO, stopped);
         assertEquals(0.2, limited.horizontalDistance(), 1.0E-5);
     }
+
+    @Test
+    void yawWrapDoesNotFlipTheOrbitInput() {
+        Vec2 atPositive = TargetStrafeMath.movementInput(2.95, 0.0, 0.0, 0.0, 180.0F, 2.95, 1, 1.0);
+        Vec2 atNegative = TargetStrafeMath.movementInput(2.95, 0.0, 0.0, 0.0, -180.0F, 2.95, 1, 1.0);
+        Vec2 justBelow = TargetStrafeMath.movementInput(2.95, 0.0, 0.0, 0.0, 179.9F, 2.95, 1, 1.0);
+        Vec2 justAbove = TargetStrafeMath.movementInput(2.95, 0.0, 0.0, 0.0, -180.1F, 2.95, 1, 1.0);
+
+        assertEquals(atPositive.x, atNegative.x, 1.0E-5F);
+        assertEquals(atPositive.y, atNegative.y, 1.0E-5F);
+        assertEquals(justBelow.x, justAbove.x, 1.0E-3F);
+        assertEquals(justBelow.y, justAbove.y, 1.0E-3F);
+        assertEquals(1.0F, atPositive.y, 1.0E-5F);
+    }
 }

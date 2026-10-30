@@ -46,17 +46,17 @@ public final class TextSettingScreen extends Screen {
 
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         int accent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
-        graphics.fill(left, top, left + panelWidth, top + 144, 0xF20D101B);
+        graphics.fill(left, top, left + panelWidth, top + 144, 0xF2101010);
         graphics.fill(left, top, left + panelWidth, top + 2, accent);
         graphics.drawString(font, title, left + 12, top + 14, accent);
-        graphics.drawString(font, "ENTER saves · ESC cancels", left + 12, top + 29, 0xFF9CA6BC);
-        graphics.fill(left + 8, top + 42, left + panelWidth - 8, top + 72, 0xFF1A2031);
+        graphics.drawString(font, "ENTER saves · ESC cancels", left + 12, top + 29, 0xFFA5A5A5);
+        graphics.fill(left + 8, top + 42, left + panelWidth - 8, top + 72, 0xFF202020);
         graphics.drawString(font, font.plainSubstrByWidth(error, panelWidth - 24), left + 12, top + 82, 0xFFFF858D);
         for (int index = 0; index < 2; index++) {
             int x = left + panelWidth - 156 + index * 74;
             boolean hover = mouseX >= x && mouseX < x + 68 && mouseY >= top + 110 && mouseY < top + 132;
-            graphics.fill(x, top + 110, x + 68, top + 132, hover ? 0xFF38304F : 0xFF20283A);
-            graphics.drawString(font, index == 0 ? "SAVE" : "CANCEL", x + 10, top + 117, 0xFFE6E1F1);
+            graphics.fill(x, top + 110, x + 68, top + 132, hover ? 0xFF343434 : 0xFF282828);
+            graphics.drawString(font, index == 0 ? "SAVE" : "CANCEL", x + 10, top + 117, 0xFFE3E3E3);
         }
         super.render(graphics, mouseX, mouseY, partialTick);
     }

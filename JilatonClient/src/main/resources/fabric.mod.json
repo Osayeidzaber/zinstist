@@ -3,7 +3,11 @@
   "id": "jilaton",
   "version": "${version}",
   "name": "Jilaton Client",
+  "icon": "assets/jilaton/brand/icon-128.png",
   "description": "A fast, configurable Fabric client.",
+  "authors": [
+    "Osayeid Zaber"
+  ],
   "license": "GPL-3.0-only",
   "environment": "client",
   "mixins": [

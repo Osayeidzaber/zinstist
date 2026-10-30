@@ -7,6 +7,18 @@ loom {
         useLegacyMixinAp = true
         defaultRefmapName = 'jilaton.refmap.json'
     }
+    runs {
+        // Isolated, scripted visual check: loads a copy of the test world, stages scenes, saves screenshots, quits.
+        visualVerify {
+            client()
+            name = "Visual Verify"
+            runDir = "run-verify"
+            programArgs "--quickPlaySingleplayer", "Jilaton HUD verification"
+            // 1920x1080 at GUI scale 2 is a 960x540 logical screen, which keeps the ClickGUI shell wide.
+            programArgs "--width", "1920", "--height", "1080"
+            vmArg "-Djilaton.visualVerify=true"
+        }
+    }
 }
 
 group = project.maven_group
@@ -38,9 +50,11 @@ java {
 sourceSets.main.java.srcDirs = ['src/main/java']
 
 processResources {
-    inputs.property 'version', project.version
+    // Read once at configuration time: touching Task.project during execution is removed in Gradle 10.
+    def modVersion = project.version
+    inputs.property 'version', modVersion
     filesMatching('fabric.mod.json') {
-        expand 'version': project.version
+        expand 'version': modVersion
     }
 }
 

@@ -1,5 +1,7 @@
 package dev.jilaton.client.module.impl;
 
+import net.minecraft.util.Mth;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +13,11 @@ public final class BowAimMath {
     private static final double ROOT_TOLERANCE = 1.0E-7;
 
     private BowAimMath() {
+    }
+
+    /** Signed shortest-path yaw from the view to the solved angle, in [-180, 180]. */
+    static float yawDelta(float viewYaw, float solutionYaw) {
+        return Mth.wrapDegrees(solutionYaw - viewYaw);
     }
 
     public static Optional<Solution> solve(double originX, double originY, double originZ,

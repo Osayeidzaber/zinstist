@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KillAuraTargetingTest {
     @Test
@@ -28,11 +29,16 @@ class KillAuraTargetingTest {
     }
 
     @Test
-    void skipsAnAttackBlockedByAShieldOnlyWhenNoAxeCanBeUsed() {
-        assertEquals(true, KillAuraTargeting.shouldSkipShield(true, true, false, false));
-        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, true, true, false));
-        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, true, false, true));
-        assertEquals(false, KillAuraTargeting.shouldSkipShield(false, true, false, false));
-        assertEquals(false, KillAuraTargeting.shouldSkipShield(true, false, false, false));
+    void selectionPrefersTheBetterRankOverHurtTimeAndDistance() {
+        assertTrue(KillAuraTargeting.compare(1.0, 10, 4.0, 2.0, 0, 1.0) < 0);
+        assertTrue(KillAuraTargeting.compare(2.0, 0, 1.0, 1.0, 10, 4.0) > 0);
+    }
+
+    @Test
+    void equalRanksBreakTheTieOnHurtTimeThenDistance() {
+        assertTrue(KillAuraTargeting.compare(3.0, 2, 9.0, 3.0, 6, 1.0) < 0);
+        assertTrue(KillAuraTargeting.compare(3.0, 6, 1.0, 3.0, 2, 9.0) > 0);
+        assertTrue(KillAuraTargeting.compare(3.0, 4, 1.0, 3.0, 4, 2.0) < 0);
+        assertEquals(0, KillAuraTargeting.compare(3.0, 4, 2.0, 3.0, 4, 2.0));
     }
 }

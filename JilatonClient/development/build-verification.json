@@ -1,10 +1,36 @@
 {
-  "tests": 259,
+  "tests": 383,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
-  "artifact": "build/libs/jilaton-client-0.1.0.jar",
-  "size_bytes": 427662,
-  "sha256": "2e620bf823b24e76bc472d412e89a80d164b8a3a8e6b8197fd9602f727fe64bf",
-  "packaging_checks": "Zoom and new remapped Mixins present; no reference client classes bundled"
+  "test_classes": 109,
+  "artifact": ".isolated-build/root/libs/jilaton-client-0.1.0.jar",
+  "size_bytes": 6065306,
+  "sha256": "2bf2ad8d34cc303a86609119788b23ee65d8e7cd7de9ac7a23ee5362bbb2b039",
+  "built_at": "2026-10-30T21:32:14+06:00",
+  "build_kind": "isolated build (.isolated-build/, build/ untouched)",
+  "built_by": "HUD session, authorised isolated build; counts and jar bytes independently verified by O from .isolated-build/root/test-results/test/TEST-*.xml (109 suites, all stamped 21:32:03) and sha256 of the jar",
+  "stale": false,
+  "staleness_check": "0 .java sources newer than the jar at 2026-10-30T21:34+06:00",
+  "registered_modules": 80,
+  "includes": [
+    "ClickGUI shell with truthful per-theme accent (ClickGuiScreen.accentFor -> ClientTheme.resolveAccent) and 8 shell/accent tests",
+    "HUD subsystem: Minimal/Full presets, target card, four Full panels, four new persistable widget ids",
+    "Nick Hider: policy, module, five mixins registered in jilaton.mixins.json, local display only",
+    "Music/lyrics: LRCLIB-synced in-world lyrics, Music Center, lyric typography pass, HUD overlap audit",
+    "Sky: permitted Dramatic Skys art bundled at assets/jilaton/textures/sky (5,150,221 B, hashes verified), runtime pack loader as override only"
+  ],
+  "runtime_verified": [
+    "In-world spatial lyrics matched from LRCLIB (61-line track), shot run-verify/screenshots/verify-11-spatial-lyrics.png at 21:20",
+    "Music Center with real artwork and transport, shot verify-12-music-center.png at 21:21",
+    "Sky/ambience/player-effects/TargetESP/hit FX shots from the 20:36 and 20:52 passes (classpath path, pre-refactor)"
+  ],
+  "not_runtime_verified": [
+    "ClickGUI shell and Visuals preview cards (no harness step existed at build time)",
+    "HUD Full preset panels and above-head target label (projection gate still missing the above-head condition at WorldOverlayProjection.java)",
+    "Nick Hider in chat, tab list, nametags and book text",
+    "Sky pack loader refactor and single screen-blend pipeline",
+    "Spotify Web API device transfer and local audio playback - these touch the user's Spotify account and need explicit authorisation; do not test unasked"
+  ],
+  "notes": "A test count is not runtime proof. LEVEL is BUILD_VERIFIED for every item in 'includes'. The previous contents of this file (346 tests, 955,370 B, build/libs path) were stale and are superseded."
 }

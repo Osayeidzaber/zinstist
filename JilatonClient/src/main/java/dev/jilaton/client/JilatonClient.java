@@ -38,7 +38,14 @@ public final class JilatonClient implements ClientModInitializer {
     private static final ModuleManager MODULES = new ModuleManager();
     private static final ClientConfig CONFIG = new ClientConfig(FabricLoader.getInstance().getConfigDir());
     private static KeyMapping openGui;
+    private static KeyMapping openMusic;
+    private static KeyMapping inspectKnife;
     private static boolean middleMouseWasDown;
+
+    /** Whether the knife inspect key is held right now (CS skins keep spinning while it is). */
+    public static boolean inspectHeld() {
+        return inspectKnife != null && inspectKnife.isDown();
+    }
 
     public static ModuleManager moduleManager() {
         return MODULES;
@@ -55,8 +62,18 @@ public final class JilatonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
+        dev.jilaton.client.render.character.CharacterModule.ensureDropFolder();
         MODULES.notifications().clear();
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            ClientModule camera = MODULES.get("freecam");
+            if (camera != null) camera.setEnabled(false);
+            dev.jilaton.client.render.CombatTargetTracker.clear();
+            dev.jilaton.client.render.fx.FxParticles.get().clear();
+        });
         JilatonCommands.register(CONFIG);
+        dev.jilaton.client.gui.MenuChrome.register();
+        dev.jilaton.client.dev.VisualVerifier.registerIfRequested();
+        dev.jilaton.client.dev.ViewmodelShots.registerIfRequested();
         AttackEntityCallback.EVENT.register((attacker, world, hand, target, hitResult) -> {
             ClientModule criticals = MODULES.get("criticals");
             if (criticals instanceof CriticalsModule module && module.beforeAttack(attacker, world, target)) {
@@ -77,10 +94,14 @@ public final class JilatonClient implements ClientModInitializer {
             }
             return InteractionResult.PASS;
         });
-        HudRenderer hudRenderer = new HudRenderer(MODULES, CONFIG);
+        var overlayProjection = new dev.jilaton.client.render.WorldOverlayProjection();
+        overlayProjection.register(MODULES);
+        HudRenderer hudRenderer = new HudRenderer(MODULES, CONFIG, overlayProjection);
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("jilaton", "hud"), hudRenderer::render);
         FriendHatRenderer.register();
         new dev.jilaton.client.render.EntityOverlayRenderer(MODULES, CONFIG).register();
+        new dev.jilaton.client.render.DamageParticleRenderer().register(MODULES, CONFIG, overlayProjection);
+        new dev.jilaton.client.render.NametagRenderer().register(MODULES, CONFIG, overlayProjection);
         Category category = Category.register(Identifier.fromNamespaceAndPath("jilaton", "main"));
         openGui = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.jilaton.open_gui",
@@ -88,19 +109,43 @@ public final class JilatonClient implements ClientModInitializer {
                 GLFW.GLFW_KEY_RIGHT_SHIFT,
                 category
         ));
+        openMusic = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.jilaton.music_center",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_M,
+                category
+        ));
+
+        inspectKnife = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.jilaton.inspect",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_V,
+                category
+        ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             MODULES.tick(client);
             handleFriendMiddleClick(client);
+            while (inspectKnife.consumeClick()) {
+                if (client.screen == null && MODULES.get("cosmetic_knife") instanceof dev.jilaton.client.module.impl.CosmeticKnifeModule knife)
+                    knife.inspect();
+            }
+            while (openMusic.consumeClick()) {
+                if (client.screen == null) client.setScreen(new dev.jilaton.client.gui.MusicCenterScreen(null));
+            }
             while (openGui.consumeClick()) {
-                Screen nextScreen = client.screen instanceof ClickGuiScreen ? null : new ClickGuiScreen(MODULES, CONFIG, null);
-                client.setScreen(nextScreen);
+                if (client.screen instanceof ClickGuiScreen gui) {
+                    gui.onClose();
+                } else {
+                    client.setScreen(new ClickGuiScreen(MODULES, CONFIG, null));
+                }
             }
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             CONFIG.save(MODULES);
             MODULES.disableAll();
+            dev.jilaton.client.music.MusicCenter.get().shutdown();
         });
     }
 

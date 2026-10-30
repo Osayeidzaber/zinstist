@@ -27,18 +27,33 @@ import java.util.Properties;
 public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
-    private static final Set<String> THEME_IDS = Set.of("obsidian", "violet", "blue", "cyan", "rose", "amber", "custom");
-    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target", "armor", "effects", "cps", "notifications");
+    private static final Set<String> THEME_IDS = Set.of("obsidian", "graphite", "violet", "blue", "cyan", "rose", "amber", "custom");
+    private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target", "armor", "effects", "cps", "notifications", "music", "keybinds", "server", "above_head", "held_item", "staff", "radar");
     private final Path path;
     private final Path profilesDirectory;
     private final Map<String, HudPosition> hudPositions = new HashMap<>();
     private final Map<String, HudStyle> hudStyles = new HashMap<>();
     private String themeId = "obsidian";
-    private String customAccent = "8878FF";
+    private String customAccent = "F2F2F2";
     private boolean reducedMotion;
+    private double animationIntensity = 1.0;
+    /** ClickGUI Visuals card order, as module ids; empty means registration order. */
+    private final List<String> visualOrder = new ArrayList<>();
+
+    public List<String> visualOrder() { return List.copyOf(visualOrder); }
+    public void setVisualOrder(List<String> order) {
+        visualOrder.clear();
+        for (String id : order) if (id != null && id.matches("[a-z0-9][a-z0-9_-]*") && !visualOrder.contains(id)) visualOrder.add(id);
+    }
 
     public boolean reducedMotion() { return reducedMotion; }
     public void setReducedMotion(boolean reducedMotion) { this.reducedMotion = reducedMotion; }
+    /** Spatial animation scale: 0 keeps fades only, 1 is the default, 1.5 is the most expressive. */
+    public double animationIntensity() { return animationIntensity; }
+    public void setAnimationIntensity(double intensity) {
+        if (!Double.isFinite(intensity)) throw new IllegalArgumentException("Animation intensity must be finite");
+        animationIntensity = Math.max(0, Math.min(1.5, Math.round(intensity * 20) / 20.0));
+    }
 
     public ClientConfig(Path configDirectory) {
         this.path = configDirectory.resolve("jilaton.properties");
@@ -149,6 +164,13 @@ public final class ClientConfig {
         hudPositions.clear();
         hudStyles.clear();
         reducedMotion = Boolean.parseBoolean(values.getProperty("ui.reduced_motion", "false"));
+        String configuredOrder = values.getProperty("ui.visual_order", "");
+        setVisualOrder(configuredOrder.isBlank() ? List.of() : List.of(configuredOrder.split(",")));
+        try {
+            setAnimationIntensity(Double.parseDouble(values.getProperty("ui.animation_intensity", "1.0")));
+        } catch (IllegalArgumentException exception) {
+            animationIntensity = 1.0;
+        }
         String configuredFriends = values.getProperty("friends.names");
         if (configuredFriends != null) {
             FriendManager.replace(List.of(configuredFriends.split(",")));
@@ -247,7 +269,7 @@ public final class ClientConfig {
             String key = "module." + module.id() + ".enabled";
             String value = values.getProperty(key, Boolean.toString(module.enabledByDefault()));
             if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
-                module.setEnabled(Boolean.parseBoolean(value));
+                module.setEnabled(module.persistEnabled() && Boolean.parseBoolean(value));
             } else {
                 System.err.println("Jilaton ignored invalid module state " + key);
             }
@@ -259,6 +281,8 @@ public final class ClientConfig {
         values.setProperty("ui.theme", themeId);
         values.setProperty("ui.custom_accent", customAccent);
         values.setProperty("ui.reduced_motion", Boolean.toString(reducedMotion));
+        values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
+        values.setProperty("ui.visual_order", String.join(",", visualOrder));
         values.setProperty("friends.names", String.join(",", FriendManager.names()));
         for (String widgetId : HUD_WIDGET_IDS) {
             HudStyle style = hudStyle(widgetId);
@@ -277,7 +301,7 @@ public final class ClientConfig {
             }
         }
         for (ClientModule module : modules.all()) {
-            values.setProperty("module." + module.id() + ".enabled", Boolean.toString(module.enabled()));
+            values.setProperty("module." + module.id() + ".enabled", Boolean.toString(module.persistEnabled() && module.enabled()));
             values.setProperty("module." + module.id() + ".keycode", Integer.toString(module.keyCode()));
             for (Setting setting : module.settings()) {
                 if (setting instanceof BooleanSetting booleanSetting) {
@@ -285,7 +309,7 @@ public final class ClientConfig {
                 } else if (setting instanceof NumberSetting numberSetting) {
                     values.setProperty(settingKey(module, setting), Double.toString(numberSetting.value()));
                 } else if (setting instanceof ChoiceSetting choiceSetting) {
-                    values.setProperty(settingKey(module, setting), choiceSetting.value());
+                    values.setProperty(settingKey(module, setting), choiceSetting.persistedValue());
                 } else if (setting instanceof TextSetting textSetting) {
                     values.setProperty(settingKey(module, setting), textSetting.value());
                 }
@@ -303,9 +327,22 @@ public final class ClientConfig {
             Properties values = new Properties();
             values.load(input);
             return values;
-        } catch (IOException exception) {
+        } catch (IOException | IllegalArgumentException exception) {
+            // Properties.load throws IllegalArgumentException on a malformed unicode escape. Either way the
+            // defaults take over and the next save rewrites this file, so keep the original bytes first.
             System.err.println("Jilaton could not read its configuration: " + exception.getMessage());
+            backUpUnreadable(source);
             return null;
+        }
+    }
+
+    private static void backUpUnreadable(Path source) {
+        Path backup = source.resolveSibling(source.getFileName() + ".unreadable-" + System.currentTimeMillis());
+        try {
+            Files.copy(source, backup, StandardCopyOption.COPY_ATTRIBUTES);
+            System.err.println("Jilaton kept the unreadable configuration as " + backup.getFileName());
+        } catch (IOException | RuntimeException backupFailure) {
+            System.err.println("Jilaton could not back up its unreadable configuration: " + backupFailure.getMessage());
         }
     }
 

@@ -1,5 +1,7 @@
 package dev.jilaton.client.module.impl;
 
+import net.minecraft.util.Mth;
+
 /** Damage ranking adapted from Anubis's Combo.value scoring policy. */
 final class AnchorAuraScoring {
     static final float POP_RANK = 500.0F;
@@ -25,5 +27,10 @@ final class AnchorAuraScoring {
             return Float.NEGATIVE_INFINITY;
         }
         return targetValue - SELF_DAMAGE_WEIGHT * selfDamage;
+    }
+
+    /** Unsigned shortest-path yaw error from the view to the anchor target, in [0, 180]. */
+    static float yawError(float viewYaw, float targetYaw) {
+        return Math.abs(Mth.wrapDegrees(targetYaw - viewYaw));
     }
 }

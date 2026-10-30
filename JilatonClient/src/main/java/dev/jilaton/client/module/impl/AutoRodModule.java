@@ -176,21 +176,21 @@ public final class AutoRodModule extends ClientModule {
     private Player findTarget(Minecraft client, Player self) {
         Player best = null;
         double bestScore = Double.POSITIVE_INFINITY;
-        double minDistance = minimumRange.value() * minimumRange.value();
-        double maxDistance = maximumRange.value() * maximumRange.value();
         for (Player candidate : client.level.players()) {
             if (candidate == self || !candidate.isAlive() || candidate.isSpectator() || candidate.isCreative()
-                    || candidate.getHealth() <= minimumTargetHealth.value()
-                    || !PlayerTargetFilters.allowsPlayer(client, self, candidate)
-                    || !self.hasLineOfSight(candidate)) {
+                    || !PlayerTargetFilters.allowsPlayer(client, self, candidate)) {
                 continue;
             }
             double distance = self.distanceToSqr(candidate);
-            if (distance < minDistance || distance > maxDistance) {
+            if (distance < minimumRange.value() * minimumRange.value()
+                    || distance > maximumRange.value() * maximumRange.value()) {
                 continue;
             }
             float aimError = aimErrorDegrees(self, candidate);
-            if (!Float.isFinite(aimError) || aimError > fieldOfView.value()) {
+            // Cheap range/health/aim checks first; the line-of-sight raycast only runs for survivors.
+            if (!AutoRodPolicy.targetEligible(distance, minimumRange.value(), maximumRange.value(),
+                    candidate.getHealth(), (float) minimumTargetHealth.value(), true,
+                    aimError, (float) fieldOfView.value()) || !self.hasLineOfSight(candidate)) {
                 continue;
             }
             double score = aimError * 4.0 + distance;
@@ -313,7 +313,7 @@ public final class AutoRodModule extends ClientModule {
 
     static float aimErrorDegrees(Player self, Player target) {
         RotationAngles desired = aimRotation(self, target);
-        return RotationPolicy.angularError(self.getYRot(), self.getXRot(), desired);
+        return AutoRodPolicy.aimError(self.getYRot(), self.getXRot(), desired.yaw(), desired.pitch());
     }
 
     private static RotationAngles aimRotation(Player self, Player target) {

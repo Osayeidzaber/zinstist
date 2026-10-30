@@ -17,6 +17,17 @@ class MovementMixinTargetsTest {
         check("StepMixin", "net/minecraft/world/entity/Entity", "jilaton$useConfiguredStepHeight");
     }
 
+    @Test
+    void renderMixinInvocationTargetsExistInMappedVanilla() throws Exception {
+        check("FreeLookCameraMixin", "net/minecraft/client/Camera", "jilaton$minecartOrbit");
+        check("FreeLookCameraMixin", "net/minecraft/client/Camera", "jilaton$ordinaryOrbit");
+        check("ViewModelMixin", "net/minecraft/client/renderer/ItemInHandRenderer", "jilaton$transformHand");
+        check("ZoomMouseMixin", "net/minecraft/client/MouseHandler", "jilaton$zoomSensitivity");
+        check("HitParticleAttackMixin", "net/minecraft/client/multiplayer/MultiPlayerGameMode", "jilaton$attackParticles");
+        check("FreecamHandsMixin", "net/minecraft/client/renderer/GameRenderer", "jilaton$freecamHands");
+        check("FreecamCrosshairMixin", "net/minecraft/client/gui/Gui", "jilaton$freecamCrosshair");
+    }
+
     private void check(String mixin, String vanilla, String handler) throws IOException {
         List<String> selected = new ArrayList<>();
         String[] invocation = {null};

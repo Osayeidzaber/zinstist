@@ -67,16 +67,15 @@ public final class TargetStrafeModule extends ClientModule {
         Minecraft client = Minecraft.getInstance();
         Input input = event.input();
         lastInput = input;
-        if (input.jump() && !jumpWasDown) {
-            direction = -direction;
-        }
+        direction = TargetStrafePolicy.directionAfterInput(direction, input.jump(), jumpWasDown,
+                input.left(), input.right());
         jumpWasDown = input.jump();
-        if (input.left() != input.right()) {
-            direction = input.left() ? -1 : 1;
-        }
 
         Player player = client.player;
-        if (!eligible(client, player, input)) {
+        if (player == null || input == null
+                || !TargetStrafePolicy.eligible(client.level != null, TargetStrafePolicy.screenOpen(client.screen),
+                requireGround.value(), player.onGround(), requireMovementInput.value(),
+                TargetStrafePolicy.hasMovementInput(input), isSprintTapActive(client))) {
             return;
         }
 
@@ -91,14 +90,13 @@ public final class TargetStrafeModule extends ClientModule {
 
         double dx = target.getX() - player.getX();
         double dz = target.getZ() - player.getZ();
-        double distance = Math.hypot(dx, dz);
-        if (distance < 1.0E-5 || distance > followRange.value()) {
+        if (!TargetStrafePolicy.canOrbit(Math.hypot(dx, dz), followRange.value())) {
             return;
         }
 
         Vec2 movement = TargetStrafeMath.movementInput(player.getX(), player.getZ(), target.getX(), target.getZ(),
                 player.getYRot(), radius.value(), direction, strength.value());
-        if (movement.x * movement.x + movement.y * movement.y > 1.0E-6F) {
+        if (TargetStrafePolicy.meaningfulInput(movement)) {
             event.setMoveVectorOverride(movement);
         }
     }
@@ -111,7 +109,12 @@ public final class TargetStrafeModule extends ClientModule {
 
         Minecraft client = Minecraft.getInstance();
         Player player = client.player;
-        if (!eligible(client, player, lastInput) || player.isPassenger() || player.getAbilities().flying
+        Input input = lastInput;
+        if (player == null || input == null
+                || !TargetStrafePolicy.eligible(client.level != null, TargetStrafePolicy.screenOpen(client.screen),
+                requireGround.value(), player.onGround(), requireMovementInput.value(),
+                TargetStrafePolicy.hasMovementInput(input), isSprintTapActive(client))
+                || player.isPassenger() || player.getAbilities().flying
                 || player.isFallFlying() || player.isInWater() || player.isInLava()) {
             return;
         }
@@ -120,7 +123,8 @@ public final class TargetStrafeModule extends ClientModule {
         if (target == null || !target.isAlive() || target.isSpectator()) {
             return;
         }
-        if (Math.hypot(target.getX() - player.getX(), target.getZ() - player.getZ()) > followRange.value()) {
+        double distance = Math.hypot(target.getX() - player.getX(), target.getZ() - player.getZ());
+        if (!TargetStrafePolicy.inFollowRange(distance, followRange.value())) {
             return;
         }
 
@@ -146,13 +150,6 @@ public final class TargetStrafeModule extends ClientModule {
         }
 
         event.setMovement(new Vec3(desired.x, movement.y, desired.z));
-    }
-
-    private boolean eligible(Minecraft client, Player player, Input input) {
-        return player != null && client.level != null && client.screen == null && input != null
-                && (!requireGround.value() || player.onGround())
-                && (!requireMovementInput.value() || hasMovementInput(input))
-                && !isSprintTapActive(client);
     }
 
     private Vec3 motionPlan(Player player, LivingEntity target, double speed, int side) {
@@ -214,10 +211,6 @@ public final class TargetStrafeModule extends ClientModule {
             }
         }
         return closest;
-    }
-
-    private static boolean hasMovementInput(Input input) {
-        return input.forward() || input.backward() || input.left() || input.right();
     }
 
     private static boolean isSprintTapActive(Minecraft client) {

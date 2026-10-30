@@ -225,7 +225,7 @@ public final class KillAuraModule extends ClientModule {
             double horizontalDistance = Math.sqrt(difference.x * difference.x + difference.z * difference.z);
             float yaw = (float) (Math.atan2(difference.z, difference.x) * (180.0 / Math.PI)) - 90.0F;
             float pitch = (float) (-Math.atan2(difference.y, horizontalDistance) * (180.0 / Math.PI));
-            float yawDelta = Mth.wrapDegrees(yaw - player.getYRot());
+            float yawDelta = KillAuraTargeting.yawDelta(player.getYRot(), yaw);
             float pitchDelta = pitch - player.getXRot();
             double angle = Math.hypot(yawDelta, pitchDelta);
             if (angle > fieldOfView.value()) {
@@ -251,24 +251,26 @@ public final class KillAuraModule extends ClientModule {
             if (!players.value() || !PlayerTargetFilters.allowsPlayer(client, player, other)) {
                 return false;
             }
-            if (!avoidWastedShieldAttacks.value() || !other.isBlocking()
-                    || !ShieldTargetPolicy.shieldFacesAttacker(player.getX(), player.getZ(),
-                    other.getX(), other.getZ(), other.getYHeadRot())) {
-                return true;
-            }
-            boolean axeEquipped = player.getMainHandItem().is(net.minecraft.tags.ItemTags.AXES);
-            if (axeEquipped) {
-                return true;
-            }
-            ClientModule weaponModule = JilatonClient.moduleManager().get("auto_weapon");
-            boolean autoWeaponCanSelectAxe = weaponModule instanceof AutoWeaponModule autoWeapon
-                    && autoWeapon.canSelectShieldBreaker(client, player);
-            return !KillAuraTargeting.shouldSkipShield(true, true, false, autoWeaponCanSelectAxe);
+            boolean blocking = other.isBlocking();
+            boolean facing = blocking && ShieldTargetPolicy.shieldFacesAttacker(player.getX(), player.getZ(),
+                    other.getX(), other.getZ(), other.getYHeadRot());
+            return !avoidWastedShieldAttacks.value()
+                    || !ShieldTargetPolicy.shieldAbsorbsAttack(blocking, facing,
+                    facing && attackerCanDisableBlocking(client, player));
         }
         if (!hostiles.value() || !(candidate instanceof Monster monster) || player.isAlliedTo(candidate)) {
             return false;
         }
         return !(monster instanceof NeutralMob) || monster.isAggressive();
+    }
+
+    private boolean attackerCanDisableBlocking(Minecraft client, Player player) {
+        if (player.getMainHandItem().is(net.minecraft.tags.ItemTags.AXES)) {
+            return true;
+        }
+        ClientModule weaponModule = JilatonClient.moduleManager().get("auto_weapon");
+        return weaponModule instanceof AutoWeaponModule autoWeapon
+                && autoWeapon.canSelectShieldBreaker(client, player);
     }
 
     private boolean raycastAllows(Minecraft client, Player player, LivingEntity target) {
@@ -331,14 +333,8 @@ public final class KillAuraModule extends ClientModule {
     }
 
     private static int compare(Target left, Target right) {
-        int order = Double.compare(left.rank(), right.rank());
-        if (order == 0) {
-            order = Integer.compare(left.entity().hurtTime, right.entity().hurtTime);
-        }
-        if (order == 0) {
-            order = Double.compare(left.distance(), right.distance());
-        }
-        return order;
+        return KillAuraTargeting.compare(left.rank(), left.entity().hurtTime, left.distance(),
+                right.rank(), right.entity().hurtTime, right.distance());
     }
 
     private record Target(LivingEntity entity, float yaw, float pitch, float yawDelta, float pitchDelta,

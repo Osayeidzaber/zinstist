@@ -16,7 +16,20 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import dev.jilaton.client.render.fx.FxEmitter;
+import dev.jilaton.client.render.fx.FxFrame;
+import dev.jilaton.client.render.fx.FxParticles;
+import dev.jilaton.client.render.fx.VisualQuality;
+import dev.jilaton.client.module.ClientModule;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +44,8 @@ public final class EntityOverlayRenderer implements AutoCloseable {
     private Object lastWorld;
     private ByteBufferBuilder storage;
     private MultiBufferSource.BufferSource buffers;
+    private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton");
+    private long lastFrameNanos;
 
     public EntityOverlayRenderer(ModuleManager modules, ClientConfig config) { this.modules = modules; this.config = config; }
 
@@ -38,13 +53,16 @@ public final class EntityOverlayRenderer implements AutoCloseable {
         WorldRenderEvents.END_EXTRACTION.register(this::extract);
         WorldRenderEvents.END_MAIN.register(this::draw);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> close());
+        // Build the overlay pipelines once the client is up, so a bad pipeline fails at launch, not on the first world frame.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> OverlayRenderTypes.fill(false));
     }
 
     private void extract(WorldExtractionContext context) {
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || context.world() == null) { context.worldState().setData(KEY, null); highlight.reset(); return; }
-        if (lastWorld != context.world()) { lastWorld = context.world(); highlight.reset(); }
-        if (!enabled("player_esp") && !enabled("item_esp") && !enabled("tracers") && !enabled("kill_aura")) {
+        if (lastWorld != context.world()) { lastWorld = context.world(); highlight.reset(); FxParticles.get().clear(); }
+        if (!enabled("player_esp") && !enabled("item_esp") && !enabled("tracers") && !enabled("kill_aura")
+                && !enabled("target_esp") && !enabled("jump_circles") && !enabled("trails") && !anyFx()) {
             context.worldState().setData(KEY, null);
             highlight.reset();
             return;
@@ -87,8 +105,16 @@ public final class EntityOverlayRenderer implements AutoCloseable {
                         color, items.lineWidth(), items.throughWalls()));
             }
         }
+        long now = System.nanoTime();
+        EffectBatch effects = new EffectBatch();
+        if (modules.get("trails") instanceof TrailsModule trails) trails.emit(effects, client, partial, camera, accent, now);
+        if (modules.get("jump_circles") instanceof JumpCirclesModule circles) circles.emit(effects, camera, accent, now);
+        if (modules.get("target_esp") instanceof TargetEspModule targetEsp)
+            targetEsp.emit(effects, client, partial, camera, accent, now, config.reducedMotion());
+        Quaternionf rotation = new Quaternionf(context.camera().rotation());
+        FxFrame fx = fxFrame(client, context, effects, camera, rotation, accent, partial, now);
         Halo halo = null;
-        if (modules.get("kill_aura") instanceof KillAuraModule aura) {
+        if (modules.get("kill_aura") instanceof KillAuraModule aura && !enabled("target_esp")) {
             LivingEntity entity = aura.currentTarget();
             boolean active = aura.enabled() && aura.showTargetIndicator() && client.screen == null
                     && entity != null && entity.isAlive() && entity.level() == client.level;
@@ -107,7 +133,43 @@ public final class EntityOverlayRenderer implements AutoCloseable {
                 if (aura.highlightCorners()) addCorners(lines, halo);
             }
         }
-        context.worldState().setData(KEY, new Frame(List.copyOf(boxes), List.copyOf(lines), halo));
+        context.worldState().setData(KEY, new Frame(List.copyOf(boxes), List.copyOf(lines), halo, effects,
+                List.copyOf(fx.texts()), List.copyOf(fx.images()), List.copyOf(fx.sky()), rotation));
+    }
+
+    private boolean anyFx() {
+        if (FxParticles.get().count() > 0 || FxParticles.get().decalCount() > 0) return true;
+        for (ClientModule module : modules.all()) if (module instanceof FxEmitter && module.enabled()) return true;
+        return false;
+    }
+
+    /** Runs every enabled {@link FxEmitter} and the shared particle simulation for this frame. */
+    private FxFrame fxFrame(Minecraft client, WorldExtractionContext context, EffectBatch effects, Vec3 camera,
+                            Quaternionf rotation, int accent, float partial, long now) {
+        double dt = lastFrameNanos == 0 ? 0 : Math.min(0.1, (now - lastFrameNanos) / 1e9);
+        lastFrameNanos = now;
+        Vector3f right = new Vector3f(1, 0, 0).rotate(rotation), up = new Vector3f(0, 1, 0).rotate(rotation),
+                forward = new Vector3f(0, 0, -1).rotate(rotation);
+        VisualQuality quality = VisualQuality.BALANCED;
+        double opacity = 1;
+        if (modules.get("visual_engine") instanceof VisualEngineModule engine) {
+            quality = engine.quality(dt);
+            opacity = engine.opacity();
+        }
+        FxFrame frame = new FxFrame(client, effects, camera.x, camera.y, camera.z,
+                new float[]{right.x, right.y, right.z}, new float[]{up.x, up.y, up.z}, new float[]{forward.x, forward.y, forward.z},
+                now, dt, partial, accent, quality, config.reducedMotion(), opacity, !context.camera().isDetached());
+        for (ClientModule module : modules.all()) {
+            if (!(module instanceof FxEmitter emitter) || !module.enabled()) continue;
+            try {
+                emitter.emit(frame);
+            } catch (RuntimeException failure) {
+                LOGGER.error("World effect '{}' failed and was disabled", module.id(), failure);
+                module.setEnabled(false);
+            }
+        }
+        FxParticles.get().step(frame);
+        return frame;
     }
 
     private static AABB relativeBox(Entity entity, float partial, Vec3 camera) {
@@ -119,7 +181,8 @@ public final class EntityOverlayRenderer implements AutoCloseable {
 
     private void draw(WorldRenderContext context) {
         Frame frame = context.worldState().getData(KEY);
-        if (frame == null || frame.boxes().isEmpty() && frame.lines().isEmpty() && frame.halo() == null) return;
+        if (frame == null || frame.boxes().isEmpty() && frame.lines().isEmpty() && frame.halo() == null && frame.effects().isEmpty()
+                && frame.texts().isEmpty() && frame.images().isEmpty() && frame.sky().isEmpty()) return;
         if (buffers == null) { storage = new ByteBufferBuilder(262144); buffers = MultiBufferSource.immediate(storage); }
         PoseStack.Pose pose = context.matrices().last();
         for (int depth = 0; depth < 2; depth++) {
@@ -127,13 +190,88 @@ public final class EntityOverlayRenderer implements AutoCloseable {
             VertexConsumer fill = buffers.getBuffer(OverlayRenderTypes.fill(walls));
             for (Box box : frame.boxes()) if (box.walls() == walls && box.opacity() > 0) boxFaces(fill, pose, box);
             if (walls && frame.halo() != null && frame.halo().ring()) haloFaces(fill, pose, frame.halo());
+            for (EffectBatch.Quad quad : frame.effects().quads()) if (quad.walls() == walls) quad(fill, pose, quad);
             buffers.endBatch();
             VertexConsumer line = buffers.getBuffer(OverlayRenderTypes.line(walls));
             for (Box box : frame.boxes()) if (box.walls() == walls && box.outline()) boxEdges(line, pose, box);
             for (Line segment : frame.lines()) if (segment.walls() == walls) line(line, pose, segment);
             if (walls && frame.halo() != null && frame.halo().ring()) haloLines(line, pose, frame.halo());
+            for (EffectBatch.Segment s : frame.effects().segments())
+                if (s.walls() == walls) line(line, pose, s.x1(), s.y1(), s.z1(), s.x2(), s.y2(), s.z2(), s.color(), s.width());
             buffers.endBatch();
         }
+        if (!frame.sky().isEmpty()) drawSky(pose, frame);
+        if (!frame.images().isEmpty()) drawImages(context.matrices(), frame);
+        if (!frame.texts().isEmpty()) drawTexts(context.matrices(), frame);
+    }
+
+    /** Textured skybox faces, in frame order; batch flushes on every texture/blend change to keep the layering exact. */
+    private void drawSky(PoseStack.Pose pose, Frame frame) {
+        RenderType current = null;
+        for (FxFrame.SkyQuad quad : frame.sky()) {
+            RenderType type = OverlayRenderTypes.sky(quad.texture());
+            if (type != current) {
+                if (current != null) buffers.endBatch();
+                current = type;
+            }
+            VertexConsumer buffer = buffers.getBuffer(type);
+            float[] p = quad.positions(), uv = quad.uvs();
+            for (int i = 0; i < 4; i++)
+                buffer.addVertex(pose, p[i * 3], p[i * 3 + 1], p[i * 3 + 2]).setUv(uv[i * 2], uv[i * 2 + 1]).setColor(quad.color());
+        }
+        buffers.endBatch();
+    }
+
+    private void drawImages(PoseStack matrices, Frame frame) {
+        for (FxFrame.WorldImage image : frame.images()) {
+            matrices.pushPose();
+            matrices.translate(image.x(), image.y(), image.z());
+            if (image.billboard()) matrices.mulPose(frame.rotation());
+            else matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-image.yaw()));
+            PoseStack.Pose pose = matrices.last();
+            float h = image.size() / 2;
+            int color = (int) (Math.max(0, Math.min(1, image.alpha())) * 255) << 24 | 0xFFFFFF;
+            VertexConsumer buffer = buffers.getBuffer(RenderTypes.entityTranslucent(image.texture()));
+            imageVertex(buffer, pose, -h, -h, 0, 1, color);
+            imageVertex(buffer, pose, h, -h, 1, 1, color);
+            imageVertex(buffer, pose, h, h, 1, 0, color);
+            imageVertex(buffer, pose, -h, h, 0, 0, color);
+            matrices.popPose();
+        }
+        buffers.endBatch();
+    }
+
+    private static void imageVertex(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float u, float v, int color) {
+        buffer.addVertex(pose, x, y, 0).setColor(color).setUv(u, v).setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0, 0, 1);
+    }
+
+    private void drawTexts(PoseStack matrices, Frame frame) {
+        Font font = Minecraft.getInstance().font;
+        for (FxFrame.WorldText text : frame.texts()) {
+            matrices.pushPose();
+            matrices.translate(text.x(), text.y(), text.z());
+            if (text.billboard()) matrices.mulPose(frame.rotation());
+            else matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-text.yaw()));
+            matrices.scale(text.scale(), -text.scale(), text.scale());
+            org.joml.Matrix4f matrix = matrices.last().pose();
+            Font.DisplayMode mode = text.seeThrough() ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL;
+            int width = font.width(text.plain());
+            float x = text.align() < 0 ? 0 : text.align() > 0 ? -width : -width / 2F;
+            if ((text.glow() >>> 24) != 0) {
+                String plain = text.plain();
+                for (int i = 0; i < 4; i++) {
+                    float ox = (i & 1) == 0 ? -0.7F : 0.7F, oy = (i & 2) == 0 ? -0.7F : 0.7F;
+                    font.drawInBatch(plain, x + ox, oy, text.glow(), false, matrix, buffers, mode, 0, LightTexture.FULL_BRIGHT);
+                }
+            }
+            for (FxFrame.Run run : text.runs()) {
+                font.drawInBatch(run.text(), x, 0, run.color(), false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
+                x += font.width(run.text());
+            }
+            matrices.popPose();
+        }
+        buffers.endBatch();
     }
 
     private static void boxFaces(VertexConsumer buffer, PoseStack.Pose pose, Box box) {
@@ -196,6 +334,13 @@ public final class EntityOverlayRenderer implements AutoCloseable {
         }
     }
 
+    private static void quad(VertexConsumer buffer, PoseStack.Pose pose, EffectBatch.Quad q) {
+        vertex(buffer, pose, q.ax(), q.ay(), q.az(), q.colorA());
+        vertex(buffer, pose, q.bx(), q.by(), q.bz(), q.colorB());
+        vertex(buffer, pose, q.cx(), q.cy(), q.cz(), q.colorC());
+        vertex(buffer, pose, q.dx(), q.dy(), q.dz(), q.colorD());
+    }
+
     private static void vertex(VertexConsumer buffer, PoseStack.Pose pose, double x, double y, double z, int color) {
         buffer.addVertex(pose, (float) x, (float) y, (float) z).setColor(color);
     }
@@ -216,8 +361,10 @@ public final class EntityOverlayRenderer implements AutoCloseable {
     }
 
     private static int alpha(int rgb, double opacity) { return (int)Math.round(Math.max(0,Math.min(1,opacity))*255)<<24 | rgb&0xFFFFFF; }
-    @Override public void close() { if (storage != null) { storage.close(); storage = null; buffers = null; } highlight.reset(); lastWorld = null; }
-    private record Frame(List<Box> boxes, List<Line> lines, Halo halo) { }
+    @Override public void close() { if (storage != null) { storage.close(); storage = null; buffers = null; } highlight.reset(); lastWorld = null; FxParticles.get().clear(); }
+    private record Frame(List<Box> boxes, List<Line> lines, Halo halo, EffectBatch effects,
+                         List<FxFrame.WorldText> texts, List<FxFrame.WorldImage> images,
+                         List<FxFrame.SkyQuad> sky, Quaternionf rotation) { }
     private record Box(AABB bounds, int color, double opacity, boolean outline, float width, boolean walls) { }
     private record Line(double x1,double y1,double z1,double x2,double y2,double z2,int color,float width,boolean walls) { }
     private record Halo(double x,double y,double z,double height,double radius,double scan,double direction,double phase,double opacity,int color,float width,boolean ring) { }

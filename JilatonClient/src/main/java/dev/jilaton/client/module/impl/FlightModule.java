@@ -124,14 +124,11 @@ public final class FlightModule extends ClientModule {
             return;
         }
         Abilities abilities = previousOwner.getAbilities();
-        if (Float.compare(abilities.getFlyingSpeed(), appliedFlyingSpeed) == 0) {
-            abilities.setFlyingSpeed(previousFlyingSpeed);
-        }
-        if (abilities.mayfly) {
-            abilities.mayfly = previousMayfly;
-        }
-        if (forcedFlying && abilities.flying) {
-            abilities.flying = previousFlying;
+        abilities.setFlyingSpeed(FlightPolicy.restoredFlyingSpeed(abilities.getFlyingSpeed(),
+                appliedFlyingSpeed, previousFlyingSpeed));
+        abilities.mayfly = FlightPolicy.restoredFlag(abilities.mayfly, previousMayfly);
+        if (forcedFlying) {
+            abilities.flying = FlightPolicy.restoredFlag(abilities.flying, previousFlying);
         }
         owner = null;
         forcedFlying = false;

@@ -9,7 +9,6 @@ import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BowItem;
@@ -279,7 +278,7 @@ public final class BowAimModule extends ClientModule {
         if (angle == null) {
             return Double.POSITIVE_INFINITY;
         }
-        float yaw = Mth.wrapDegrees(angle.yaw() - player.getYRot());
+        float yaw = BowAimMath.yawDelta(player.getYRot(), angle.yaw());
         float pitch = angle.pitch() - player.getXRot();
         return Math.hypot(yaw, pitch);
     }

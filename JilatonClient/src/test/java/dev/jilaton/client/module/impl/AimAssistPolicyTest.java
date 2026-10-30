@@ -15,6 +15,22 @@ class AimAssistPolicyTest {
     }
 
     @Test
+    void interpolatesAcrossTheWrapBoundaryInTheNegativeDirection() {
+        AimAssistPolicy.Angles result = AimAssistPolicy.apply(-179.0F, 0.0F, 179.0F, 0.0F,
+                0.5, true, false);
+
+        assertEquals(-180.0F, result.yaw(), 0.001F);
+    }
+
+    @Test
+    void normalizesTargetYawThatLiesOutsideTheSignedRange() {
+        AimAssistPolicy.Angles result = AimAssistPolicy.apply(0.0F, 0.0F, -350.0F, 0.0F,
+                1.0, true, false);
+
+        assertEquals(10.0F, result.yaw(), 0.001F);
+    }
+
+    @Test
     void axesCanBeAdjustedIndependently() {
         AimAssistPolicy.Angles result = AimAssistPolicy.apply(20.0F, 10.0F, 80.0F, 50.0F,
                 0.5, true, false);

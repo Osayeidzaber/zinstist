@@ -40,7 +40,10 @@ public final class ZoomModule extends ClientModule {
         }
         if (configuredFov != fov.value()) configuredFov = activeFov = fov.value();
         boolean active = enabled() && client.player != null && client.screen == null && !client.player.isScoping();
-        double target = active ? zoomFactor(activeFov, client.options.fov().get()) : 1;
+        double baseFov = client.options.fov().get();
+        if (dev.jilaton.client.JilatonClient.moduleManager().get("custom_fov") instanceof CustomFovModule custom && custom.enabled())
+            baseFov = custom.apply((float) baseFov, true, false);
+        double target = active ? zoomFactor(activeFov, baseFov) : 1;
         currentFactor = factor.update(target, System.nanoTime(), reducedMotion || !smooth.value() || client.player == null);
         return (float) Math.max(1, Math.min(179, original * currentFactor));
     }

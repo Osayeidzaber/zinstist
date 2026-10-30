@@ -81,6 +81,8 @@ public abstract class ClientModule {
 
     public boolean holdKey() { return false; }
 
+    public boolean persistEnabled() { return true; }
+
     public final int keyCode() {
         return keyCode;
     }

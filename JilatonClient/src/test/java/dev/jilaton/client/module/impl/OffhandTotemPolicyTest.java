@@ -37,5 +37,26 @@ class OffhandTotemPolicyTest {
     void rejectsIncompleteSlotSnapshots() {
         assertThrows(IllegalArgumentException.class,
                 () -> OffhandTotemPolicy.findSource(new boolean[9], false));
+        assertThrows(IllegalArgumentException.class,
+                () -> OffhandTotemPolicy.findSource(null, false));
+    }
+
+    @Test
+    void storedOnlyScanStartsAtTheFirstStoredSlotAndSkipsTheHotbar() {
+        boolean[] slots = new boolean[36];
+        slots[8] = true;
+        slots[9] = true;
+        slots[20] = true;
+
+        assertEquals(9, OffhandTotemPolicy.findSource(slots, false));
+        assertEquals(8, OffhandTotemPolicy.findSource(slots, true));
+    }
+
+    @Test
+    void hotbarOptInFallsBackToStoredSlotsWhenOnlyOffhandIsInTheHotbar() {
+        boolean[] slots = new boolean[36];
+        slots[9] = true;
+
+        assertEquals(9, OffhandTotemPolicy.findSource(slots, true));
     }
 }

@@ -13,7 +13,7 @@ public final class VelocityStrafeMath {
         }
 
         double forwardInput = (forward ? 1.0 : 0.0) - (backward ? 1.0 : 0.0);
-        double sideInput = (right ? 1.0 : 0.0) - (left ? 1.0 : 0.0);
+        double sideInput = (left ? 1.0 : 0.0) - (right ? 1.0 : 0.0);
         double inputLength = Math.hypot(forwardInput, sideInput);
         if (inputLength < 1.0E-9) {
             double currentLength = Math.hypot(currentX, currentZ);

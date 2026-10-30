@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -415,7 +414,7 @@ public final class AnchorAuraModule extends ClientModule {
         float desiredPitch = (float) (-Math.atan2(direction.y, horizontal) * 180.0 / Math.PI);
         JilatonClient.moduleManager().rotationManager().request(id(), RotationPriorities.ANCHOR_AURA,
                 desiredYaw, desiredPitch, (float) turnSpeed.value());
-        return Math.abs(Mth.wrapDegrees(desiredYaw - player.getYRot())) < 0.6F
+        return AnchorAuraScoring.yawError(player.getYRot(), desiredYaw) < 0.6F
                 && Math.abs(desiredPitch - player.getXRot()) < 0.6F;
     }
 

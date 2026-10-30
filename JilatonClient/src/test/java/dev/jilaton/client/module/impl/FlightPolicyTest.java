@@ -37,4 +37,17 @@ class FlightPolicyTest {
     void openAirHeartbeatIsSuppressedWhenABlockIsBelow() {
         assertEquals(false, FlightPolicy.shouldSendOpenAirHeartbeat(80, true));
     }
+
+    @Test
+    void restoreReturnsTheReplacedFlyingSpeedOnlyWhileTheAppliedValueIsStillThere() {
+        assertEquals(0.05F, FlightPolicy.restoredFlyingSpeed(1.0F, 1.0F, 0.05F));
+        assertEquals(0.2F, FlightPolicy.restoredFlyingSpeed(0.2F, 1.0F, 0.05F));
+    }
+
+    @Test
+    void restoreNeverResurrectsAbilityFlagsTheGameAlreadyCleared() {
+        assertEquals(true, FlightPolicy.restoredFlag(true, true));
+        assertEquals(false, FlightPolicy.restoredFlag(true, false));
+        assertEquals(false, FlightPolicy.restoredFlag(false, true));
+    }
 }

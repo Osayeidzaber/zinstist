@@ -10,5 +10,6 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 public interface OverlayPipelineAccess {
     @Accessor("LINES_SNIPPET") static RenderPipeline.Snippet linesSnippet() { throw new AssertionError(); }
     @Accessor("DEBUG_FILLED_SNIPPET") static RenderPipeline.Snippet filledSnippet() { throw new AssertionError(); }
+    @Accessor("MATRICES_PROJECTION_SNIPPET") static RenderPipeline.Snippet matricesProjectionSnippet() { throw new AssertionError(); }
     @Invoker("register") static RenderPipeline registerPipeline(RenderPipeline pipeline) { throw new AssertionError(); }
 }

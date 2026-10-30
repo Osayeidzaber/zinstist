@@ -26,4 +26,15 @@ class VelocityReversalPolicyTest {
         assertEquals(0.0, motion.x(), 1.0E-9);
         assertEquals(-3.0, motion.z(), 1.0E-9);
     }
+
+    @Test
+    void reversalRunsAfterTheReductionAndPreservesVerticalMotion() {
+        double reduced = VelocityPolicy.applyAxis(4.0, 0.0, 50.0, 0.0);
+
+        VelocityReversalPolicy.Motion motion = VelocityReversalPolicy.apply(reduced, 0.4, -1.0, 1.0, 1.0);
+
+        assertEquals(-2.0, motion.x(), 1.0E-9);
+        assertEquals(0.4, motion.y(), 1.0E-9);
+        assertEquals(1.0, motion.z(), 1.0E-9);
+    }
 }

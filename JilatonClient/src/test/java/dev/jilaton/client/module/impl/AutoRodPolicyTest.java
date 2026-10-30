@@ -16,6 +16,15 @@ class AutoRodPolicyTest {
     }
 
     @Test
+    void targetRangeBoundariesAreInclusiveAndNonFiniteAimIsRejected() {
+        assertTrue(AutoRodPolicy.targetEligible(12.25, 3.5, 5.0, 12.0F, 4.0F, true, 5.0F, 5.0F));
+        assertTrue(AutoRodPolicy.targetEligible(25.0, 3.5, 5.0, 12.0F, 4.0F, true, 5.0F, 5.0F));
+        assertFalse(AutoRodPolicy.targetEligible(12.2499, 3.5, 5.0, 12.0F, 4.0F, true, 2.0F, 5.0F));
+        assertFalse(AutoRodPolicy.targetEligible(25.0001, 3.5, 5.0, 12.0F, 4.0F, true, 2.0F, 5.0F));
+        assertFalse(AutoRodPolicy.targetEligible(16.0, 3.5, 5.0, 12.0F, 4.0F, true, Float.NaN, 5.0F));
+    }
+
+    @Test
     void initiationHonorsHealthCrowdRodAndInputRequirements() {
         assertTrue(AutoRodPolicy.mayStart(16.0F, 10.0F, 1, 1, true, true, true, false, true));
         assertTrue(AutoRodPolicy.mayStart(16.0F, 10.0F, 8, 0, true, false, false, false, true));

@@ -8,9 +8,7 @@ import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec2;
 
 public final class StrafeModule extends ClientModule {
     private final NumberSetting strengthInAir;
@@ -39,15 +37,9 @@ public final class StrafeModule extends ClientModule {
 
     @Override
     protected void onMovementInput(MovementInputEvent event) {
-        Input input = event.input();
-        Vec2 override = event.moveVectorOverride();
-        if (override != null) {
-            sideways = override.x;
-            forward = override.y;
-        } else {
-            forward = (input.forward() ? 1.0 : 0.0) - (input.backward() ? 1.0 : 0.0);
-            sideways = (input.left() ? 1.0 : 0.0) - (input.right() ? 1.0 : 0.0);
-        }
+        StrafePolicy.Sampling sampling = StrafePolicy.sample(event.input(), event.moveVectorOverride());
+        forward = sampling.forward();
+        sideways = sampling.sideways();
     }
 
     @Override
@@ -57,12 +49,13 @@ public final class StrafeModule extends ClientModule {
         }
         Minecraft client = Minecraft.getInstance();
         Player player = client.player;
-        if (player == null || client.level == null || player.isPassenger() || player.isFallFlying()
-                || player.getAbilities().flying || player.isSpectator() || player.isInWater() || player.isInLava()) {
+        if (player == null || !StrafePolicy.shouldApply(client.level != null, player.isPassenger(),
+                player.isFallFlying(), player.getAbilities().flying, player.isSpectator(),
+                player.isInWater(), player.isInLava())) {
             return;
         }
 
-        double strength = player.onGround() ? strengthOnGround.value() : strengthInAir.value();
+        double strength = StrafePolicy.strength(player.onGround(), strengthOnGround.value(), strengthInAir.value());
         event.setMovement(StrafeMath.apply(event.movement(), player.getYRot(), forward, sideways,
                 strength, strictMovement.value()));
     }

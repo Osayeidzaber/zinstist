@@ -18,7 +18,7 @@
     "Detailed reference-to-target behavior mappings remain in the markdown inventories"
   ],
   "counts": {
-    "registered": 52,
+    "registered": 66,
     "reference_sources": 373,
     "verified": 0
   },
@@ -1725,6 +1725,219 @@
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
+      "id": "custom_crosshair",
+      "name": "CustomCrosshair",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/CustomCrosshairModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/CustomCrosshairModule.java",
+      "source_sha256": "2e6af5dcf17b146d6256cb7fce3b7668d1be265e114b5d1c54f324b26a0b8cb6",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "shape",
+          "label": "Shape",
+          "declaration": "\"shape\", \"Shape\", List.of(\"Cross\", \"Circle\", \"Dot\"), \"Cross\"",
+          "modes": [
+            "Cross",
+            "Circle",
+            "Dot",
+            "Cross"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "size",
+          "label": "Arm length / radius",
+          "declaration": "\"size\", \"Arm length / radius\", 1, 20, 1, 5",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "thickness",
+          "label": "Thickness",
+          "declaration": "\"thickness\", \"Thickness\", 1, 5, 1, 1",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "gap",
+          "label": "Gap",
+          "declaration": "\"gap\", \"Gap\", 0, 10, 1, 2",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "dynamic",
+          "label": "Cooldown expansion",
+          "declaration": "\"dynamic\", \"Cooldown expansion\", 0, 10, 0.5, 3",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "outline",
+          "label": "Dark outline",
+          "declaration": "\"outline\", \"Dark outline\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "dot",
+          "label": "Center dot",
+          "declaration": "\"dot\", \"Center dot\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "third_person",
+          "label": "Show in third person",
+          "declaration": "\"third_person\", \"Show in third person\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "cooldown_bar",
+          "label": "Attack cooldown bar",
+          "declaration": "\"cooldown_bar\", \"Attack cooldown bar\", true",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "color",
+          "label": "Color",
+          "declaration": "\"color\", \"Color\", List.of(\"Theme\", \"White\", \"Green\"), \"Theme\"",
+          "modes": [
+            "Theme",
+            "White",
+            "Green",
+            "Theme"
+          ]
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Rotating two-color gradients and fractional thickness are not ported; native rendering needs live checks",
+      "source_ports": [
+        "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/crosshair/ModuleCrosshair.kt"
+      ]
+    },
+    {
+      "id": "custom_fov",
+      "name": "CustomFOV",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/CustomFovModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/CustomFovModule.java",
+      "source_sha256": "0557da70e1491430c6add32352476248ddf8c7182d32b5e025527d53b471dae1",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Number",
+          "id": "fov",
+          "label": "Field of view",
+          "declaration": "\"fov\", \"Field of view\", 30, 160, 1, 110",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/CustomFovModuleTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Native wide/narrow camera, hand projection, fire/water/wall overlays, terrain edges and Zoom interaction need live checks; vanilla options are not mutated",
+      "source_ports": [
+        "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/CustomFovModule.java"
+      ]
+    },
+    {
+      "id": "damage_particles",
+      "name": "DamageParticles",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/DamageParticlesModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/DamageParticlesModule.java",
+      "source_sha256": "9c6b68eff3f9f394c33bb555ff2f4f2645835e2cc4d6de6a40ef25e967ffb0f8",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Number",
+          "id": "lifetime",
+          "label": "Lifetime (seconds)",
+          "declaration": "\"lifetime\", \"Lifetime (seconds)\", 0.5, 5, 0.5, 2",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "scale",
+          "label": "Text scale",
+          "declaration": "\"scale\", \"Text scale\", 0.5, 3, 0.25, 1",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "rise",
+          "label": "Rise distance",
+          "declaration": "\"rise\", \"Rise distance\", 0, 3, 0.25, 1.5",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "range",
+          "label": "Track range",
+          "declaration": "\"range\", \"Track range\", 8, 128, 8, 64",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "players_only",
+          "label": "Players only",
+          "declaration": "\"players_only\", \"Players only\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "healing",
+          "label": "Show healing",
+          "declaration": "\"healing\", \"Show healing\", true",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/HealthChangeTracker.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "OnUpdate tracking, four-color palette, arbitrary displacement vector and selectable easing remain unported; no local-player damage attribution",
+      "source_ports": [
+        "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleDamageParticles.kt"
+      ]
+    },
+    {
       "id": "elytra_target",
       "name": "ElytraTarget",
       "category": "COMBAT",
@@ -1957,6 +2170,168 @@
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
+      "id": "freecam",
+      "name": "Freecam",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/FreecamModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/FreecamModule.java",
+      "source_sha256": "46a73f33270813fa6e1b13354de19173279a541160ed6ab36d41567421b0f73e",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Number",
+          "id": "speed",
+          "label": "Speed",
+          "declaration": "\"speed\", \"Speed\", 0.1, 50, 0.1, 1",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "vertical_speed",
+          "label": "Vertical speed",
+          "declaration": "\"vertical_speed\", \"Vertical speed\", 0.2, 5, 0.05, 1",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "smooth",
+          "label": "Smooth camera",
+          "declaration": "\"smooth\", \"Smooth camera\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "body",
+          "label": "Show own body",
+          "declaration": "\"body\", \"Show own body\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "hands",
+          "label": "Show hands",
+          "declaration": "\"hands\", \"Show hands\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "body_keys",
+          "label": "Keys also move body",
+          "declaration": "\"body_keys\", \"Keys also move body\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "keep_walking",
+          "label": "Keep prior walking",
+          "declaration": "\"keep_walking\", \"Keep prior walking\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "scroll_speed",
+          "label": "Scroll adjusts speed",
+          "declaration": "\"scroll_speed\", \"Scroll adjusts speed\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "reset_scroll_speed",
+          "label": "Reset scroll speed on disable",
+          "declaration": "\"reset_scroll_speed\", \"Reset scroll speed on disable\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "chunks",
+          "label": "Client chunk distance",
+          "declaration": "\"chunks\", \"Client chunk distance\", 2, 32, 1, 12",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/JilatonClient.java",
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/module/MovementInputEvent.java",
+        "src/main/java/dev/jilaton/client/render/FreecamMotion.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/mixin/FreecamMixinTargetsTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/FreecamConfigTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source AutoWalk coupling remains unavailable because AutoWalk is not ported. Source VisGraph compiled-cache mutation is deliberately omitted in favor of reversible smartCull control; inside-block visibility needs live checks. Live body keys handle new jump/sprint input after the source learning window. Gameplay, cache restoration, body visibility, hands, camera bounds and module combinations remain unverified",
+      "source_ports": [
+        "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/misc/FreecamModule.java"
+      ]
+    },
+    {
+      "id": "free_look",
+      "name": "FreeLook",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/FreeLookModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/FreeLookModule.java",
+      "source_sha256": "e6e90133fab89463c17ccca7dfdec3025780073875ca48d2087d15103c074572",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "perspective",
+          "label": "Perspective",
+          "declaration": "\"perspective\", \"Perspective\", List.of(\"Back\", \"Front\"), \"Back\"",
+          "modes": [
+            "Back",
+            "Front",
+            "Back"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "sensitivity",
+          "label": "Camera sensitivity",
+          "declaration": "\"sensitivity\", \"Camera sensitivity\", 0.1, 2, 0.1, 1",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "limit_pitch",
+          "label": "Limit pitch",
+          "declaration": "\"limit_pitch\", \"Limit pitch\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "hold",
+          "label": "Hold key",
+          "declaration": "\"hold\", \"Hold key\", true",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/FreeLookRotation.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Camera restoration, F5, focus loss and mounted/front-view behavior require live checks",
+      "source_ports": [
+        "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleFreeLook.kt"
+      ]
+    },
+    {
       "id": "friends",
       "name": "Friends",
       "category": "COMBAT",
@@ -2085,15 +2460,155 @@
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
+      "id": "hit_particles",
+      "name": "HitParticles",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/HitParticlesModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/HitParticlesModule.java",
+      "source_sha256": "1c284d0a20ecf8129b70eaa6a1abcec051382c8b1164c759adef1e2c1662ead0",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "type",
+          "label": "Particle",
+          "declaration": "\"type\", \"Particle\", List.of(\"Crit\", \"Magic Crit\", \"Spark\", \"Flame\", \"Soul Flame\", \"End Rod\", \"Totem\", \"Heart\", \"Dust\"), \"Crit\"",
+          "modes": [
+            "Crit",
+            "Magic Crit",
+            "Spark",
+            "Flame",
+            "Soul Flame",
+            "End Rod",
+            "Totem",
+            "Heart",
+            "Dust",
+            "Crit"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "amount",
+          "label": "Particles per attack",
+          "declaration": "\"amount\", \"Particles per attack\", 1, 40, 1, 10",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "spread",
+          "label": "Spread",
+          "declaration": "\"spread\", \"Spread\", 0.25, 3, 0.25, 1",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "origin",
+          "label": "Origin",
+          "declaration": "\"origin\", \"Origin\", List.of(\"Impact\", \"Body\"), \"Impact\"",
+          "modes": [
+            "Impact",
+            "Body",
+            "Impact"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "only_crits",
+          "label": "Only critical attacks",
+          "declaration": "\"only_crits\", \"Only critical attacks\", false",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "targets",
+          "label": "Targets",
+          "declaration": "\"targets\", \"Targets\", List.of(\"Living\", \"Players\", \"All\"), \"Living\"",
+          "modes": [
+            "Living",
+            "Players",
+            "All",
+            "Living"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "dust_color_mode",
+          "label": "Dust color mode",
+          "declaration": "\"dust_color_mode\", \"Dust color mode\", List.of(\"Theme\", \"Custom\"), \"Theme\"",
+          "modes": [
+            "Theme",
+            "Custom",
+            "Theme"
+          ]
+        },
+        {
+          "type": "Text",
+          "id": "dust_color",
+          "label": "Dust RGB hex",
+          "declaration": "\"dust_color\", \"Dust RGB hex\", 7, \"F2F2F2\", value -> {\n        String normalized = value.startsWith(\"#\") ? value.substring(1) : value;\n        if (!normalized.matches(\"[0-9A-Fa-f]{6}\")) throw new IllegalArgumentException(\"Use six RGB hex digits\");\n        return normalized.toUpperCase(Locale.ROOT);\n    }",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "dust_size",
+          "label": "Dust size",
+          "declaration": "\"dust_size\", \"Dust size\", 0.5, 2, 0.1, 1",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/JilatonClient.java",
+        "src/main/java/dev/jilaton/client/gui/ClientTheme.java",
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/ParticleBurstMath.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/render/ParticleBurstMathTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "ThemeTint recoloring replaced by Jilaton theme/custom colors; effects are attack attempts, not confirmed hits; all particle types need live checks",
+      "source_ports": [
+        "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/HitParticlesModule.java"
+      ]
+    },
+    {
       "id": "hud",
       "name": "HUD",
       "category": "CLIENT",
       "state": "IMPLEMENTED",
       "source_path": "src/main/java/dev/jilaton/client/module/impl/HudModule.java",
       "target_path": "src/main/java/dev/jilaton/client/module/impl/HudModule.java",
-      "source_sha256": "6570aef6aa8c76254d6ab873709a81d5f35c414c759c14d6aca8e1671f098510",
+      "source_sha256": "427f68f260f0c652703ead4d212c120ebcf5cd99e270376008e7c791f2158548",
       "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
       "settings": [
+        {
+          "type": "Choice",
+          "id": "target_placement",
+          "label": "Target card position",
+          "declaration": "\"target_placement\", \"Target card position\", List.of(\"HUD\", \"Follow target\"), \"HUD\"",
+          "modes": [
+            "HUD",
+            "Follow target",
+            "HUD"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "target_style",
+          "label": "Target card style",
+          "declaration": "\"target_style\", \"Target card style\", List.of(\"Detailed\", \"Compact\"), \"Detailed\"",
+          "modes": [
+            "Detailed",
+            "Compact",
+            "Detailed"
+          ]
+        },
         {
           "type": "Boolean",
           "id": "watermark",
@@ -2168,7 +2683,8 @@
       "dependencies": [
         "src/main/java/dev/jilaton/client/module/ClientModule.java",
         "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
-        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java"
+        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java",
+        "src/main/java/dev/jilaton/client/setting/ChoiceSetting.java"
       ],
       "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
       "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
@@ -2176,7 +2692,8 @@
       "tests": [
         "src/test/java/dev/jilaton/client/config/ClientConfigTest.java",
         "src/test/java/dev/jilaton/client/module/ModuleNotificationsTest.java",
-        "src/test/java/dev/jilaton/client/notification/NotificationCenterTest.java"
+        "src/test/java/dev/jilaton/client/notification/NotificationCenterTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
@@ -2227,6 +2744,244 @@
         "src/test/java/dev/jilaton/client/config/ClientConfigTest.java",
         "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
       ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
+      "id": "item_esp",
+      "name": "ItemESP",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/ItemEspModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/ItemEspModule.java",
+      "source_sha256": "b3004627054ea1201653626d5c1064148740155e55c6c00a515397ebf43c6ac5",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "mode",
+          "label": "Mode",
+          "declaration": "\"mode\", \"Mode\", List.of(\"Box\", \"Glow\", \"Both\"), \"Box\"",
+          "modes": [
+            "Box",
+            "Glow",
+            "Both",
+            "Box"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "filter",
+          "label": "Item filter",
+          "declaration": "\"filter\", \"Item filter\", List.of(\"Blacklist\", \"Whitelist\"), \"Blacklist\"",
+          "modes": [
+            "Blacklist",
+            "Whitelist",
+            "Blacklist"
+          ]
+        },
+        {
+          "type": "Text",
+          "id": "item_ids",
+          "label": "Item IDs",
+          "declaration": "\"item_ids\", \"Item IDs\", 4096, \"\", ItemIdFilter::normalize",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "regular_arrows",
+          "label": "Regular arrows",
+          "declaration": "\"regular_arrows\", \"Regular arrows\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "tipped_arrows",
+          "label": "Tipped arrows",
+          "declaration": "\"tipped_arrows\", \"Tipped arrows\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "spectral_arrows",
+          "label": "Spectral arrows",
+          "declaration": "\"spectral_arrows\", \"Spectral arrows\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "tridents",
+          "label": "Thrown tridents",
+          "declaration": "\"tridents\", \"Thrown tridents\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "tracers",
+          "label": "Item tracers",
+          "declaration": "\"tracers\", \"Item tracers\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "through_walls",
+          "label": "Through walls",
+          "declaration": "\"through_walls\", \"Through walls\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "range",
+          "label": "Maximum distance",
+          "declaration": "\"range\", \"Maximum distance\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "limit",
+          "label": "Entity limit",
+          "declaration": "\"limit\", \"Entity limit\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "line_width",
+          "label": "Line width",
+          "declaration": "\"line_width\", \"Line width\", 1, 8, 0.5, 1.5",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "fill_opacity",
+          "label": "Box fill opacity",
+          "declaration": "\"fill_opacity\", \"Box fill opacity\", 0, 0.8, 0.05, 0.2",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "colors",
+          "label": "Color mode",
+          "declaration": "\"colors\", \"Color mode\", List.of(\"Gold\", \"Theme\", \"Rainbow\"), \"Gold\"",
+          "modes": [
+            "Gold",
+            "Theme",
+            "Rainbow",
+            "Gold"
+          ]
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/ItemIdFilter.java",
+        "src/main/java/dev/jilaton/client/render/OverlayColors.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/config/OverlayConfigurationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
+      "id": "jump_circles",
+      "name": "JumpCircles",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/JumpCirclesModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/JumpCirclesModule.java",
+      "source_sha256": "345f48ad47925291127735e94cbeb84450d5ee773c0b5f0f1fbac8ec12fb0e34",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "trigger",
+          "label": "Trigger",
+          "declaration": "\"trigger\", \"Trigger\", List.of(\"Land\", \"Jump\", \"Both\"), \"Both\"",
+          "modes": [
+            "Land",
+            "Jump",
+            "Both",
+            "Both"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "targets",
+          "label": "Players",
+          "declaration": "\"targets\", \"Players\", List.of(\"Self\", \"Others\", \"Everyone\"), \"Self\"",
+          "modes": [
+            "Self",
+            "Others",
+            "Everyone",
+            "Self"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "style",
+          "label": "Style",
+          "declaration": "\"style\", \"Style\", List.of(\"Ring\", \"Double\", \"Ripple\"), \"Ripple\"",
+          "modes": [
+            "Ring",
+            "Double",
+            "Ripple",
+            "Ripple"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "lifetime",
+          "label": "Lifetime (seconds)",
+          "declaration": "\"lifetime\", \"Lifetime (seconds)\", 0.3, 3, 0.1, 1.1",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "radius",
+          "label": "Radius",
+          "declaration": "\"radius\", \"Radius\", 0.4, 4, 0.1, 1.4",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "width",
+          "label": "Line width",
+          "declaration": "\"width\", \"Line width\", 1, 5, 0.5, 2",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "fill",
+          "label": "Feathered fill",
+          "declaration": "\"fill\", \"Feathered fill\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "limit",
+          "label": "Max circles",
+          "declaration": "\"limit\", \"Max circles\", 4, 64, 1, 24",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/gui/Motion.java",
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/EffectBatch.java",
+        "src/main/java/dev/jilaton/client/render/EffectPalette.java",
+        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java",
+        "src/main/java/dev/jilaton/client/setting/ChoiceSetting.java",
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java",
+        "src/main/java/dev/jilaton/client/setting/TextSetting.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
@@ -2312,7 +3067,7 @@
       "state": "IMPLEMENTED",
       "source_path": "src/main/java/dev/jilaton/client/module/impl/KillAuraModule.java",
       "target_path": "src/main/java/dev/jilaton/client/module/impl/KillAuraModule.java",
-      "source_sha256": "47e6459f50b11f549cc80828f0965752cc49da499b6a78e587733d3112a5547d",
+      "source_sha256": "ceaf22a870aa9f397daf9525cde706fe41fc599b4b12b0efb428cf074d198f44",
       "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
       "settings": [
         {
@@ -2423,8 +3178,45 @@
         {
           "type": "Boolean",
           "id": "show_target_indicator",
-          "label": "Show target ring",
-          "declaration": "\"show_target_indicator\", \"Show target ring\", true",
+          "label": "Target highlight",
+          "declaration": "\"show_target_indicator\", \"Target highlight\", true",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "highlight_style",
+          "label": "Highlight style",
+          "declaration": "\"highlight_style\", \"Highlight style\", List.of(\"Halo\", \"Corners\", \"Halo + corners\"), \"Halo\"",
+          "modes": [
+            "Halo",
+            "Corners",
+            "Halo + corners",
+            "Halo"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "highlight_color",
+          "label": "Highlight color",
+          "declaration": "\"highlight_color\", \"Highlight color\", List.of(\"Monochrome\", \"Theme\"), \"Monochrome\"",
+          "modes": [
+            "Monochrome",
+            "Theme",
+            "Monochrome"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "highlight_opacity",
+          "label": "Highlight opacity",
+          "declaration": "\"highlight_opacity\", \"Highlight opacity\", 0.1, 1, 0.05, 0.85",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "highlight_width",
+          "label": "Highlight line width",
+          "declaration": "\"highlight_width\", \"Highlight line width\", 1, 4, 0.5, 1.5",
           "modes": []
         }
       ],
@@ -2442,6 +3234,7 @@
       "supported_minecraft": "1.21.11",
       "tests": [
         "src/test/java/dev/jilaton/client/config/ClientConfigTest.java",
+        "src/test/java/dev/jilaton/client/config/OverlayConfigurationTest.java",
         "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
@@ -2496,6 +3289,168 @@
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
+      "id": "nametags",
+      "name": "NameTags",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/NametagsModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/NametagsModule.java",
+      "source_sha256": "2a388b39a2cccf5dbf98269a6e66a13117b68e3b13ed583aa9b497fd79f1bfef",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "presentation",
+          "label": "Presentation",
+          "declaration": "\"presentation\", \"Presentation\", List.of(\"Equipment\", \"Compact\"), \"Equipment\"",
+          "modes": [
+            "Equipment",
+            "Compact",
+            "Equipment"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "self",
+          "label": "Compact self label in third person",
+          "declaration": "\"self\", \"Compact self label in third person\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "compact_background",
+          "label": "Compact background",
+          "declaration": "\"compact_background\", \"Compact background\", false",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "health_units",
+          "label": "Compact health units",
+          "declaration": "\"health_units\", \"Compact health units\", List.of(\"Hearts\", \"HP\"), \"Hearts\"",
+          "modes": [
+            "Hearts",
+            "HP",
+            "Hearts"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "ping",
+          "label": "Ping",
+          "declaration": "\"ping\", \"Ping\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "held_items",
+          "label": "Held items",
+          "declaration": "\"held_items\", \"Held items\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "seen_items",
+          "label": "Previously seen items",
+          "declaration": "\"seen_items\", \"Previously seen items\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "armor",
+          "label": "Armor",
+          "declaration": "\"armor\", \"Armor\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "durability",
+          "label": "Item durability",
+          "declaration": "\"durability\", \"Item durability\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "health",
+          "label": "Health and absorption",
+          "declaration": "\"health\", \"Health and absorption\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "hide_vanilla",
+          "label": "Replace vanilla names",
+          "declaration": "\"hide_vanilla\", \"Replace vanilla names\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "items",
+          "label": "Dropped items",
+          "declaration": "\"items\", \"Dropped items\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "invisible",
+          "label": "Invisible players",
+          "declaration": "\"invisible\", \"Invisible players\", false",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "range",
+          "label": "Range",
+          "declaration": "\"range\", \"Range\", 8, 512, 1, 128",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "max_tags",
+          "label": "Tag limit",
+          "declaration": "\"max_tags\", \"Tag limit\", 1, 64, 1, 64",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "scale",
+          "label": "Scale",
+          "declaration": "\"scale\", \"Scale\", 0.5, 2, 0.1, 1",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "min_scale",
+          "label": "Minimum distance scale",
+          "declaration": "\"min_scale\", \"Minimum distance scale\", 0.3, 1, 0.05, 0.55",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "background",
+          "label": "Panel opacity",
+          "declaration": "\"background\", \"Panel opacity\", 0, 1, 0.05, 0.65",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/RecentItems.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source NameProtect/NameFilter alias integration is absent because that subsystem is not ported. Native panel appearance, equipment icons, world projection, occlusion, selected-name suppression and reconnect behavior require live checks",
+      "source_ports": [
+        "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/NametagsModule.java"
+      ]
     },
     {
       "id": "no_bob",
@@ -2736,6 +3691,140 @@
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
+      "id": "player_esp",
+      "name": "PlayerESP",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/PlayerEspModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/PlayerEspModule.java",
+      "source_sha256": "fae20ecb023993b620ab6ef1e810d598eb91d2036a8605bb96a91d69395950da",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "mode",
+          "label": "Mode",
+          "declaration": "\"mode\", \"Mode\", List.of(\"Box\", \"Glow\", \"Both\"), \"Box\"",
+          "modes": [
+            "Box",
+            "Glow",
+            "Both",
+            "Box"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "outline",
+          "label": "Box outline",
+          "declaration": "\"outline\", \"Box outline\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "fill_opacity",
+          "label": "Box fill opacity",
+          "declaration": "\"fill_opacity\", \"Box fill opacity\", 0, 0.8, 0.05, 0.2",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "expand",
+          "label": "Box expansion",
+          "declaration": "\"expand\", \"Box expansion\", 0, 0.5, 0.01, 0.05",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "players",
+          "label": "Players",
+          "declaration": "\"players\", \"Players\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "hostiles",
+          "label": "Hostile mobs",
+          "declaration": "\"hostiles\", \"Hostile mobs\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "passive",
+          "label": "Other living entities",
+          "declaration": "\"passive\", \"Other living entities\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "friends",
+          "label": "Include friends",
+          "declaration": "\"friends\", \"Include friends\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "invisible",
+          "label": "Invisible entities",
+          "declaration": "\"invisible\", \"Invisible entities\", false",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "range",
+          "label": "Maximum distance",
+          "declaration": "\"range\", \"Maximum distance\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "limit",
+          "label": "Entity limit",
+          "declaration": "\"limit\", \"Entity limit\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "colors",
+          "label": "Color mode",
+          "declaration": "\"colors\", \"Color mode\", List.of(\"Theme\", \"Health\", \"Distance\", \"Rainbow\"), \"Theme\"",
+          "modes": [
+            "Theme",
+            "Health",
+            "Distance",
+            "Rainbow",
+            "Theme"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "through_walls",
+          "label": "Through walls",
+          "declaration": "\"through_walls\", \"Through walls\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "line_width",
+          "label": "Line width",
+          "declaration": "\"line_width\", \"Line width\", 1, 8, 0.5, 1.5",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/LivingOverlayOptions.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/config/OverlayConfigurationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
       "id": "reach",
       "name": "Reach",
       "category": "PLAYER",
@@ -2872,7 +3961,8 @@
       "supported_minecraft": "1.21.11",
       "tests": [
         "src/test/java/dev/jilaton/client/config/ClientConfigTest.java",
-        "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
+        "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java",
+        "src/test/java/dev/jilaton/client/module/impl/FreecamConfigTest.java"
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
@@ -3073,6 +4163,109 @@
         "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "EquipOffset, blocking framework, AirWalker and swing-duration settings remain unported; source ItemScale is a Z offset, exposed as Z plus independent scale in Jilaton",
+      "source_ports": [
+        "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/animations/ModuleAnimations.kt"
+      ]
+    },
+    {
+      "id": "target_esp",
+      "name": "TargetESP",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/TargetEspModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/TargetEspModule.java",
+      "source_sha256": "9e66ab965007d12c109abfdac16bdf08ec6ac906fe4362a65e9d1115bd83e476",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "style",
+          "label": "Style",
+          "declaration": "\"style\", \"Style\",\n            List.of(TargetEspGeometry.HALO, TargetEspGeometry.ORBIT, TargetEspGeometry.HELIX, TargetEspGeometry.BRACKETS),\n            TargetEspGeometry.HALO",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "source",
+          "label": "Target source",
+          "declaration": "\"source\", \"Target source\",\n            List.of(\"Combat\", \"Last hit\", \"Crosshair\"), \"Combat\"",
+          "modes": [
+            "Combat",
+            "Last hit",
+            "Crosshair",
+            "Combat"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "hit_flash",
+          "label": "Hit flash",
+          "declaration": "\"hit_flash\", \"Hit flash\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "scale",
+          "label": "Scale",
+          "declaration": "\"scale\", \"Scale\", 0.6, 1.8, 0.1, 1.0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "speed",
+          "label": "Speed",
+          "declaration": "\"speed\", \"Speed\", 0.2, 2.5, 0.1, 1.0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "opacity",
+          "label": "Opacity",
+          "declaration": "\"opacity\", \"Opacity\", 0.2, 1.0, 0.05, 0.85",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "memory",
+          "label": "Memory (seconds)",
+          "declaration": "\"memory\", \"Memory (seconds)\", 0.5, 15, 0.5, 4",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "players_only",
+          "label": "Players only",
+          "declaration": "\"players_only\", \"Players only\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "through_walls",
+          "label": "Through walls",
+          "declaration": "\"through_walls\", \"Through walls\", true",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/JilatonClient.java",
+        "src/main/java/dev/jilaton/client/gui/Motion.java",
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/CombatTargetTracker.java",
+        "src/main/java/dev/jilaton/client/render/EffectBatch.java",
+        "src/main/java/dev/jilaton/client/render/EffectPalette.java",
+        "src/main/java/dev/jilaton/client/render/TargetEspGeometry.java",
+        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java",
+        "src/main/java/dev/jilaton/client/setting/ChoiceSetting.java",
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java",
+        "src/main/java/dev/jilaton/client/setting/TextSetting.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
@@ -3238,6 +4431,211 @@
         "src/test/java/dev/jilaton/client/config/ClientConfigTest.java",
         "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
       ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
+      "id": "tracers",
+      "name": "Tracers",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/TracersModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/TracersModule.java",
+      "source_sha256": "2d33ad8ef3799eddd95267e9bd520c4dbb23d810c6798d90079bb12c9d49e9de",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "point",
+          "label": "Line endpoint",
+          "declaration": "\"point\", \"Line endpoint\", List.of(\"Feet\", \"Center\", \"Head\"), \"Feet\"",
+          "modes": [
+            "Feet",
+            "Center",
+            "Head",
+            "Feet"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "stem",
+          "label": "Vertical body line",
+          "declaration": "\"stem\", \"Vertical body line\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "players",
+          "label": "Players",
+          "declaration": "\"players\", \"Players\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "hostiles",
+          "label": "Hostile mobs",
+          "declaration": "\"hostiles\", \"Hostile mobs\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "passive",
+          "label": "Other living entities",
+          "declaration": "\"passive\", \"Other living entities\", false",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "friends",
+          "label": "Include friends",
+          "declaration": "\"friends\", \"Include friends\", true",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "invisible",
+          "label": "Invisible entities",
+          "declaration": "\"invisible\", \"Invisible entities\", false",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "range",
+          "label": "Maximum distance",
+          "declaration": "\"range\", \"Maximum distance\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "limit",
+          "label": "Entity limit",
+          "declaration": "\"limit\", \"Entity limit\", 8, 512, 8, 128",
+          "modes": []
+        },
+        {
+          "type": "Choice",
+          "id": "colors",
+          "label": "Color mode",
+          "declaration": "\"colors\", \"Color mode\", List.of(\"Theme\", \"Health\", \"Distance\", \"Rainbow\"), \"Theme\"",
+          "modes": [
+            "Theme",
+            "Health",
+            "Distance",
+            "Rainbow",
+            "Theme"
+          ]
+        },
+        {
+          "type": "Boolean",
+          "id": "through_walls",
+          "label": "Through walls",
+          "declaration": "\"through_walls\", \"Through walls\", true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "line_width",
+          "label": "Line width",
+          "declaration": "\"line_width\", \"Line width\", 1, 8, 0.5, 1.5",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/LivingOverlayOptions.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "Source-client parity and server compatibility are not established"
+    },
+    {
+      "id": "trails",
+      "name": "Trails",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/TrailsModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/TrailsModule.java",
+      "source_sha256": "507a75d536eb3081eb6cdba2345e4b60adeb7e5f7bc93a8e62e2f6a792c27ee3",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Choice",
+          "id": "targets",
+          "label": "Players",
+          "declaration": "\"targets\", \"Players\", List.of(\"Self\", \"Others\", \"Everyone\"), \"Self\"",
+          "modes": [
+            "Self",
+            "Others",
+            "Everyone",
+            "Self"
+          ]
+        },
+        {
+          "type": "Choice",
+          "id": "style",
+          "label": "Style",
+          "declaration": "\"style\", \"Style\", List.of(\"Ribbon\", \"Line\", \"Ground\"), \"Ribbon\"",
+          "modes": [
+            "Ribbon",
+            "Line",
+            "Ground",
+            "Ribbon"
+          ]
+        },
+        {
+          "type": "Number",
+          "id": "lifetime",
+          "label": "Lifetime (seconds)",
+          "declaration": "\"lifetime\", \"Lifetime (seconds)\", 0.2, 3, 0.1, 0.7",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "height",
+          "label": "Ribbon height",
+          "declaration": "\"height\", \"Ribbon height\", 0.1, 1, 0.05, 0.55",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "width",
+          "label": "Line width",
+          "declaration": "\"width\", \"Line width\", 1, 5, 0.5, 2",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "opacity",
+          "label": "Opacity",
+          "declaration": "\"opacity\", \"Opacity\", 0.1, 1, 0.05, 0.6",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "first_person",
+          "label": "Own trail in first person",
+          "declaration": "\"first_person\", \"Own trail in first person\", false",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/render/EffectBatch.java",
+        "src/main/java/dev/jilaton/client/render/EffectPalette.java",
+        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java",
+        "src/main/java/dev/jilaton/client/setting/ChoiceSetting.java",
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java",
+        "src/main/java/dev/jilaton/client/setting/TextSetting.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
@@ -3515,6 +4913,147 @@
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {
+      "id": "view_model",
+      "name": "ViewModel",
+      "category": "RENDER",
+      "state": "IMPLEMENTED",
+      "source_path": "src/main/java/dev/jilaton/client/module/impl/ViewModelModule.java",
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/ViewModelModule.java",
+      "source_sha256": "2906e52f070c6b098d5e554f573930fe21db5b357933afd5a845c2d059a01004",
+      "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
+      "settings": [
+        {
+          "type": "Boolean",
+          "id": "main_enabled",
+          "label": "Main hand transform",
+          "declaration": "true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_x",
+          "label": "Main hand X",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_y",
+          "label": "Main hand Y",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_z",
+          "label": "Main hand Z",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_rx",
+          "label": "Main hand rotation X",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_ry",
+          "label": "Main hand rotation Y",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_rz",
+          "label": "Main hand rotation Z",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "main_scale",
+          "label": "Main hand scale",
+          "declaration": "0.25, 2, 0.05, 1",
+          "modes": []
+        },
+        {
+          "type": "Boolean",
+          "id": "off_enabled",
+          "label": "Off hand transform",
+          "declaration": "true",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_x",
+          "label": "Off hand X",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_y",
+          "label": "Off hand Y",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_z",
+          "label": "Off hand Z",
+          "declaration": "-2, 2, 0.05, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_rx",
+          "label": "Off hand rotation X",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_ry",
+          "label": "Off hand rotation Y",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_rz",
+          "label": "Off hand rotation Z",
+          "declaration": "-180, 180, 5, 0",
+          "modes": []
+        },
+        {
+          "type": "Number",
+          "id": "off_scale",
+          "label": "Off hand scale",
+          "declaration": "0.25, 2, 0.05, 1",
+          "modes": []
+        }
+      ],
+      "dependencies": [
+        "src/main/java/dev/jilaton/client/module/ClientModule.java",
+        "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
+        "src/main/java/dev/jilaton/client/setting/BooleanSetting.java",
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java"
+      ],
+      "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
+      "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
+      "supported_minecraft": "1.21.11",
+      "tests": [
+        "src/test/java/dev/jilaton/client/module/impl/RenderModuleIntegrationTest.java"
+      ],
+      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "compatibility_issues": "EquipOffset, blocking framework, AirWalker and swing-duration settings remain unported; source ItemScale is a Z offset, exposed as Z plus independent scale in Jilaton",
+      "source_ports": [
+        "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/animations/ModuleAnimations.kt"
+      ]
+    },
+    {
       "id": "wtap",
       "name": "WTap",
       "category": "COMBAT",
@@ -3581,7 +5120,7 @@
       "state": "IMPLEMENTED",
       "source_path": "src/main/java/dev/jilaton/client/module/impl/ZoomModule.java",
       "target_path": "src/main/java/dev/jilaton/client/module/impl/ZoomModule.java",
-      "source_sha256": "c5ee5e153c3d78ebecedcdeea4258cfa2d61097fdc1457a48cc9a31a453b5bc3",
+      "source_sha256": "e54f68800dc9e62c4049862d315ac8a595b8e929a05a286ac9cfe11d52a34f5b",
       "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
       "settings": [
         {
@@ -3641,7 +5180,10 @@
         "src/test/java/dev/jilaton/client/module/impl/ZoomModuleTest.java"
       ],
       "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
-      "compatibility_issues": "Source-client parity and server compatibility are not established"
+      "compatibility_issues": "Native wide/narrow camera, hand projection, fire/water/wall overlays, terrain edges and Zoom interaction need live checks; vanilla options are not mutated",
+      "source_ports": [
+        "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/CustomFovModule.java"
+      ]
     }
   ],
   "references": [
@@ -4434,16 +5976,38 @@
       "name": "FreecamModule",
       "category": "MISCELLANEOUS",
       "source_category": "MISC",
-      "state": "DISCOVERED",
+      "state": "IN_PROGRESS",
       "exclusion_reason": null,
       "source_path": "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/misc/FreecamModule.java",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/FreecamModule.java",
       "source_sha256": "7f65f578465b0ceabea299c1df4a6aceeff9fd052b5d0fb2edab112490c9bf35",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "FreecamMotion",
+        "FreecamBodyInput",
+        "FreecamCameraMixin",
+        "FreecamLocalPlayerMixin",
+        "FreecamRenderMixin",
+        "FreecamBodyMixin",
+        "FreecamHandsMixin",
+        "FreecamCrosshairMixin",
+        "ZoomMouseMixin",
+        "ClientInputAccessor",
+        "ClientConfig.persistEnabled",
+        "ClientChunkCache"
+      ],
+      "modes": [
+        "Detached camera",
+        "Carried body walking",
+        "Live body keys",
+        "Temporary/persistent scroll speed",
+        "Own body/hands visibility"
+      ],
+      "settings_coverage": "Speed, vertical speed, smooth half-step, body, hands, body keys, keep walking, scroll speed/reset and client chunk distance; activation never persists",
+      "compatibility_issues": "Source AutoWalk coupling remains unavailable because AutoWalk is not ported. Source VisGraph compiled-cache mutation is deliberately omitted in favor of reversible smartCull control; inside-block visibility needs live checks. Live body keys handle new jump/sprint input after the source learning window. Gameplay, cache restoration, body visibility, hands, camera bounds and module combinations remain unverified",
+      "evidence": "Complete recovered module and Camera/Entity/LevelRenderer/GameRenderer/Gui/LocalPlayer/Mouse/VisGraph hooks reviewed. Motion/body-input/chunk/speed/config tests and mapped hook/invariant tests added",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/FreecamModule.java"
+      ]
     },
     {
       "origin": "Anubis recovered",
@@ -5170,16 +6734,27 @@
       "name": "CustomFovModule",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IMPLEMENTED",
       "exclusion_reason": null,
       "source_path": "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/CustomFovModule.java",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/CustomFovModule.java",
       "source_sha256": "5b3436f7e671fa9ab4e6c72c5bc935fdeb9ea433644ac42f19099c466af8e39e",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "ZoomFovMixin",
+        "FovScreenEffectMixin",
+        "ZoomModule",
+        "LevelRenderer.needsUpdate"
+      ],
+      "modes": [
+        "Fixed FOV, 30\u2013160 degrees"
+      ],
+      "settings_coverage": "Fixed FOV; world/hand projection, screen-effect compensation, panorama guard, terrain invalidation and Zoom composition",
+      "compatibility_issues": "Native wide/narrow camera, hand projection, fire/water/wall overlays, terrain edges and Zoom interaction need live checks; vanilla options are not mutated",
+      "evidence": "Recovered module and both supporting Mixins reviewed; mapped needsUpdate and PoseStack constructor inspected; tangent-ratio/lifecycle/profile and bytecode tests",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/CustomFovModule.java",
+        "src/main/java/dev/jilaton/client/module/impl/ZoomModule.java"
+      ]
     },
     {
       "origin": "Anubis recovered",
@@ -5330,16 +6905,39 @@
       "name": "HitParticlesModule",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IMPLEMENTED",
       "exclusion_reason": null,
       "source_path": "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/HitParticlesModule.java",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/HitParticlesModule.java",
       "source_sha256": "ec89f4a723934c9b21c877b7592b246f61facdbcfa2e82d1fff701bef41a5cf4",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "HitParticleAttackMixin",
+        "ParticleBurstMath",
+        "ClientTheme",
+        "Minecraft particle engine"
+      ],
+      "modes": [
+        "Crit",
+        "Magic Crit",
+        "Spark",
+        "Flame",
+        "Soul Flame",
+        "End Rod",
+        "Totem",
+        "Heart",
+        "Dust",
+        "Impact",
+        "Body",
+        "Living",
+        "Players",
+        "All"
+      ],
+      "settings_coverage": "Type, amount, spread, origin, critical-only filter, targets, theme/custom dust RGB and dust size",
+      "compatibility_issues": "ThemeTint recoloring replaced by Jilaton theme/custom colors; effects are attack attempts, not confirmed hits; all particle types need live checks",
+      "evidence": "Recovered Anubis source reviewed; geometry/filter/RGB-validation/profile tests and mapped attack-invocation check",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/HitParticlesModule.java"
+      ]
     },
     {
       "origin": "Anubis recovered",
@@ -5442,16 +7040,33 @@
       "name": "NametagsModule",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IN_PROGRESS",
       "exclusion_reason": null,
       "source_path": "reference/anubis-cfr-0.9.9.3/net/anubis/client/module/impl/render/NametagsModule.java",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/NametagsModule.java",
       "source_sha256": "630d44451c59c5fe7016f30fa0eb09d935b5522db6c0bed158d926a90371cdc9",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "RecentItems",
+        "NametagLayout",
+        "NametagRenderer",
+        "NametagMixin",
+        "WorldOverlayProjection",
+        "WorldProjection",
+        "GameRendererFovAccess",
+        "FriendManager"
+      ],
+      "modes": [
+        "Player equipment panels",
+        "Compact identity/health labels (Jilaton addition)",
+        "Dropped-item labels",
+        "Observed item history"
+      ],
+      "settings_coverage": "Ping, held/seen items, armor, durability, health/absorption, vanilla-name replacement, dropped items, range, cap, scale, minimum scale and opacity; Jilaton adds invisible-player switch, Equipment/Compact modes, actual skin face, HP/hearts, background switch and third-person self label",
+      "compatibility_issues": "Source NameProtect/NameFilter alias integration is absent because that subsystem is not ported. Native panel appearance, equipment icons, world projection, occlusion, selected-name suppression and reconnect behavior require live checks",
+      "evidence": "Complete recovered module reviewed; history ordering/eviction/snapshot reuse, layout, colors, distance scale and profiles tested; ASM verifies base extraction field and AvatarRenderer delegation",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/NametagsModule.java"
+      ]
     },
     {
       "origin": "Anubis recovered",
@@ -8274,16 +9889,27 @@
       "name": "ModuleAnimations",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IN_PROGRESS",
       "exclusion_reason": null,
       "source_path": "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/animations/ModuleAnimations.kt",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/SwingAnimationsModule.java",
       "source_sha256": "744b1fcfe3a98dcaf91d78690b0c6b201fb5cad3188c13b0a282ac1923e94a11",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "ViewModelMixin",
+        "FirstPersonHandsAndItemsMixin",
+        "PoseStack"
+      ],
+      "modes": [
+        "Independent main/off hand transforms",
+        "Existing Jilaton swing styles"
+      ],
+      "settings_coverage": "Per-hand enable, X/Y/Z offsets, X/Y/Z rotation and scale; shared-map blending",
+      "compatibility_issues": "EquipOffset, blocking framework, AirWalker and swing-duration settings remain unported; source ItemScale is a Z offset, exposed as Z plus independent scale in Jilaton",
+      "evidence": "Hand identity/isolation/map-blending matrix tests, profiles and mapped vanilla invocation check",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/SwingAnimationsModule.java",
+        "src/main/java/dev/jilaton/client/module/impl/ViewModelModule.java"
+      ]
     },
     {
       "origin": "LiquidBounce public source",
@@ -8306,16 +9932,26 @@
       "name": "ModuleCrosshair",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IN_PROGRESS",
       "exclusion_reason": null,
       "source_path": "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/crosshair/ModuleCrosshair.kt",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/CustomCrosshairModule.java",
       "source_sha256": "994a96cf74adbebbfdabfdc45f56f590608e84ab6530db199a66c43af55b2196",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "CustomCrosshairMixin",
+        "ClientTheme"
+      ],
+      "modes": [
+        "Cross (CS2 geometry)",
+        "Circle",
+        "Dot (Jilaton addition)"
+      ],
+      "settings_coverage": "Size, thickness, gap, cooldown expansion, outline, center dot, third-person visibility, cooldown bar and fixed/theme colors",
+      "compatibility_issues": "Rotating two-color gradients and fractional thickness are not ported; native rendering needs live checks",
+      "evidence": "CrosshairCS2, CrosshairCircle and CrosshairMode reviewed; expansion and profile tests",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/CustomCrosshairModule.java"
+      ]
     },
     {
       "origin": "LiquidBounce public source",
@@ -8594,16 +10230,26 @@
       "name": "ModuleDamageParticles",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IN_PROGRESS",
       "exclusion_reason": null,
       "source_path": "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleDamageParticles.kt",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/DamageParticlesModule.java",
       "source_sha256": "3ce69f7989b623762427969d0440d17fc1954c9fa73c2496f7b0c114c0c264a9",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "HealthChangeTracker",
+        "WorldProjection",
+        "DamageParticleRenderer",
+        "GameRendererFovAccess"
+      ],
+      "modes": [
+        "OnTick"
+      ],
+      "settings_coverage": "Lifetime, text scale, rise, range, players-only and healing display; fixed damage/heal colors",
+      "compatibility_issues": "OnUpdate tracking, four-color palette, arbitrary displacement vector and selectable easing remain unported; no local-player damage attribution",
+      "evidence": "Health baseline/delta/despawn/capacity tests, perspective-projection tests and profiles",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/DamageParticlesModule.java"
+      ]
     },
     {
       "origin": "LiquidBounce public source",
@@ -8642,16 +10288,27 @@
       "name": "ModuleFreeLook",
       "category": "RENDER",
       "source_category": "RENDER",
-      "state": "DISCOVERED",
+      "state": "IMPLEMENTED",
       "exclusion_reason": null,
       "source_path": "../analysis/liquidbounce-upstream/src/main/kotlin/net/ccbluex/liquidbounce/features/module/modules/render/ModuleFreeLook.kt",
-      "target_path": null,
+      "target_path": "src/main/java/dev/jilaton/client/module/impl/FreeLookModule.java",
       "source_sha256": "8d81f3a33057887d30ac5cbde002c0f1ba9d11690cd5555467d94e8109b596bf",
-      "dependencies": [],
-      "modes": [],
-      "settings_coverage": "Pending behavior audit",
-      "compatibility_issues": "Not imported automatically; review behavior, license and dependencies",
-      "evidence": "Existing markdown inventories retain partial coverage mappings; name discovery is not a port"
+      "dependencies": [
+        "FreeLookRotation",
+        "FreeLookCameraMixin",
+        "ZoomMouseMixin",
+        "ModuleManager hold bindings"
+      ],
+      "modes": [
+        "Front",
+        "Back"
+      ],
+      "settings_coverage": "Perspective, sensitivity multiplier, pitch limit and hold/toggle; clamped pitch is the Jilaton default",
+      "compatibility_issues": "Camera restoration, F5, focus loss and mounted/front-view behavior require live checks",
+      "evidence": "Mouse-unit/clamp/wrap/invalid-input tests, profiles and mapped camera invocation checks",
+      "target_paths": [
+        "src/main/java/dev/jilaton/client/module/impl/FreeLookModule.java"
+      ]
     },
     {
       "origin": "LiquidBounce public source",

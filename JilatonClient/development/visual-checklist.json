@@ -2,9 +2,27 @@
   "schema_version": 1,
   "components": [
     {
+      "id": "freecam",
+      "state": "IMPLEMENTED",
+      "evidence": "Detached camera position/mouse control, body-intent separation, carried/live body keys, scroll speed, body/hands/crosshair hooks, bounded client cache focus and nonpersistent activation.",
+      "verification": "Motion/config/body/chunk and bytecode checks; all live camera/visibility/restoration and combination checks remain open"
+    },
+    {
+      "id": "custom_fov",
+      "state": "IMPLEMENTED",
+      "evidence": "Fixed 30–160 camera/hand FOV, terrain invalidation, tangent-ratio screen-overlay compensation and composed Zoom/panorama handling.",
+      "verification": "Math/lifecycle/config and vanilla constructor/panorama bytecode checks; native camera and screen-effect checks remain open"
+    },
+    {
+      "id": "nametags",
+      "state": "IMPLEMENTED",
+      "evidence": "Equipment/history panels plus optional Compact face/name/health labels, HP/hearts, third-person self label, dropped items, 64-tag cap and selected vanilla-name suppression.",
+      "verification": "History/layout/profile and vanilla extraction-chain tests; all native presentation and lifecycle checks remain open"
+    },
+    {
       "id": "logo",
       "state": "IMPLEMENTED",
-      "evidence": "Original vector J mark is drawn in the native title screen; small watermark icon asset remains open.",
+      "evidence": "Original angular J shared by title screen, ClickGUI and HUD; editable SVG, reproducible 128px PNG and Fabric metadata icon supplied.",
       "verification": "See CHECKPOINT.md; implemented does not imply full runtime verification"
     },
     {
@@ -52,7 +70,7 @@
     {
       "id": "target_hud",
       "state": "IMPLEMENTED",
-      "evidence": "KillAura target card, portrait and time-based health interpolation; full targeting/combo verification remains open.",
+      "evidence": "Detailed/Compact KillAura target cards, actual skin face, weapon/health/distance, time-based health interpolation, HUD/Follow target placement, viewport bounds and side hysteresis; confirmed-hit combo remains open.",
       "verification": "See CHECKPOINT.md; implemented does not imply full runtime verification"
     },
     {
@@ -102,6 +120,36 @@
       "state": "DISCOVERED",
       "evidence": "Not implemented; must distinguish attempted attacks from confirmed hits.",
       "verification": "See CHECKPOINT.md; implemented does not imply full runtime verification"
+    },
+    {
+      "id": "free_look",
+      "state": "IMPLEMENTED",
+      "evidence": "Front/back camera orbit, mouse isolation, sensitivity/pitch controls, perspective release and profile integration.",
+      "verification": "Automated math/config/invocation checks; live camera and restoration checks remain open"
+    },
+    {
+      "id": "view_model",
+      "state": "IMPLEMENTED",
+      "evidence": "Independent main/off hand offsets, rotations, scale and enabled-hand map blending inside vanilla pose scope.",
+      "verification": "Matrix/profile/invocation tests; live held items, left-handed view and maps remain open"
+    },
+    {
+      "id": "custom_crosshair",
+      "state": "IMPLEMENTED",
+      "evidence": "Cross/Circle/Dot, cooldown expansion, outline, theme colors and cooldown bar; gradients remain unported.",
+      "verification": "Cooldown math/config tests; native appearance, spectator/F3 and third-person checks remain open"
+    },
+    {
+      "id": "damage_particles",
+      "state": "IMPLEMENTED",
+      "evidence": "Bounded OnTick health-change text, projection, rise/fade, lifetime, scale and filters; OnUpdate remains unported.",
+      "verification": "Health-history/projection/profile tests; live damage/heal text and camera alignment remain open"
+    },
+    {
+      "id": "hit_particles",
+      "state": "IMPLEMENTED",
+      "evidence": "Anubis-derived nine particle types, impact/body bursts, filters, RGB/theme and size controls.",
+      "verification": "Geometry/filter/RGB/profile/invocation tests; nine particle types and attack timing require live checks"
     },
     {
       "id": "esp_particles_blur",

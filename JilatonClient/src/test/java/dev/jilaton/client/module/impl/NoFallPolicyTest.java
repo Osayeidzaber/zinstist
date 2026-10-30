@@ -19,4 +19,11 @@ class NoFallPolicyTest {
         assertFalse(NoFallPolicy.shouldSpoof(false, true, true, 5.0, 3.0));
         assertFalse(NoFallPolicy.shouldSpoof(false, true, false, Double.NaN, 3.0));
     }
+
+    @Test
+    void zeroTriggerSpoofsImmediatelyAndNonFiniteTriggerNeverDoes() {
+        assertTrue(NoFallPolicy.shouldSpoof(false, true, false, 0.0, 0.0));
+        assertFalse(NoFallPolicy.shouldSpoof(false, true, false, -0.5, 0.0));
+        assertFalse(NoFallPolicy.shouldSpoof(false, true, false, 5.0, Double.NaN));
+    }
 }

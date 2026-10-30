@@ -127,10 +127,46 @@ public final class ModuleManager {
         register(new SwingAnimationsModule());
         register(new NoBobModule());
         register(new dev.jilaton.client.module.impl.ZoomModule());
+        register(new dev.jilaton.client.module.impl.FreecamModule());
+        register(new dev.jilaton.client.module.impl.FreeLookModule());
+        register(new dev.jilaton.client.module.impl.ViewModelModule());
+        register(new dev.jilaton.client.module.impl.CustomCrosshairModule());
+        register(new dev.jilaton.client.module.impl.DamageParticlesModule());
+        register(new dev.jilaton.client.module.impl.HitParticlesModule());
+        register(new dev.jilaton.client.module.impl.TargetEspModule());
+        register(new dev.jilaton.client.module.impl.JumpCirclesModule());
+        register(new dev.jilaton.client.module.impl.TrailsModule());
+        register(new dev.jilaton.client.module.impl.NametagsModule());
+        register(new dev.jilaton.client.module.impl.CustomFovModule());
+        register(new dev.jilaton.client.module.impl.VisualEngineModule());
+        register(new dev.jilaton.client.module.impl.HitEffectsModule());
+        register(new dev.jilaton.client.module.impl.PlayerEffectsModule());
+        register(new dev.jilaton.client.module.impl.AmbienceModule());
+        register(new dev.jilaton.client.module.impl.CustomSkyModule());
+        register(new dev.jilaton.client.module.impl.MusicCenterModule());
+        register(new dev.jilaton.client.module.impl.NowPlayingModule());
+        register(new dev.jilaton.client.module.impl.SpatialLyricsModule());
+        register(new dev.jilaton.client.module.impl.MusicVisualsModule());
+        register(new dev.jilaton.client.module.impl.ExplosiveHighlightsModule());
+        register(new dev.jilaton.client.module.impl.TotemSpiritModule());
+        register(new dev.jilaton.client.module.impl.FloatingRelicsModule());
+        register(new dev.jilaton.client.module.impl.PharaohHeaddressModule());
+        register(new dev.jilaton.client.module.impl.PearlTrajectoryModule());
+        register(new dev.jilaton.client.module.impl.BlockOutlineModule());
+        register(new dev.jilaton.client.module.impl.LowFireModule());
+        register(new dev.jilaton.client.module.impl.RadianceModule());
+        register(new dev.jilaton.client.module.impl.AfterglowModule());
+        register(new dev.jilaton.client.module.impl.WeatherModule());
         register(new dev.jilaton.client.module.impl.PlayerEspModule());
         register(new dev.jilaton.client.module.impl.ItemEspModule());
         register(new dev.jilaton.client.module.impl.TracersModule());
+        register(new dev.jilaton.client.module.impl.NickHiderModule());
         register(new HudModule());
+        register(new dev.jilaton.client.module.impl.WingsModule());
+        register(new dev.jilaton.client.module.impl.HaloModule());
+        register(new dev.jilaton.client.module.impl.CosmeticKnifeModule());
+        register(new dev.jilaton.client.module.impl.CompanionModule());
+        register(new dev.jilaton.client.render.character.CharacterModule());
     }
 
     private void register(ClientModule module) {
@@ -170,8 +206,13 @@ public final class ModuleManager {
 
     public MovementInputEvent dispatchMovementInput(Input input) {
         MovementInputEvent event = null;
+        ClientModule camera = modules.get("freecam");
+        if (camera != null && camera.enabled()) {
+            event = new MovementInputEvent(input);
+            camera.handleMovementInput(event);
+        }
         for (ClientModule module : modules.values()) {
-            if (!module.enabled()) {
+            if (!module.enabled() || module == camera) {
                 continue;
             }
             if (event == null) {
@@ -219,6 +260,11 @@ public final class ModuleManager {
         for (ClientModule module : modules.values()) {
             int keyCode = module.keyCode();
             boolean down = keyCode >= 0 && GLFW.glfwGetKey(window, keyCode) == GLFW.GLFW_PRESS;
+            if (module.id().equals("free_look") && modules.get("freecam").enabled()) {
+                module.setEnabled(false);
+                previousKeyStates.put(module.id(), down);
+                continue;
+            }
             boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
             if (module.holdKey() && keyCode >= 0) {
                 module.setEnabled(down && client.isWindowActive());

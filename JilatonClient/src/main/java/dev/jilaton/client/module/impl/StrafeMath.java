@@ -24,9 +24,12 @@ public final class StrafeMath {
         }
 
         double boundedStrength = Math.max(0.0, Math.min(1.0, strength));
-        double direction = Math.toRadians(yawDegrees) + Math.atan2(sideways, forward);
-        double targetX = -Math.sin(direction) * horizontalSpeed;
-        double targetZ = Math.cos(direction) * horizontalSpeed;
+        double yaw = Math.toRadians(yawDegrees);
+        double sin = Math.sin(yaw);
+        double cos = Math.cos(yaw);
+        double scale = horizontalSpeed / inputLength;
+        double targetX = (sideways * cos - forward * sin) * scale;
+        double targetZ = (forward * cos + sideways * sin) * scale;
         double retained = 1.0 - boundedStrength;
         return new Vec3(movement.x * retained + targetX * boundedStrength,
                 movement.y,
