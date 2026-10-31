@@ -50,6 +50,20 @@ class WorldFxBoundsTest {
     }
 
     @Test
+    void blockBudgetIsSplitAcrossEveryLiveWave() {
+        assertEquals(TerrainWave.MAX_BLOCKS_PER_FRAME, TerrainWave.blockBudget(0));
+        assertEquals(TerrainWave.MAX_BLOCKS_PER_FRAME, TerrainWave.blockBudget(1));
+        assertEquals(700, TerrainWave.blockBudget(2));
+        assertEquals(466, TerrainWave.blockBudget(3));
+        assertEquals(280, TerrainWave.blockBudget(5));
+        assertEquals(1, TerrainWave.blockBudget(10_000), "every wave always gets at least one cell");
+        for (int waves = 1; waves <= 64; waves++) {
+            assertTrue(TerrainWave.blockBudget(waves) * waves <= TerrainWave.MAX_BLOCKS_PER_FRAME,
+                    "shares must stay inside the frame cap at " + waves + " waves");
+        }
+    }
+
+    @Test
     void blockTopReusesACallerBufferAndMatchesTheAllocatingVariant() {
         double[] allocated = TerrainWave.blockTop(10.7, -3.2, 64);
         double[] buffer = new double[14];
