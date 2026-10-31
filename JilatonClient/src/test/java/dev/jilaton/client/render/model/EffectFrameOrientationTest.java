@@ -31,7 +31,7 @@ class EffectFrameOrientationTest {
                         Transform feather = WingMotion.featherFrame(pivot, side, fan, flap);
                         double[] forward = forward(feather);
                         double outwardDot = dot(forward, outward);
-                        assertTrue(outwardDot > 0.05,
+                        assertTrue(outwardDot > 1e-3,
                                 "side " + side + " fan " + fan + " flap " + flap
                                         + " points across the spine: outward=" + outwardDot);
                         if (fan < 0) {

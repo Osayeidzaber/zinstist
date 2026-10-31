@@ -120,24 +120,20 @@ public final class CompanionModule extends ClientModule implements FxEmitter {
                 EffectBatch.mixRgb(accent, 0xFFFFFF, 0.35), accent, 0.90);
 
         double s = size.value();
-        Transform base = Transform.translation(state[0], state[1], state[2])
-                .compose(Transform.lookAlong(vx, vy, vz, 0, 1, 0))
-                .rotate(0, 0, bank);
+        Transform base = CompanionMotion.bankedFrame(state[0], state[1], state[2], vx, vy, vz, bank);
         batch.reset();
         FxShapes.softDot(f, state[0], state[1], state[2], 0.10 * s, accent, 0.16 * alpha, false);
         batch.add(f, core, coreMaterial, base, s, alpha, false);
         if (CompanionMotion.hasRing(selected)) {
-            Transform tilted = base.rotate(0, 72, 0)
-                    .compose(Transform.rotation(Math.toDegrees(orbitPhase * 1.4), 0, 0));
+            Transform tilted = CompanionMotion.ringFrame(base, orbitPhase);
             batch.add(f, ring, ringMaterial, tilted, s, alpha, false);
         }
         int shards = CompanionMotion.shards(selected);
         double orbit = CompanionMotion.shardOrbit(selected) * 0.14;
         for (int i = 0; i < shards; i++) {
             double angle = orbitPhase * 1.9 + i * Math.PI * 2 / shards;
-            Transform shardFrame = base
-                    .translate(Math.cos(angle) * orbit, Math.sin(orbitPhase * 1.3 + i) * 0.02, Math.sin(angle) * orbit)
-                    .rotate(0, Math.toDegrees(angle), 0);
+            Transform shardFrame = CompanionMotion.shardFrame(base, angle, orbit,
+                    Math.sin(orbitPhase * 1.3 + i) * 0.02);
             batch.add(f, shard, shardMaterial, shardFrame, 0.38 * s, alpha, false);
         }
         if (CompanionMotion.hasTail(selected)) {

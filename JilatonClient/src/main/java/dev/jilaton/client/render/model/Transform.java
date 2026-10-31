@@ -69,6 +69,17 @@ public final class Transform {
         return compose(localRotation(yawDegrees, pitchDegrees, rollDegrees));
     }
 
+    /**
+     * Negates the frame's local X axis. Composed <em>after</em> an orientation it flips the frame's handedness
+     * while leaving the origin, forward and up axes untouched, so a placement can keep the winding and authored
+     * normals the submit path culls and lights by even when its parent attachment frame is left-handed (a
+     * Minecraft-shaped right/up/forward triple from {@link #rotation} or {@code BodyAnchor}). Geometry that is
+     * symmetric in X renders identically; the flip is only about winding and lighting.
+     */
+    public static Transform mirrorX() {
+        return fromBasis(-1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0);
+    }
+
     /** Frame whose +Z points along {@code forward} and whose +X stays level with {@code upHint}. */
     public static Transform lookAlong(double fx, double fy, double fz, double ux, double uy, double uz) {
         double fl = Math.sqrt(fx * fx + fy * fy + fz * fz);

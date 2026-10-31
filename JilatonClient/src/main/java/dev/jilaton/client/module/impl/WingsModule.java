@@ -106,16 +106,12 @@ public final class WingsModule extends ClientModule implements FxEmitter {
         for (int layer = 0; layer < layers; layer++) {
             int count = WingMotion.feathers(styleName, layer, quality);
             for (int i = 0; i < count; i++) {
-                double fan = Math.toRadians(WingMotion.fanDegrees(i, count));
-                double dirX = side * Math.cos(fan);
-                double dirY = Math.sin(fan);
-                double dirZ = -0.16;
                 double flap = WingMotion.flapAngle(phase, featherIndex++,
                         WingMotion.baseFlap(styleName), WingMotion.amplitude(styleName));
                 Transform pivot = wing.translate(side * (0.02 + 0.02 * layer),
                         WingMotion.rootHeight(layer), WingMotion.layerDepth(layer));
-                Transform feather = pivot.rotate(0, 0, Math.toDegrees(flap) * side)
-                        .compose(Transform.lookAlong(dirX, dirY, dirZ, 0, 1, 0));
+                Transform feather = WingMotion.featherFrame(pivot, side,
+                        WingMotion.fanDegrees(i, count), Math.toDegrees(flap));
                 double length = WingMotion.featherLength(layer, i, count) * WingMotion.spread(styleName) * scale;
                 batch.add(f, built, material, feather, length, alpha, false);
             }
