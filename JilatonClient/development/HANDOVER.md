@@ -15,8 +15,8 @@ the integrated tree and no runtime evidence since `d0f9e37`.
 - `main` (`f11bfff`) is old and must not be merged.
 - Lane branches pushed as `origin/lane/2026-10-31-hold-key-edge` (lane 1, `ec77a80`),
   `origin/lane/2026-10-31-world-fx-wip` (lane 2, WIP `b6a9a59`) and
-  `origin/lane/2026-10-31-viewmodel-wip` (lane 3, WIP `79c1934`). Lanes 2/3 are test-only WIP and are **expected
-  to be red**; they are not integration candidates.
+  `origin/lane/2026-10-31-viewmodel-wip` (lane 3, WIP `b2c10a5`). Lanes 2/3 are work-in-progress and are
+  **expected to be red**; they are not integration candidates. Lane 3's `b2c10a5` is a mid-edit snapshot.
 - Resume on a new machine: clone, `git checkout jilaton/2026-10-31-work`, then
   `git worktree add <path> lane/2026-10-31-hold-key-edge` etc. `development/` docs are now tracked.
 - Environment: Windows 10 x64, Temurin 21, Gradle 9.8.2 wrapper, Fabric Loader 0.20.1 / Fabric API 0.141.6 /
@@ -52,7 +52,7 @@ All worktrees are under `C:/Users/zaber/Desktop/zinstist/.qoder/worktrees/agent-
 |---|---|---|---|---|
 | Agent 1 — modules/FreeLook | `389712d8` | `ec77a80` | clean | completed; 196/910 gate; **not merged**; no runtime claim |
 | Agent 2 — world FX shockwave + Radiance | `15d1682f` | `b6a9a59` (WIP) | clean | in progress; tests only, expected red |
-| Agent 3 — ViewModel/Swing coordination | `9a155ccd` | `79c1934` (WIP) | clean | in progress; tests only |
+| Agent 3 — ViewModel/Swing coordination | `9a155ccd` | `b2c10a5` (WIP) | clean as of push | in progress; snapshot of live edits |
 | Agent 4 — HUD/ClickGUI | `60ae4d60` | `f1cd094` | clean | completed, task id `a0eef55b3e7cb9d5d`; merged |
 | Agent 5 — visual reference | — | — | not spawned | reserved, idle; no user references queued |
 
