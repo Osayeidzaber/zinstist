@@ -42,6 +42,11 @@ public final class ClientConfig {
     private double animationIntensity = 1.0;
     private double backdropOpacity = 0.55;
     private boolean backdropBlur = true;
+    /**
+     * Explicit opt-in for the desktop media bridge (PowerShell/AppleScript reading the OS media session).
+     * Off by default and never enabled implicitly: while off no process is spawned and no media is read.
+     */
+    private boolean desktopMediaBridge;
     /** UI typeface: "inter" (shipped TTF) or "minecraft" (vanilla pixel font). */
     private String uiFont = "inter";
 
@@ -154,6 +159,10 @@ public final class ClientConfig {
     /** Whether the in-world ClickGUI blurs the world behind it (vanilla blur, the player's own radius). */
     public boolean backdropBlur() { return backdropBlur; }
     public void setBackdropBlur(boolean backdropBlur) { this.backdropBlur = backdropBlur; }
+
+    /** Desktop media bridge opt-in; false means Jilaton never starts the media-session process. */
+    public boolean desktopMediaBridgeEnabled() { return desktopMediaBridge; }
+    public void setDesktopMediaBridgeEnabled(boolean enabled) { this.desktopMediaBridge = enabled; }
 
     public ClientConfig(Path configDirectory) {
         this.path = configDirectory.resolve("jilaton.properties");
@@ -303,6 +312,7 @@ public final class ClientConfig {
             backdropOpacity = 0.55;
         }
         backdropBlur = Boolean.parseBoolean(values.getProperty("ui.backdrop_blur", "true"));
+        desktopMediaBridge = Boolean.parseBoolean(values.getProperty("music.desktop_bridge", "false"));
         String configuredFriends = values.getProperty("friends.names");
         if (configuredFriends != null) {
             FriendManager.replace(List.of(configuredFriends.split(",")));
@@ -418,6 +428,7 @@ public final class ClientConfig {
         values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
         values.setProperty("ui.backdrop_opacity", Double.toString(backdropOpacity));
         values.setProperty("ui.backdrop_blur", Boolean.toString(backdropBlur));
+        values.setProperty("music.desktop_bridge", Boolean.toString(desktopMediaBridge));
         values.setProperty("ui.font", uiFont);
         values.setProperty("ui.visual_order", String.join(",", visualOrder));
         values.setProperty("ui.module_order", String.join(",", moduleOrder));

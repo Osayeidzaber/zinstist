@@ -229,6 +229,18 @@ public final class MusicCenterScreen extends Screen {
             String repeat = "Repeat " + s.repeatLabel();
             chip(g, repeat, !"Off".equalsIgnoreCase(s.repeatLabel()), LEFT + COL_W - Ui.width(repeat, 12, JilatonType.Face.MEDIUM) - 24,
                     674, mx, my, s::cycleRepeat);
+        } else if (s != null && center().source() == MusicCenter.Source.DESKTOP) {
+            // The desktop bridge is opt-in: it reads this PC's media session through PowerShell/AppleScript.
+            boolean bridgeOn = JilatonClient.clientConfig().desktopMediaBridgeEnabled();
+            String label = bridgeOn ? "Media bridge on" : "Media bridge off";
+            chip(g, label, bridgeOn, LEFT, 674, mx, my, () -> {
+                boolean next = !JilatonClient.clientConfig().desktopMediaBridgeEnabled();
+                JilatonClient.clientConfig().setDesktopMediaBridgeEnabled(next);
+                center().refreshDesktopBridgeGate();
+                JilatonClient.clientConfig().save(JilatonClient.moduleManager());
+            });
+            Ui.textRight(g, bridgeOn ? "Reads your player's media session" : "Off — no process, no media access",
+                    LEFT + COL_W, 681, 10, JilatonType.Face.REGULAR, Ui.TEXT_3);
         }
     }
 

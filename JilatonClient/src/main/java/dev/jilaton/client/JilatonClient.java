@@ -76,6 +76,8 @@ public final class JilatonClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CONFIG.load(MODULES);
+        // The desktop media bridge (PowerShell/AppleScript) never starts without the persisted opt-in.
+        dev.jilaton.client.music.MusicCenter.get().attachConfig(CONFIG);
         dev.jilaton.client.render.character.CharacterModule.ensureDropFolder();
         MODULES.notifications().clear();
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {

@@ -16,16 +16,24 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Synced lyrics from LRCLIB (lrclib.net), a free, keyless, community lyrics database. Tracks are matched
  * by title, artist, album and duration, then by scored search ({@link LyricsMatcher}, adapted from Anubis). Results (including "not found") are cached on disk so each song is requested once.
+ *
+ * <p>Lookups never run on the calling (render) thread. The worker pool has two threads so one slow or failed
+ * track cannot hold every other track's lookup behind it. Each key is tried at most
+ * {@link #MAX_LOOKUP_FAILURES} times, with a {@link #RETRY_MILLIS} back-off; the in-memory negative cache
+ * expires together with the on-disk {@code .none} marker.
  */
 public final class OnlineLyrics {
     private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton Lyrics");
@@ -34,17 +42,47 @@ public final class OnlineLyrics {
     private final Path cacheDir;
     private final Map<String, Lyrics> memory = new ConcurrentHashMap<>();
     private final Map<String, String> status = new ConcurrentHashMap<>();
-    /** Failed lookups may be retried after this many nanos; the worker itself never waits. */
-    private static final long RETRY_NANOS = 30_000_000_000L;
+    /** Failed lookups may be retried after this long; the worker itself never waits. */
+    static final long RETRY_MILLIS = 30_000L;
+    /** LRCLIB "not found" results are cached on disk for an hour, then looked up again. */
+    static final long NEGATIVE_TTL_MILLIS = 3_600_000L;
+    /** After this many failed lookups a track is left alone until it changes or the client restarts. */
+    static final int MAX_LOOKUP_FAILURES = 3;
     private final Map<String, Long> retryAfter = new ConcurrentHashMap<>();
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "Jilaton lyrics");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final Map<String, Integer> failures = new ConcurrentHashMap<>();
+    /** When an in-memory empty result stops counting as a valid negative cache entry. */
+    private final Map<String, Long> negativeUntil = new ConcurrentHashMap<>();
+    private final Clock clock;
+    private final Executor worker;
+    private final boolean ownsWorker;
+    private final SyncedFetcher fetcher;
+
+    /** Seam for tests: the network lookup, replaceable without touching LRCLIB. */
+    @FunctionalInterface
+    interface SyncedFetcher {
+        String fetch(String title, String artist, String album, int durationSeconds) throws IOException;
+    }
 
     public OnlineLyrics(Path configDir) {
+        this(configDir, Clock.systemUTC(), null, null);
+    }
+
+    OnlineLyrics(Path configDir, Clock clock, Executor worker, SyncedFetcher fetcher) {
         cacheDir = configDir.resolve("jilaton").resolve("lyrics-cache");
+        this.clock = clock == null ? Clock.systemUTC() : clock;
+        if (worker == null) {
+            ExecutorService pool = Executors.newFixedThreadPool(2, runnable -> {
+                Thread thread = new Thread(runnable, "Jilaton lyrics");
+                thread.setDaemon(true);
+                return thread;
+            });
+            this.worker = pool;
+            this.ownsWorker = true;
+        } else {
+            this.worker = worker;
+            this.ownsWorker = false;
+        }
+        this.fetcher = fetcher == null ? this::fetch : fetcher;
     }
 
     /** Lyrics for the track if known; otherwise schedules a lookup and returns {@link Lyrics#EMPTY}. */
@@ -57,12 +95,24 @@ public final class OnlineLyrics {
         String album = track.album() == null ? "" : track.album();
         String key = key(title, artist);
         Lyrics cached = memory.get(key);
-        if (cached != null) return cached;
+        if (cached != null) {
+            Long negativeExpiry = negativeUntil.get(key);
+            if (negativeExpiry == null || negativeCacheAlive(negativeExpiry, clock.millis())) return cached;
+            // The negative cache expired: forget the empty result and allow one fresh lookup.
+            memory.remove(key, cached);
+            negativeUntil.remove(key, negativeExpiry);
+            status.remove(key);
+        }
+        long now = clock.millis();
         Long retryAt = retryAfter.get(key);
-        if (retryAt != null && System.nanoTime() - retryAt >= 0 && retryAfter.remove(key, retryAt)) status.remove(key);
+        if (retryAt != null && retryExpired(retryAt, now) && retryAfter.remove(key, retryAt)) status.remove(key);
         if (status.putIfAbsent(key, "Searching LRCLIB…") == null) {
             long duration = track.durationMs();
-            worker.execute(() -> resolve(key, title, artist, album, duration));
+            try {
+                worker.execute(() -> resolve(key, title, artist, album, duration));
+            } catch (RejectedExecutionException shuttingDown) {
+                status.remove(key);
+            }
         }
         return Lyrics.EMPTY;
     }
@@ -76,31 +126,65 @@ public final class OnlineLyrics {
         Path missing = cacheDir.resolve(hash(key) + ".none");
         try {
             if (Files.isRegularFile(file)) { finish(key, Lyrics.parse(Files.readString(file)), "Synced lyrics · LRCLIB (cached)"); return; }
-            if (Files.isRegularFile(missing) && Files.getLastModifiedTime(missing).toMillis() > System.currentTimeMillis() - 3_600_000L) {
-                finish(key, Lyrics.EMPTY, "No synced lyrics on LRCLIB");
-                return;
+            long nowMillis = clock.millis();
+            if (Files.isRegularFile(missing)) {
+                long modified = Files.getLastModifiedTime(missing).toMillis();
+                if (negativeCacheFresh(modified, nowMillis)) {
+                    finishNegative(key, "No synced lyrics on LRCLIB", modified + NEGATIVE_TTL_MILLIS);
+                    return;
+                }
             }
-            String synced = fetch(title, artist, album, (int) Math.max(0, (durationMs + 500) / 1000));
+            String synced = fetcher.fetch(title, artist, album, (int) Math.max(0, (durationMs + 500) / 1000));
             Files.createDirectories(cacheDir);
             if (synced == null || synced.isBlank()) {
                 Files.writeString(missing, "");
-                finish(key, Lyrics.EMPTY, "No synced lyrics on LRCLIB");
+                Files.deleteIfExists(file);
+                finishNegative(key, "No synced lyrics on LRCLIB", nowMillis + NEGATIVE_TTL_MILLIS);
             } else {
                 Files.writeString(file, synced);
+                Files.deleteIfExists(missing);
+                failures.remove(key);
+                negativeUntil.remove(key);
                 finish(key, Lyrics.parse(synced), "Synced lyrics · LRCLIB");
             }
         } catch (IOException | RuntimeException exception) {
             LOGGER.debug("LRCLIB lookup failed for {}", key, exception);
             status.put(key, "Lyrics lookup failed (offline?)");
-            // Allow a retry once the back-off passes. Sleeping on the single worker here would stall every
-            // other track's lookup behind this one failure.
-            retryAfter.put(key, System.nanoTime() + RETRY_NANOS);
+            // Allow a retry once the back-off passes. Sleeping on the worker here would stall every other
+            // track's lookup behind this one failure, so the retry is scheduled by the next get() call instead.
+            int failed = failures.merge(key, 1, Integer::sum);
+            if (retryAllowed(failed)) retryAfter.put(key, clock.millis() + RETRY_MILLIS);
+            else retryAfter.remove(key);
         }
     }
 
     private void finish(String key, Lyrics lyrics, String message) {
         memory.put(key, lyrics);
         status.put(key, message);
+    }
+
+    private void finishNegative(String key, String message, long expiresAtMillis) {
+        memory.put(key, Lyrics.EMPTY);
+        negativeUntil.put(key, expiresAtMillis);
+        status.put(key, message);
+    }
+
+    /** True while the on-disk negative marker is younger than the negative TTL. */
+    static boolean negativeCacheFresh(long markerMillis, long nowMillis) {
+        return markerMillis > nowMillis - NEGATIVE_TTL_MILLIS;
+    }
+
+    /** True while a negative entry already converted to an expiry time is still in effect. */
+    static boolean negativeCacheAlive(long expiresAtMillis, long nowMillis) {
+        return nowMillis < expiresAtMillis;
+    }
+
+    static boolean retryExpired(long retryAtMillis, long nowMillis) {
+        return nowMillis - retryAtMillis >= 0;
+    }
+
+    static boolean retryAllowed(int failedLookups) {
+        return failedLookups < MAX_LOOKUP_FAILURES;
     }
 
     /**
@@ -214,5 +298,7 @@ public final class OnlineLyrics {
 
     private static String enc(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
 
-    public void shutdown() { worker.shutdownNow(); }
+    public void shutdown() {
+        if (ownsWorker && worker instanceof ExecutorService service) service.shutdownNow();
+    }
 }
