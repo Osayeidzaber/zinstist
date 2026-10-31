@@ -44,7 +44,7 @@ class CustomCharactersTest {
 
     @Test
     void catalogRefreshRunsHeadlessly() {
-        boolean changed = assertDoesNotThrow(CharacterCatalog::refresh, "refresh() must survive a headless scan");
+        boolean changed = assertDoesNotThrow(() -> CharacterCatalog.refresh(), "refresh() must survive a headless scan");
         assertFalse(changed, "a catalog with no custom designs should not report a change");
         assertTrue(CharacterCatalog.all().size() >= 9, "the built-in designs must survive a scan");
     }

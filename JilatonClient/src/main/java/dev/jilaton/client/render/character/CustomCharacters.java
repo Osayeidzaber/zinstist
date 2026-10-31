@@ -31,6 +31,10 @@ final class CustomCharacters {
    private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton Characters");
    private static final long MAX_FILE = 268435456L;
    private static final int MAX_TEXTURE = 8192;
+   /** Bumped whenever the bake format changes, so every cached .anc is invalidated. */
+   static final String BAKE_VERSION = "3";
+   private static final int MAX_REPORTS = 256;
+   private static final Set<String> REPORTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
    private CustomCharacters() {
    }
@@ -86,17 +90,19 @@ final class CustomCharacters {
          return List.of();
       }
 
+      for (Path gltf : unsupportedGltf(root)) {
+         reportUnsupported(gltf);
+      }
+
       files.sort(null);
       List<BakedDesign> out = new ArrayList<>();
       Set<String> ids = new HashSet<>();
 
       for (Path file : files) {
-         String name = file.getFileName().toString();
-         name = name.substring(0, name.length() - 4);
+         String name = baseName(file);
 
          try {
-            String stamp = name + Files.size(file) + Files.getLastModifiedTime(file).toMillis() + "3";
-            String id = "custom_" + slug(name) + "_" + Integer.toHexString(stamp.hashCode());
+            String id = cacheId(name, Files.size(file), Files.getLastModifiedTime(file).toMillis());
             ids.add(id);
             out.add(new BakedDesign(id, name, () -> open(file, id, cacheDir)));
          } catch (IOException e) {
@@ -106,6 +112,75 @@ final class CustomCharacters {
 
       prune(ids, cacheDir);
       return out;
+   }
+
+   /**
+    * Cache identity of a drop-folder model. The stamp covers the display name, byte size, modification time and
+    * the bake format version, so a replaced or renamed file never reuses an older bake.
+    */
+   static String cacheId(String name, long size, long modifiedMillis) {
+      return "custom_" + slug(name) + "_" + Integer.toHexString(stamp(name, size, modifiedMillis).hashCode());
+   }
+
+   static String stamp(String name, long size, long modifiedMillis) {
+      return name + size + modifiedMillis + BAKE_VERSION;
+   }
+
+   private static String baseName(Path file) {
+      String name = file.getFileName().toString();
+      int dot = name.lastIndexOf(46);
+      return dot > 0 ? name.substring(0, dot) : name;
+   }
+
+   /**
+    * .gltf scene files are listed here only so they can be reported: the importer reads self-contained .glb
+    * binaries and cannot resolve external .bin buffers or image files. They are never returned as designs.
+    */
+   static List<Path> unsupportedGltf(Path root) {
+      if (root == null) {
+         return List.of();
+      }
+
+      List<Path> out = new ArrayList<>();
+
+      try (DirectoryStream<Path> dir = Files.newDirectoryStream(root, "*.{gltf,GLTF}")) {
+         for (Path file : dir) {
+            if (Files.isRegularFile(file)) {
+               out.add(file);
+            }
+         }
+      } catch (IOException ignored) {
+         return List.of();
+      }
+
+      out.sort(null);
+      return out;
+   }
+
+   private static void reportUnsupported(Path file) {
+      String key = file.toAbsolutePath().normalize().toString();
+
+      try {
+         key = key + ":" + Files.size(file) + ":" + Files.getLastModifiedTime(file).toMillis();
+      } catch (IOException unreadable) {
+         // Still report the name; the file may be locked or removed while scanning.
+      }
+
+      if (REPORTED.contains(key)) {
+         return;
+      }
+
+      if (REPORTED.size() >= MAX_REPORTS) {
+         REPORTED.clear();
+      }
+
+      REPORTED.add(key);
+      LOGGER.warn(
+         "[Characters] Ignoring {}: .gltf scene files are not supported because their external .bin and image "
+            + "files cannot be read. Export the model as one self-contained .glb.",
+         file.getFileName()
+      );
+      CharacterModule.unsupportedModel(file.getFileName().toString());
    }
 
    private static String slug(String name) {

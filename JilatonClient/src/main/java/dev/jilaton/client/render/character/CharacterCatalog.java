@@ -1,5 +1,6 @@
 package dev.jilaton.client.render.character;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import dev.jilaton.client.render.character.designs.Aoi;
@@ -37,10 +38,18 @@ public final class CharacterCatalog {
    }
 
    static boolean refresh() {
+      return refresh(CustomCharacters.folder());
+   }
+
+   /**
+    * Rebuilds the catalogue from an explicit drop folder. Package-private seam used by the tick path (through
+    * {@link #refresh()}) and by headless tests, so the public API is unchanged.
+    */
+   static boolean refresh(Path root) {
       List<CharacterDesign> next = new ArrayList<>(BUILT_IN);
       List<String> taken = new ArrayList<>(names(BUILT_IN));
 
-      for (BakedDesign custom : CustomCharacters.scan()) {
+      for (BakedDesign custom : CustomCharacters.scan(root)) {
          if (!taken.contains(custom.name())) {
             taken.add(custom.name());
             next.add(custom);

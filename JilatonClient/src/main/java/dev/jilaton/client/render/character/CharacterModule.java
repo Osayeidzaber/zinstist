@@ -67,9 +67,21 @@ public final class CharacterModule extends ClientModule {
     }
 
     private void refreshCharacters() {
-        if (CharacterCatalog.refresh()) {
-            this.character.setChoices(CharacterCatalog.names());
+        refreshCharacters(CustomCharacters.folder());
+    }
+
+    /**
+     * Tick-path catalogue refresh with an explicit drop folder. Package-private so tests can prove the whole
+     * selection chain without touching FabricLoader's config directory.
+     */
+    boolean refreshCharacters(java.nio.file.Path root) {
+        boolean catalogChanged = CharacterCatalog.refresh(root);
+        List<String> names = CharacterCatalog.names();
+        if (catalogChanged || !names.equals(this.character.choices())) {
+            this.character.setChoices(names);
+            return true;
         }
+        return false;
     }
 
     public static void ensureDropFolder() {
@@ -176,6 +188,13 @@ public final class CharacterModule extends ClientModule {
                     ? file + " has no skeleton the client recognises, so it moves as one piece"
                     : file + " only moves its " + String.join(" and ", limbs) + ", the rest of its skeleton wasn't recognised";
             send(message);
+        }
+    }
+
+    /** One chat line for a drop-folder file the importer cannot read at all (.gltf scene files). */
+    static void unsupportedModel(String file) {
+        if (active != null) {
+            send(file + " is a .gltf scene file; only self-contained .glb models are supported. Export it as a single .glb");
         }
     }
 

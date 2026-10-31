@@ -127,26 +127,26 @@ public final class BodyAnchor {
                 .rotate(bodyYaw, 0, 0);
         return switch (part) {
             case HEAD -> compose(Part.HEAD, ox, oy + height - HEAD_CENTRE + crouchDrop, oz, bodyYaw, headYaw, headPitch);
-            case TORSO -> root.translate(0, height * TORSO_HEIGHT, 0).rotate(0, torsoPitchDeg, 0);
-            case BACK -> root.translate(0, height * BACK_HEIGHT, -BACK_OFFSET).rotate(0, torsoPitchDeg, 0);
-            case SHOULDERS -> root.translate(0, height * SHOULDER_HEIGHT, -SHOULDER_OFFSET).rotate(0, torsoPitchDeg, 0);
+            case TORSO -> root.translate(0, height * TORSO_HEIGHT, 0).spin(0, torsoPitchDeg, 0);
+            case BACK -> root.translate(0, height * BACK_HEIGHT, -BACK_OFFSET).spin(0, torsoPitchDeg, 0);
+            case SHOULDERS -> root.translate(0, height * SHOULDER_HEIGHT, -SHOULDER_OFFSET).spin(0, torsoPitchDeg, 0);
             case RIGHT_ARM, RIGHT_HAND -> {
                 double walkSwingDeg = Math.toDegrees(Math.cos(limbPhase * 0.6662 + Math.PI) * 1.4 * limbSpeed);
                 double swingDeg = attackSwing > 0 ? -Math.sin(Math.sqrt(attackSwing) * Math.PI) * 58.0 : 0.0;
                 Transform shoulder = root.translate(SHOULDER_HALF_SPAN, height * SHOULDER_HEIGHT, 0)
-                        .rotate(0, torsoPitchDeg + walkSwingDeg + swingDeg, 0);
+                        .spin(0, torsoPitchDeg + walkSwingDeg + swingDeg, 0);
                 yield part == Part.RIGHT_ARM ? shoulder : shoulder.translate(0, -ARM_LENGTH, 0.06);
             }
             case LEFT_ARM, LEFT_HAND -> {
                 double walkSwingDeg = Math.toDegrees(Math.cos(limbPhase * 0.6662) * 1.4 * limbSpeed);
                 Transform shoulder = root.translate(-SHOULDER_HALF_SPAN, height * SHOULDER_HEIGHT, 0)
-                        .rotate(0, torsoPitchDeg + walkSwingDeg, 0);
+                        .spin(0, torsoPitchDeg + walkSwingDeg, 0);
                 yield part == Part.LEFT_ARM ? shoulder : shoulder.translate(0, -ARM_LENGTH, 0.06);
             }
             case BOTH_HANDS -> {
                 double swingDeg = attackSwing > 0 ? -Math.sin(Math.sqrt(attackSwing) * Math.PI) * 45.0 : 0.0;
                 yield root.translate(0, height * SHOULDER_HEIGHT - ARM_LENGTH * 0.72, 0.28)
-                        .rotate(0, torsoPitchDeg - 18.0 + swingDeg, 0);
+                        .spin(0, torsoPitchDeg - 18.0 + swingDeg, 0);
             }
         };
     }
