@@ -207,14 +207,24 @@ public final class Ui {
     }
 
     private static java.util.function.Supplier<net.minecraft.world.entity.player.PlayerSkin> skin;
+    private static java.util.UUID skinFor;
 
     /** The signed-in player's face (with hat layer) in a rounded tile of {@code size} board px. */
     public static void face(GuiGraphics g, float x, float y, int size) {
         var minecraft = net.minecraft.client.Minecraft.getInstance();
-        if (skin == null) skin = minecraft.getSkinManager().createLookup(minecraft.getGameProfile(), false);
+        var profile = minecraft.getGameProfile();
+        if (skin == null || !profile.id().equals(skinFor)) {
+            skin = minecraft.getSkinManager().createLookup(profile, false);
+            skinFor = profile.id();
+        }
+        face(g, x, y, size, skin.get());
+    }
+
+    /** A face tile for any skin (offline accounts use the default skin for their name). */
+    public static void face(GuiGraphics g, float x, float y, int size, net.minecraft.world.entity.player.PlayerSkin playerSkin) {
         round(g, x, y, size, size, Math.max(4, size / 5F), RAISED);
         int inset = Math.max(3, size / 8);
-        net.minecraft.client.gui.components.PlayerFaceRenderer.draw(g, skin.get(), Math.round(x) + inset,
+        net.minecraft.client.gui.components.PlayerFaceRenderer.draw(g, playerSkin, Math.round(x) + inset,
                 Math.round(y) + inset, size - inset * 2);
     }
 

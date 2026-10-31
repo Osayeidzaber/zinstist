@@ -296,8 +296,15 @@ public final class ViewmodelShots {
         shot(8, "ui-menu-enter-b");
         shot(12, "ui-menu-enter-c");
         shot(40, "ui-mainmenu");
-        then(1, () -> client.setScreen(new dev.jilaton.client.gui.AccountsScreen(null)));
+        then(1, () -> {
+            dev.jilaton.client.account.SessionSwitcher.offline().add("Builder_01");
+            client.setScreen(new dev.jilaton.client.gui.AccountsScreen(null));
+        });
         shot(40, "ui-accounts");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.AccountAddScreen(new dev.jilaton.client.gui.AccountsScreen(null), true)));
+        shot(30, "ui-account-add");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.AccountAddScreen(new dev.jilaton.client.gui.AccountsScreen(null), false)));
+        shot(30, "ui-account-add-ms");
         then(20, client::stop);
     }
 
