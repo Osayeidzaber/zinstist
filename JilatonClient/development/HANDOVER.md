@@ -1,8 +1,8 @@
 # Jilaton — Handover (device switch)
 
 **Written:** 2026-11-01 05:37 local / 2026-10-31T23:37Z by Master session `15756b54-ca7b-4178-a6d7-ecbc10b14ae4`.
-**Updated:** 2026-11-01 05:41 local — lanes 2/3 WIP commits, lane branches pushed, docs tracked. Still no gate on
-the integrated tree and no runtime evidence since `d0f9e37`.
+**Updated:** 2026-11-01 05:52 local — lanes 1, 2 and 3 all finished and were pushed; no gate on the integrated
+tree and no runtime evidence since `d0f9e37`.
 **Goal:** registered "Jilaton — Master Architect & Autonomous Development Team" objective. Last reported budget
 4/20 turns used; the user paused the session and is switching devices. Resume with `/goal resume`.
 
@@ -10,13 +10,14 @@ the integrated tree and no runtime evidence since `d0f9e37`.
 
 - Git root: `C:\Users\zaber\Desktop\zinstist`; Gradle project: `JilatonClient` (Bash cwd is `.../JilatonClient`,
   so use absolute paths for `.qoder/...` and `git -C`).
-- Branch `jilaton/2026-10-31-work`, HEAD **`24e9ce9`** — "Integrate lane 4: HUD right-column stacking (JA-009)".
-  Pushed to `origin/jilaton/2026-10-31-work` before the device switch, together with the docs commit on top.
+- Branch `jilaton/2026-10-31-work`; last known HEAD `a2e9355` plus this update (`git log -1` after checkout).
+  Pushed to `origin/jilaton/2026-10-31-work`.
 - `main` (`f11bfff`) is old and must not be merged.
-- Lane branches pushed as `origin/lane/2026-10-31-hold-key-edge` (lane 1, `ec77a80`),
-  `origin/lane/2026-10-31-world-fx-wip` (lane 2, WIP `b6a9a59`) and
-  `origin/lane/2026-10-31-viewmodel-wip` (lane 3, WIP `b2c10a5`). Lanes 2/3 are work-in-progress and are
-  **expected to be red**; they are not integration candidates. Lane 3's `b2c10a5` is a mid-edit snapshot.
+- Lane branches pushed and all **complete**:
+  `origin/lane/2026-10-31-hold-key-edge` = `ec77a80`,
+  `origin/lane/2026-10-31-world-fx-wip` = `d008267`,
+  `origin/lane/2026-10-31-viewmodel-wip` = `61aa076`.
+  None of them is merged into the work branch yet; each is green only in its own lane build.
 - Resume on a new machine: clone, `git checkout jilaton/2026-10-31-work`, then
   `git worktree add <path> lane/2026-10-31-hold-key-edge` etc. `development/` docs are now tracked.
 - Environment: Windows 10 x64, Temurin 21, Gradle 9.8.2 wrapper, Fabric Loader 0.20.1 / Fabric API 0.141.6 /
@@ -29,7 +30,13 @@ Commits since the previous integrated head `d0f9e37`:
 | `c02c7ec` | VisualVerifier scene 32: clears FreeLook's hold binding before enabling it (Master) |
 | `f1cd094` | Lane 4: HUD right-column stacking (Agent 4, branch `worktree-agent-general-purpose-60ae4d60`) |
 | `24e9ce9` | Merge of lane 4 (no-ff) |
-| `ec77a80` | Lane 1: edge-based hold-key policy + `HoldKeyPolicyTest` (Agent 1) — **committed but NOT merged** |
+| `ec77a80` | Lane 1: edge-based hold-key policy + `HoldKeyPolicyTest` (Agent 1) — **committed, NOT merged** |
+| `b6a9a59` | Lane 2 red-phase tests: wave lifetime, band selection, block budget, radiance aura (Agent 2) |
+| `6bf22ce` | Lane 2: `TerrainWave.impactLife` keeps a wave alive for its whole 1.6 s sweep; per-wave block budget |
+| `d008267` | Lane 2: radiance drawn as two feathered camera-facing layers instead of the six-face shell |
+| `79c1934` | Lane 3: `FirstPersonTransformCoordinationTest` pins the mapped 1.21.11 transform order (Agent 3) |
+| `b2c10a5` | Lane 3 mid-edit snapshot (superseded by `61aa076`; unreviewable, keep only for history) |
+| `61aa076` | Lane 3: wing fan opens away from the spine, companion parts share one handedness, `Transform.mirrorX` |
 
 ## 2. What is integrated and why
 
@@ -51,14 +58,34 @@ All worktrees are under `C:/Users/zaber/Desktop/zinstist/.qoder/worktrees/agent-
 | Lane | Suffix | Branch HEAD | Worktree state | Report |
 |---|---|---|---|---|
 | Agent 1 — modules/FreeLook | `389712d8` | `ec77a80` | clean | completed; 196/910 gate; **not merged**; no runtime claim |
-| Agent 2 — world FX shockwave + Radiance | `15d1682f` | `b6a9a59` (WIP) | clean | in progress; tests only, expected red |
-| Agent 3 — ViewModel/Swing coordination | `9a155ccd` | `b2c10a5` (WIP) | clean as of push | in progress; snapshot of live edits |
+| Agent 2 — world FX shockwave + Radiance | `15d1682f` | `d008267` | clean | completed; 196/912 lane gate; **not merged**; no runtime claim |
+| Agent 3 — ViewModel/Swing coordination | `9a155ccd` | `61aa076` | clean | completed; 197/917 lane gate; **not merged**; no runtime claim |
 | Agent 4 — HUD/ClickGUI | `60ae4d60` | `f1cd094` | clean | completed, task id `a0eef55b3e7cb9d5d`; merged |
 | Agent 5 — visual reference | — | — | not spawned | reserved, idle; no user references queued |
 
-Lanes 2 and 3 were wrongly reported as stalled when this file was first written; both later produced test-only
-commits (`b6a9a59`, `79c1934`), which are pushed. Their production changes are still missing, so P3-9 shockwave,
-P1-11 Radiance and P3-5 ViewModel/Swing remain open.
+Lanes 2 and 3 were wrongly reported as stalled when this file was first written; both finished afterwards. No
+lane is merged except lane 4, and no lane has runtime evidence.
+
+**Lane 2 report (received, P3-9 + P1-11).** Shockwave root cause: `HitEffectsModule.emit()` culled every impact at
+`lifetime*1.2` = 1.2 s while the wave expands for 1.6 s, and scene 28's `shot(12)` lands at ~1.35 s, past the cull;
+budget was not the cause. Fix: `TerrainWave.impactLife(life) = max(life*1.2, 1.6 s)`, one reused `double[12]`
+buffer instead of per-cell allocation, per-wave share `MAX_BLOCKS_PER_FRAME / liveWaves` (total still ≤ 1400
+quads), front-band selection extracted to `TerrainWave.selectsCell(...)`. Radiance root cause: `shell()` drew six
+AABB faces as border strips at the same peak alpha with `du = min(thickness, half-extent)`, so strips overlapped
+into a translucent rectangle. Fix: two camera-facing feathered ellipse layers sized from the body footprint;
+`FxShapes.softDot` delegates to a new shared `softEllipse`. **Known scene limitation:** the plaza is only ~24.5
+blocks wide (`VisualVerifier.java:593` sets radius 44) so the wave leaves the built ground after ~0.45 s; a
+visible wide front needs a Master-owned scene edit (radius 44 → ~20–22, `shot(12)` → `shot(4)`).
+**Lane 3 report (received, P3-5).** Audit verdict SOURCE_REVIEWED, **no double-transform defect**: the mapped
+1.21.11 `ItemInHandRenderer` has exactly one push/pop pair in `renderArmWithItem`, the ViewModel hook is injected
+right after the push (before every arm transform and the single `swingArm` call), `swingArm` applies the attack
+pose once, and `renderPlayerArm` never calls `swingArm`. Two real rotation defects were found and fixed instead:
+the wing fan's inserted X mirror flipped it across the spine (outward dot −0.37), and the companion mixed
+handedness (core/ring/tail det −1 vs shards +1). Adds `Transform.mirrorX()` and pure frame helpers, with
+`FirstPersonTransformCoordinationTest` (5) and `EffectFrameOrientationTest` (6) pinning both. Documented, not
+fixed (product gaps): `FirstPersonHandsAndItemsMixin` only replaces `swingArm`, so the empty-hand inline swing
+never gets a SwingAnimations style; `KnifeViewmodelMixin` HEAD-cancels `renderArmWithItem`, bypassing ViewModel and
+swing styles.
 
 **Lane 1 report (received).** Root cause, evidence-backed: the verifier's END_CLIENT_TICK listener runs before
 `MODULES.tick`, and inside `ModuleManager.tick` the keybind pass runs before module `tick`; FreeLook is hold-bound
@@ -78,10 +105,10 @@ HudPreset changes). Residuals it reported: a 20+ module list at a 540-px GUI can
 
 ## 4. Verification status — be precise
 
-- **No gate has run on the integrated tree `24e9ce9`.** Two per-lane figures exist and belong to their own
-  worktrees, both based on `d0f9e37`: lane 4 = 196 suites / 911 tests / 0 failures / 0 errors / 0 skipped
-  (`.isolated-build-d/...`); lane 1 = 196 suites / 910 tests / 0 failures / 0 errors / 0 skipped
-  (`.isolated-build-a/...`, baseline 195/905 + exactly its 1 suite/5 tests). Neither describes HEAD.
+- **No gate has run on the integrated tree.** Per-lane figures, each from its own worktree on baseline
+  `d0f9e37` (195 suites / 905 tests): lane 1 = 196/910, lane 2 = 196/912, lane 3 = 197/917, lane 4 = 196/911,
+  all 0 failures / 0 errors / 0 skipped. None of these describes the merged tree, and they cannot simply be
+  added because each lane's delta was measured against the same baseline.
 - Last runtime evidence is the 2026-11-01 harness run on `d0f9e37` (32 scenes, exit 0, 124 screenshots in
   `JilatonClient/run-verify/screenshots/`): Fullbright RUNTIME_VERIFIED; screenshot Copy RUNTIME_VERIFIED;
   FreeLook BROKEN; HUD overlap BROKEN; terrain shockwave NOT VISIBLE; Radiance BROKEN; pharaoh verified after
@@ -92,13 +119,14 @@ HudPreset changes). Residuals it reported: a 20+ module list at a 540-px GUI can
 ## 5. Next steps in order
 
 1. Resume the goal (`/goal resume`) if the turn budget paused it.
-2. Lane 2/3 worktrees are clean but hold only test WIP. Re-read
-   `git show b6a9a59` / `git show 79c1934` on the new machine; the production fixes (P3-9 shockwave invisible,
-   P1-11 Radiance column, P3-5 ViewModel/Swing) still have to be written against those red tests. Reassign to
-   fresh agents after the integration gate if the original agents are gone, keeping the same file boundaries.
-3. Merge lane 1 (agent complete, worktree clean at `ec77a80`):
-   `git merge --no-ff worktree-agent-general-purpose-389712d8 -m "Integrate lane 1: hold-key edge policy"`.
-   Re-read `git diff d0f9e37..ec77a80` first if the branch moved.
+2. Fetch and add the lane branches as worktrees: `git fetch origin`, then
+   `git worktree add ../lane1 lane/2026-10-31-hold-key-edge`, `../lane2 lane/2026-10-31-world-fx-wip`,
+   `../lane3 lane/2026-10-31-viewmodel-wip`.
+3. Review and merge in this order, one at a time, re-reading each diff first:
+   `git diff d0f9e37..ec77a80` then `git merge --no-ff lane/2026-10-31-hold-key-edge -m "Integrate lane 1: hold-key edge policy"`;
+   `git diff d0f9e37..d008267` then merge lane 2 (shockwave + radiance);
+   `git diff d0f9e37..61aa076` then merge lane 3 (wing/companion orientation; ignore `b2c10a5`, it is a snapshot).
+   Watch for conflicts: lanes 2 and 3 both touch `render/` but in different packages.
 4. Run the combined gate on the integrated tree:
    `cd C:/Users/zaber/Desktop/zinstist/JilatonClient && ./gradlew --init-script C:/tmp/jilaton-arch/isolated-o.gradle test --no-daemon --console=plain`
    Sum `tests/failures/errors/skipped` from `.isolated-build-o/root/test-results/test/TEST-*.xml` (one build at a
@@ -115,9 +143,13 @@ HudPreset changes). Residuals it reported: a 20+ module list at a 540-px GUI can
    stays enabled for all 24 telemetry ticks while KillAura turns the body, camera yaw stays independent of the
    body turn, and the screenshot is third-person (the old run showed first-person because the release blend had
    already finished). The run must stay window-focused: FreeLook still releases when `!client.isWindowActive()`.
+   For `28b-terrain-wave-wide` lane 2 recommends a Master-owned scene edit first: `world_wave_radius` 44 → ~20–22
+   at `VisualVerifier.java:593` and `shot(12)` → `shot(4)` at ~line 608, otherwise the front has already left the
+   ~24.5-block plaza and stays faint by design. `23-radiance` should now show two soft elliptical layers with no
+   straight edges.
 7. Update `PROJECT_STATUS.md`, `BACKLOG.md` and `AGENT_REPORTS.md` with the new HEAD, gate totals, jar SHA, and
-   per-scene verdicts; keep them within the 100–150 / 50–80 line limits. Then commit the Master-owned docs
-   (they are untracked) and, if the user asks, push — nothing has been pushed.
+   per-scene verdicts; keep them within the 100–150 / 50–80 line limits. These docs are tracked and pushed; commit
+   further edits and push only when the user asks (nothing has been pushed to `main`).
 8. Hand the freed lane (Agent 4) its next approved backlog item only after the gate: P1-9 ClickGUI persistence is
    still pending, but it needs ClientConfig schema additions, which are **Master-owned** — either implement the
    schema change first or split the task. P3-6 HUD scaling/drag persistence and P3-7 music HUD are lane-owned and
