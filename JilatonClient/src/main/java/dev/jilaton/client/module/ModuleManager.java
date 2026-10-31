@@ -66,6 +66,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class ModuleManager {
+    /** What one tick of a hold-bound key binding should do to its module. */
+    enum HoldKeyAction { NONE, ENABLE, DISABLE }
+
     private final Map<String, ClientModule> modules = new LinkedHashMap<>();
     private final Collection<ClientModule> modulesView = Collections.unmodifiableCollection(modules.values());
     private final Map<String, Boolean> previousKeyStates = new HashMap<>();
@@ -271,11 +274,27 @@ public final class ModuleManager {
             }
             boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
             if (module.holdKey() && keyCode >= 0) {
-                module.setEnabled(down && client.isWindowActive());
-            } else if (down && !wasDown) {
-                module.toggle();
+                HoldKeyAction action = holdKeyAction(down, wasDown, client.isWindowActive());
+                if (action == HoldKeyAction.ENABLE) module.setEnabled(true);
+                else if (action == HoldKeyAction.DISABLE) module.setEnabled(false);
+                // An unfocused window never counts as a held key, so returning with the key still
+                // down reads as a fresh press instead of being swallowed by a stale true.
+                previousKeyStates.put(module.id(), down && client.isWindowActive());
+            } else {
+                if (down && !wasDown) module.toggle();
+                previousKeyStates.put(module.id(), down);
             }
-            previousKeyStates.put(module.id(), down);
         }
+    }
+
+    /**
+     * Pure hold-key decision. A hold module follows real press and release edges, so a programmatic
+     * enable (ClickGUI toggle, config restore, verification harness) is not revoked while the bound
+     * key was never pressed. Losing window focus still releases a held module.
+     */
+    static HoldKeyAction holdKeyAction(boolean down, boolean wasDown, boolean windowActive) {
+        if (!windowActive) return HoldKeyAction.DISABLE;
+        if (down == wasDown) return HoldKeyAction.NONE;
+        return down ? HoldKeyAction.ENABLE : HoldKeyAction.DISABLE;
     }
 }
