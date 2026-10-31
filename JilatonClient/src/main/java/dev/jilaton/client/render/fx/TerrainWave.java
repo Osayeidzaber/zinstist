@@ -7,6 +7,8 @@ package dev.jilaton.client.render.fx;
  */
 public final class TerrainWave {
     public static final int MAX_SAMPLES = 160;
+    /** Frame-wide angular-sample budget shared by every live wave; a full wave leaves 80 for the next one. */
+    public static final int MAX_SAMPLES_PER_FRAME = 240;
     public static final double MAX_LIFE_SECONDS = 1.6;
     /** Hard cap on glowing block tops drawn per frame across every live wave. */
     public static final int MAX_BLOCKS_PER_FRAME = 1400;
@@ -36,6 +38,14 @@ public final class TerrainWave {
         return Math.min(MAX_SAMPLES, wanted);
     }
 
+    /**
+     * Samples one wave may use after {@code alreadySampled} this frame: the per-wave cap, further limited by
+     * what the frame-wide angular budget has left. Returns 0 once the frame budget is exhausted.
+     */
+    public static int samplesThisFrame(double radius, int alreadySampled) {
+        return Math.max(0, Math.min(samples(radius), MAX_SAMPLES_PER_FRAME - Math.max(0, alreadySampled)));
+    }
+
     /** Whether a radial direction is in front of the camera (or only slightly behind). */
     public static boolean inFront(double dirX, double dirZ, double forwardX, double forwardZ, double margin) {
         return dirX * forwardX + dirZ * forwardZ >= -margin;
@@ -43,9 +53,23 @@ public final class TerrainWave {
 
     /** Four top-face corners of the block containing the sampled point, as x,y,z triplets. */
     public static double[] blockTop(double worldX, double worldZ, double surfaceY) {
+        double[] out = new double[12];
+        blockTop(worldX, worldZ, surfaceY, out);
+        return out;
+    }
+
+    /**
+     * Writes the four top-face corners into {@code out} (12 entries) instead of allocating. A wave writes up to
+     * {@link #MAX_BLOCKS_PER_FRAME} blocks per frame, so callers should reuse one buffer for the whole wave.
+     */
+    public static void blockTop(double worldX, double worldZ, double surfaceY, double[] out) {
+        if (out == null || out.length < 12) throw new IllegalArgumentException("blockTop buffer needs 12 entries");
         double x0 = Math.floor(worldX), z0 = Math.floor(worldZ), x1 = x0 + 1, z1 = z0 + 1;
         double y = surfaceY + 0.03;
-        return new double[]{x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1};
+        out[0] = x0; out[1] = y; out[2] = z0;
+        out[3] = x1; out[4] = y; out[5] = z0;
+        out[6] = x1; out[7] = y; out[8] = z1;
+        out[9] = x0; out[10] = y; out[11] = z1;
     }
 
     /**

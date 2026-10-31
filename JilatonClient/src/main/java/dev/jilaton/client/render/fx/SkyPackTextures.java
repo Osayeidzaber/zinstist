@@ -45,6 +45,9 @@ public final class SkyPackTextures {
     /** Override texture size, matching the bundled copies: the pack's 3072×2048 atlas at two thirds. */
     private static final int WIDTH = 2048;
     private static final int HEIGHT = 1365;
+    /** Masks and the flare ship at half the atlas size, 1024×683 — not 1024×682, which integer division yields. */
+    private static final int MASK_WIDTH = 1024;
+    private static final int MASK_HEIGHT = 683;
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<String, Identifier> BUNDLED = new HashMap<>();
     private static final Map<String, Identifier> OVERRIDE = new HashMap<>();
@@ -151,15 +154,23 @@ public final class SkyPackTextures {
         }
     }
 
+    /** Target pixel size of an override layer: the bundled copy's size, so UV insets stay half a texel. */
+    static int[] targetSize(String layer) {
+        boolean half = layer.startsWith("mask") || layer.equals("sunflare");
+        return half ? new int[]{MASK_WIDTH, MASK_HEIGHT} : new int[]{WIDTH, HEIGHT};
+    }
+
     private static Identifier load(String layer) {
         byte[] bytes = read(layer);
         if (bytes == null) return null;
-        int width = layer.startsWith("mask") || layer.equals("sunflare") ? WIDTH / 2 : WIDTH;
-        int height = layer.startsWith("mask") || layer.equals("sunflare") ? HEIGHT / 2 : HEIGHT;
+        int[] target = targetSize(layer);
+        int width = target[0];
+        int height = target[1];
         NativeImage source = null;
+        NativeImage image = null;
+        DynamicTexture texture = null;
         try {
             source = NativeImage.read(NativeImage.Format.RGBA, new ByteArrayInputStream(bytes));
-            NativeImage image;
             if (source.getWidth() == width && source.getHeight() == height) {
                 image = source;
                 source = null;
@@ -170,14 +181,18 @@ public final class SkyPackTextures {
                 source = null;
             }
             Identifier id = Identifier.fromNamespaceAndPath("jilaton", "dynamic/sky/" + layer);
-            FxFrame.recordSkyTextureSize(id, image.getWidth(), image.getHeight());
-            Minecraft.getInstance().getTextureManager().register(id,
-                    new DynamicTexture(() -> "jilaton sky " + layer, image));
+            texture = new DynamicTexture(() -> "jilaton sky " + layer, image);
+            image = null; // the DynamicTexture owns the pixels
+            Minecraft.getInstance().getTextureManager().register(id, texture);
+            FxFrame.recordSkyTextureSize(id, width, height);
             LOGGER.info("[Sky] Loaded override layer {} ({}x{}) from {}", layer, width, height, source());
+            texture = null; // the texture manager owns it from here
             return id;
         } catch (IOException | RuntimeException e) {
             LOGGER.warn("[Sky] Could not load skybox layer {}; keeping the bundled copy", layer, e);
             if (source != null) source.close();
+            if (image != null) image.close();
+            if (texture != null) texture.close();
             return null;
         }
     }

@@ -22,6 +22,8 @@ public final class LyricTrail {
     public static final double MIN_DISTANCE = 0.9;
     /** Gap kept between a line and the block surface it was placed against. */
     public static final double WALL_GAP = 0.35;
+    /** Hard bound on live trail lines, independent of any caller-supplied setting. */
+    public static final int MAX_LINES = 8;
     static final double APPEAR_SECONDS = LyricStates.SETTLE_SECONDS;
     static final double FADE_SECONDS = LyricStates.FADE_SECONDS;
     static final double EVICT_SECONDS = LyricStates.EVICT_SECONDS;
@@ -66,8 +68,9 @@ public final class LyricTrail {
     }
 
     private final List<Entry> entries = new ArrayList<>();
+    private final List<Entry> entriesView = Collections.unmodifiableList(entries);
 
-    public List<Entry> entries() { return Collections.unmodifiableList(entries); }
+    public List<Entry> entries() { return entriesView; }
 
     public void clear() { entries.clear(); }
 
@@ -109,11 +112,12 @@ public final class LyricTrail {
         }
         Entry entry = new Entry(text, lineIndex, x, y, z, dirX, dirY, dirZ, facingYaw(dirX, dirZ), now);
         entries.add(entry);
+        int cap = Math.max(1, Math.min(MAX_LINES, maxLines));
         int live = 0;
         for (int i = entries.size() - 1; i >= 0; i--) {
             Entry e = entries.get(i);
             if (e.evicted()) continue;
-            if (++live > Math.max(1, maxLines)) e.evictedNanos = now;
+            if (++live > cap) e.evictedNanos = now;
         }
         return entry;
     }
@@ -131,8 +135,14 @@ public final class LyricTrail {
     public void step(double dtSeconds, long now, double lingerSeconds, int activeLineIndex) {
         double k = 1 - Math.exp(-Math.max(0, dtSeconds) * 9);
         Entry active = active(activeLineIndex);
-        entries.removeIf(e -> ageSeconds(e, now) > APPEAR_SECONDS && alpha(e, now, lingerSeconds, e == active) <= 0);
-        for (Entry e : entries) e.lift += (e.liftTarget - e.lift) * k;
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            Entry e = entries.get(i);
+            if (ageSeconds(e, now) > APPEAR_SECONDS && alpha(e, now, lingerSeconds, e == active) <= 0) entries.remove(i);
+        }
+        for (int i = 0, n = entries.size(); i < n; i++) {
+            Entry e = entries.get(i);
+            e.lift += (e.liftTarget - e.lift) * k;
+        }
     }
 
     /** 0..1 visibility from age alone: ease in, hold for the linger time, then fade; eviction fades faster. */

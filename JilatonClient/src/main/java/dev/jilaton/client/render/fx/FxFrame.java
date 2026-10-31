@@ -68,7 +68,7 @@ public final class FxFrame {
             {1, 1, 1, -1, 1, 1, -1, 1, -1, 1, 1, -1},
             {1, -1, -1, -1, -1, -1, -1, -1, 1, 1, -1, 1}
     };
-    private static final float[][] SKY_UVS = {
+    static final float[][] SKY_UVS = {
             {1 / 3F, 0.5F, 0, 0.5F, 0, 1, 1 / 3F, 1},
             {1, 0, 2 / 3F, 0, 2 / 3F, 0.5F, 1, 0.5F},
             {1, 0.5F, 2 / 3F, 0.5F, 2 / 3F, 1, 1, 1},
@@ -76,6 +76,9 @@ public final class FxFrame {
             {2 / 3F, 0, 1 / 3F, 0, 1 / 3F, 0.5F, 2 / 3F, 0.5F},
             {1 / 3F, 0, 0, 0, 0, 0.5F, 1 / 3F, 0.5F}
     };
+    /** A 3:2 atlas of six square cube faces; anything else cannot be sampled by this cube net. */
+    private static final double SKY_ATLAS_ASPECT = 1.5;
+    private static final double SKY_ATLAS_ASPECT_TOLERANCE = 0.05;
     /**
      * Half a texel, pulled in from every cell edge. Sampling the cells at their exact borders blends each
      * face's outermost pixel with the neighbouring cell, which shows up as a faint line wherever two cube faces
@@ -84,16 +87,31 @@ public final class FxFrame {
      */
     private static final float FALLBACK_INSET_U = 0.5F / 1024F;
     private static final float FALLBACK_INSET_V = 0.5F / 683F;
+    private static final float[] FALLBACK_INSET = {FALLBACK_INSET_U, FALLBACK_INSET_V};
     private static final java.util.Map<Identifier, float[]> SKY_INSETS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Per-texture inset UV sets for the six cells; immutable and cached because dimensions never change. */
+    private static final java.util.Map<Identifier, float[][]> SKY_UV_SETS = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void recordSkyTextureSize(Identifier texture, int width, int height) {
         if (texture != null && width > 0 && height > 0) {
             SKY_INSETS.put(texture, halfTexel(width, height));
+            SKY_UV_SETS.remove(texture);
         }
     }
 
     public static void clearSkyInsets() {
         SKY_INSETS.clear();
+        SKY_UV_SETS.clear();
+    }
+
+    /**
+     * Whether measured dimensions can belong to the 3:2 cube-face atlas. A missing texture is reported by the
+     * texture manager as a 16x16 placeholder; sampling it would claim an inset of half of one 16-pixel texel
+     * (triple digits of texels on a real atlas), so implausible measurements fall through to the PNG header.
+     */
+    static boolean plausibleSkyTexture(int width, int height) {
+        if (width < 64 || height < 32) return false;
+        return Math.abs(width / (double) height - SKY_ATLAS_ASPECT) <= SKY_ATLAS_ASPECT_TOLERANCE;
     }
 
     /**
@@ -108,7 +126,7 @@ public final class FxFrame {
         float cy = (float) Math.cos(yaw), sy = (float) Math.sin(yaw);
         float cr = (float) Math.cos(roll), sr = (float) Math.sin(roll);
         double r = radius;
-        float[] inset = texelInset(texture);
+        float[][] uvs = texelUvs(texture);
         for (int f = 0; f < SKY_FACES.length; f++) {
             float[] src = SKY_FACES[f];
             float[] pos = new float[12];
@@ -119,13 +137,31 @@ public final class FxFrame {
                 pos[v * 3 + 1] = (float) ((x1 * sr + y * cr) * r);
                 pos[v * 3 + 2] = (float) (z1 * r);
             }
-            sky.add(new SkyQuad(texture, pos, insetUv(SKY_UVS[f], inset[0], inset[1]), color));
+            sky.add(new SkyQuad(texture, pos, uvs[f], color));
         }
+    }
+
+    /** Inset UVs for all six faces of {@code texture}, computed once per measured texture. */
+    private float[][] texelUvs(Identifier texture) {
+        if (texture == null) return computeUvs(FALLBACK_INSET);
+        float[][] known = SKY_UV_SETS.get(texture);
+        if (known != null) return known;
+        float[] inset = texelInset(texture);
+        float[][] uvs = computeUvs(inset);
+        // Cache only measurements; a fallback used before the texture loads must not stick to a real atlas.
+        if (SKY_INSETS.containsKey(texture)) SKY_UV_SETS.put(texture, uvs);
+        return uvs;
+    }
+
+    private static float[][] computeUvs(float[] inset) {
+        float[][] uvs = new float[SKY_UVS.length][];
+        for (int f = 0; f < SKY_UVS.length; f++) uvs[f] = insetUv(SKY_UVS[f], inset[0], inset[1]);
+        return uvs;
     }
 
     /** Half a texel of {@code texture} in UV units, measured dynamically from the GPU texture or PNG header. */
     private float[] texelInset(Identifier texture) {
-        if (texture == null) return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
+        if (texture == null) return FALLBACK_INSET;
         float[] known = SKY_INSETS.get(texture);
         if (known != null) return known;
         if (client != null) {
@@ -133,7 +169,10 @@ public final class FxFrame {
                 var gpu = client.getTextureManager().getTexture(texture).getTexture();
                 int w = gpu.getWidth(0);
                 int h = gpu.getHeight(0);
-                if (w > 0 && h > 0) {
+                // The texture manager hands out a 16x16 placeholder for a missing texture; treat that as a
+                // failed measurement and fall through to the header instead of caching an inset that is two
+                // orders of magnitude too large.
+                if (plausibleSkyTexture(w, h)) {
                     float[] measured = halfTexel(w, h);
                     SKY_INSETS.put(texture, measured);
                     return measured;
@@ -147,7 +186,7 @@ public final class FxFrame {
             SKY_INSETS.put(texture, measured);
             return measured;
         }
-        return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
+        return FALLBACK_INSET;
     }
 
     /** Reads width and height from the 24-byte PNG IHDR header of a classpath resource without full decoding. */
@@ -174,7 +213,7 @@ public final class FxFrame {
     }
 
     static float[] halfTexel(int width, int height) {
-        if (width <= 0 || height <= 0) return new float[]{FALLBACK_INSET_U, FALLBACK_INSET_V};
+        if (width <= 0 || height <= 0) return FALLBACK_INSET;
         return new float[]{0.5F / width, 0.5F / height};
     }
 
