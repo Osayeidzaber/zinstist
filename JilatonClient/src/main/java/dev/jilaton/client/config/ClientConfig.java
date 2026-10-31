@@ -36,7 +36,7 @@ public final class ClientConfig {
     private final Map<String, HudPosition> hudPositions = new HashMap<>();
     private final Map<String, HudStyle> hudStyles = new HashMap<>();
     /** Violet is the redesign's one accent (GUI_REDESIGN.md §0); a saved theme still wins. */
-    private String themeId = "violet";
+    private String themeId = "obsidian";
     private String customAccent = "F2F2F2";
     private boolean reducedMotion;
     private double animationIntensity = 1.0;

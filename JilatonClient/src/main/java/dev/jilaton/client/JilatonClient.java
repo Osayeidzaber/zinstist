@@ -55,6 +55,16 @@ public final class JilatonClient implements ClientModInitializer {
         return CONFIG;
     }
 
+    /** Display name of the key that opens the ClickGUI ("Right Shift" by default). */
+    public static String clickGuiKeyName() {
+        return openGui == null ? "" : openGui.getTranslatedKeyMessage().getString();
+    }
+
+    /** Display name of the Music Center key. */
+    public static String musicKeyName() {
+        return openMusic == null ? "" : openMusic.getTranslatedKeyMessage().getString();
+    }
+
     public static void openClickGui(Screen parent) {
         net.minecraft.client.Minecraft.getInstance().setScreen(new ClickGuiScreen(MODULES, CONFIG, parent));
     }

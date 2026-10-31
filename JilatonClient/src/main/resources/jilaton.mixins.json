@@ -82,7 +82,9 @@
     "KnifeViewmodelMixin",
     "CsKnifeMixin",
     "GameRendererPostEffectAccess",
-    "FontProviderAccess"
+    "FontProviderAccess",
+    "PauseScreenRedirectMixin",
+    "FontTextureSamplerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

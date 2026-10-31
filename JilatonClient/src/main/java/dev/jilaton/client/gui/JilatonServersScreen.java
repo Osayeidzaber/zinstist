@@ -5,7 +5,6 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.DirectJoinServerScreen;
 import net.minecraft.client.gui.screens.FaviconTexture;
@@ -24,8 +23,8 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.EventLoopGroupHolder;
-import net.minecraft.util.FormattedCharSequence;
 import org.slf4j.Logger;
+import dev.jilaton.client.gui.design.Ui;
 
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -51,9 +50,6 @@ public final class JilatonServersScreen extends JilatonCardScreen<ServerData> {
     private final Map<ServerData, byte[]> iconBytes = new IdentityHashMap<>();
     private ServerList servers;
     private ServerData editing;
-    private Button join;
-    private Button edit;
-    private Button delete;
 
     public JilatonServersScreen(Screen parent) {
         super(Component.literal("Servers"), "02  SERVERS", parent);
@@ -94,43 +90,38 @@ public final class JilatonServersScreen extends JilatonCardScreen<ServerData> {
 
     @Override
     protected String subtitle(int shown) {
-        return shown + (shown == 1 ? " server" : " servers") + "  ·  double-click to join  ·  shift + arrows to reorder";
+        return segment() == 0 ? "Shift + ↑ ↓ to reorder  ·  Double-click to join" : "Games open to LAN on this network";
     }
 
     @Override
     protected Component emptyMessage() {
-        return Component.literal("No saved servers — add one or connect directly.");
+        return Component.literal(segment() == 0 ? "No saved servers. Add one or connect directly."
+                : "No LAN games found yet. Open a world to LAN on this network.");
     }
 
     @Override
-    protected void addActions(int y) {
-        int w = Math.min(92, (gridW - 36) / 7);
-        int x = width - margin - (w * 7 + 36);
-        join = addRenderableWidget(Button.builder(Component.literal("Join"), b -> { if (selected != null) activate(selected); })
-                .bounds(x, y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Direct"), b -> {
-            editing = new ServerData(I18n.get("selectServer.defaultName"), "", ServerData.Type.OTHER);
-            minecraft.setScreen(new DirectJoinServerScreen(this, this::directJoined, editing));
-        }).bounds(x + (w + 6), y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Add"), b -> {
-            editing = new ServerData("", "", ServerData.Type.OTHER);
-            minecraft.setScreen(new ManageServerScreen(this, Component.translatable("manageServer.add.title"), this::added, editing));
-        }).bounds(x + (w + 6) * 2, y, w, 20).build());
-        edit = addRenderableWidget(Button.builder(Component.literal("Edit"), b -> editSelected()).bounds(x + (w + 6) * 3, y, w, 20).build());
-        delete = addRenderableWidget(Button.builder(Component.literal("Delete"), b -> confirmDelete()).bounds(x + (w + 6) * 4, y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> minecraft.setScreen(new JilatonServersScreen(parent)))
-                .bounds(x + (w + 6) * 5, y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Back"), b -> onClose()).bounds(x + (w + 6) * 6, y, w, 20).build());
-        selectionChanged();
-    }
+    protected List<String> segments() { return List.of("Saved", "LAN"); }
 
     @Override
-    protected void selectionChanged() {
-        if (join == null) return;
-        boolean saved = selected != null && !selected.isLan();
-        join.active = selected != null;
-        edit.active = saved;
-        delete.active = saved;
+    protected boolean inSegment(ServerData item, int segment) { return item.isLan() == (segment == 1); }
+
+    @Override
+    protected String rowAction() { return "Join"; }
+
+    @Override
+    protected List<Action> actions() {
+        return List.of(
+                new Action("Add server", false, always(), () -> {
+                    editing = new ServerData("", "", ServerData.Type.OTHER);
+                    minecraft.setScreen(new ManageServerScreen(this, Component.translatable("manageServer.add.title"), this::added, editing));
+                }),
+                new Action("Direct connect", false, always(), () -> {
+                    editing = new ServerData(I18n.get("selectServer.defaultName"), "", ServerData.Type.OTHER);
+                    minecraft.setScreen(new DirectJoinServerScreen(this, this::directJoined, editing));
+                }),
+                new Action("Edit", false, () -> selected != null && !selected.isLan(), this::editSelected),
+                new Action("Delete", false, () -> selected != null && !selected.isLan(), this::confirmDelete),
+                new Action("Refresh", false, always(), () -> minecraft.setScreen(new JilatonServersScreen(parent))));
     }
 
     @Override
@@ -259,64 +250,73 @@ public final class JilatonServersScreen extends JilatonCardScreen<ServerData> {
     }
 
     @Override
-    protected void renderCard(GuiGraphics graphics, ServerData item, int x, int y, int w, int h, double hover,
+    protected void renderCard(GuiGraphics graphics, ServerData item, float x, float y, float w, float h, double hover,
                               boolean selected, double alpha, long now) {
         if (item.state() == ServerData.State.INITIAL && !item.isLan()) ping(item);
-        cardSurface(graphics, x, y, w, h, hover, selected, alpha);
-        cardIcon(graphics, icon(item), item.name, x + 8, y + 8, 48, alpha);
-        int textX = x + 66;
-        int statusW = renderStatus(graphics, item, x + w - 9, y + 10, alpha, now);
-        graphics.drawString(font, fit(item.name, w - 74 - statusW - 8), textX, y + 11, JilatonUi.alpha(JilatonUi.TEXT, alpha), false);
-        List<FormattedCharSequence> motd = font.split(item.motd, w - 76);
-        for (int line = 0; line < Math.min(2, motd.size()); line++) {
-            graphics.drawString(font, motd.get(line), textX, y + 25 + line * 11, JilatonUi.alpha(line == 0 ? JilatonUi.TEXT_2 : JilatonUi.TEXT_3, alpha), false);
-        }
-        if (motd.isEmpty()) graphics.drawString(font, fit(item.ip, w - 76), textX, y + 25, JilatonUi.alpha(JilatonUi.TEXT_4, alpha), false);
-        if (item.state() == ServerData.State.SUCCESSFUL && item.players != null) {
-            String players = item.players.online() + " / " + item.players.max();
-            graphics.drawString(font, players, x + w - font.width(players) - 9, y + h - 15, JilatonUi.alpha(JilatonUi.TEXT_3, alpha), false);
-        }
-        if (hover > 0.01) {
-            String cue = "JOIN ↗";
-            int cueX = item.state() == ServerData.State.SUCCESSFUL ? textX : x + w - font.width(cue) - 9;
-            graphics.drawString(font, cue, cueX, y + h - 15, JilatonUi.alpha(JilatonUi.TEXT, alpha * hover), false);
-        }
+        cardIcon(graphics, icon(item), item.name, x + 14, y + 14, 48, alpha);
+        float textX = x + 76;
+        float statusW = renderStatus(graphics, item, x + w - 20, y + 30, alpha, now);
+        float nameMax = Math.max(60, w - 96 - statusW - 24);
+        String name = Ui.fit(item.name, nameMax * 0.6F, 15, JilatonType.Face.SEMIBOLD);
+        Ui.text(graphics, name, textX, y + 17, 15, JilatonType.Face.SEMIBOLD, Ui.alpha(Ui.TEXT, alpha));
+        float nameW = Ui.width(name, 15, JilatonType.Face.SEMIBOLD);
+        if (!item.isLan())
+            Ui.text(graphics, Ui.fit(item.ip, nameMax - nameW - 12, 11, JilatonType.Face.MONO), textX + nameW + 10, y + 20, 11,
+                    JilatonType.Face.MONO, Ui.alpha(Ui.TEXT_3, alpha));
+        String motd = item.motd == null ? "" : item.motd.getString().replace('\n', ' ').strip();
+        if (motd.isEmpty()) motd = item.isLan() ? item.ip : "";
+        Ui.text(graphics, Ui.fit(motd, nameMax, 12, JilatonType.Face.REGULAR), textX, y + 43, 12, JilatonType.Face.REGULAR,
+                Ui.alpha(Ui.TEXT_2, alpha));
     }
 
-    /** Draws latency bars or a status word right-aligned at {@code right}; returns the width used. */
-    private int renderStatus(GuiGraphics graphics, ServerData item, int right, int y, double alpha, long now) {
+    /** Players, ping meter and ms right-aligned at {@code right}, centred on {@code cy}; returns the width used. */
+    private float renderStatus(GuiGraphics graphics, ServerData item, float right, float cy, double alpha, long now) {
         if (item.isLan()) {
-            int w = font.width("LAN") + 8;
-            JilatonUi.strokeRounded(graphics, right - w, y - 1, w, 12, 2, JilatonUi.alpha(JilatonUi.TEXT_3, alpha * 0.6));
-            graphics.drawString(font, "LAN", right - w + 4, y + 1, JilatonUi.alpha(JilatonUi.TEXT_2, alpha), false);
+            float w = Ui.spacedWidth("LAN", 10, 0.8F, JilatonType.Face.MEDIUM) + 16;
+            Ui.outline(graphics, right - w, cy - 4, w, 20, 6, Ui.alpha(Ui.STROKE, alpha));
+            Ui.spaced(graphics, "LAN", right - w + 8, cy + 1, 10, 0.8F, JilatonType.Face.MEDIUM, Ui.alpha(Ui.TEXT_2, alpha));
             return w;
         }
         switch (item.state()) {
             case SUCCESSFUL -> {
-                int bars = item.ping < 150 ? 5 : item.ping < 300 ? 4 : item.ping < 600 ? 3 : item.ping < 1000 ? 2 : 1;
-                int bx = right - 14;
-                for (int i = 0; i < 5; i++) {
-                    int bh = 3 + i * 2;
-                    graphics.fill(bx + i * 3, y + 10 - bh, bx + i * 3 + 2, y + 10, JilatonUi.alpha(i < bars ? JilatonUi.TEXT : 0xFF2A2A2A, alpha));
+                int bars = item.ping < 150 ? 4 : item.ping < 300 ? 3 : item.ping < 600 ? 2 : 1;
+                int on = bars >= 3 ? Ui.ONLINE : Ui.WARN;
+                float bx = right - 22;
+                for (int i = 0; i < 4; i++) {
+                    float bh = 5 + i * 3;
+                    Ui.round(graphics, bx + i * 6, cy + 12 - bh, 4, bh, 1, Ui.alpha(i < bars ? on : Ui.FAINT, alpha));
                 }
-                String ms = item.ping + "ms";
-                graphics.drawString(font, ms, bx - font.width(ms) - 5, y + 1, JilatonUi.alpha(JilatonUi.TEXT_3, alpha), false);
-                return font.width(ms) + 19;
+                String ms = item.ping + " ms";
+                float msW = Ui.width(ms, 11, JilatonType.Face.MONO);
+                Ui.text(graphics, ms, bx - 10 - msW, cy + 2, 11, JilatonType.Face.MONO, Ui.alpha(Ui.TEXT_3, alpha));
+                float used = 22 + 10 + msW;
+                if (item.players != null) {
+                    String players = item.players.online() + " / " + item.players.max();
+                    float pw = Ui.width(players, 12, JilatonType.Face.MONO);
+                    Ui.text(graphics, players, right - used - 22 - pw, cy + 1, 12, JilatonType.Face.MONO, Ui.alpha(Ui.SOFT, alpha));
+                    used += 22 + pw;
+                }
+                return used;
             }
             case INCOMPATIBLE -> {
-                String version = fit(item.version.getString(), 80);
-                graphics.drawString(font, version, right - font.width(version), y + 1, JilatonUi.alpha(JilatonUi.DANGER, alpha), false);
-                return font.width(version);
+                String version = Ui.fit(item.version.getString(), 140, 12, JilatonType.Face.MEDIUM);
+                float vw = Ui.width(version, 12, JilatonType.Face.MEDIUM);
+                Ui.text(graphics, version, right - vw, cy + 1, 12, JilatonType.Face.MEDIUM, Ui.alpha(Ui.DANGER, alpha));
+                return vw;
             }
             case UNREACHABLE -> {
-                graphics.drawString(font, "OFFLINE", right - font.width("OFFLINE"), y + 1, JilatonUi.alpha(JilatonUi.DANGER, alpha), false);
-                return font.width("OFFLINE");
+                float vw = Ui.width("Offline", 12, JilatonType.Face.MEDIUM);
+                Ui.text(graphics, "Offline", right - vw, cy + 1, 12, JilatonType.Face.MEDIUM, Ui.alpha(Ui.DANGER, alpha));
+                return vw;
             }
             default -> {
-                int dots = (int) ((now / 250_000_000L) % 4);
-                String text = "PINGING" + ".".repeat(dots);
-                graphics.drawString(font, text, right - font.width("PINGING..."), y + 1, JilatonUi.alpha(JilatonUi.TEXT_4, alpha), false);
-                return font.width("PINGING...");
+                // Pinging: three dots breathing in turn.
+                for (int i = 0; i < 3; i++) {
+                    double phase = ((now / 1e9) * 1.6 - i * 0.18) % 1.0;
+                    double a = 0.25 + 0.75 * Math.max(0, Math.sin(Math.PI * phase));
+                    Ui.circle(graphics, right - 26 + i * 10, cy + 6, 2.5F, Ui.alpha(Ui.TEXT_2, alpha * a));
+                }
+                return 30;
             }
         }
     }

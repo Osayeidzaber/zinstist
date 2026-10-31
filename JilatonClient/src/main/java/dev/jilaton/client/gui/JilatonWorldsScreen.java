@@ -3,7 +3,6 @@ package dev.jilaton.client.gui;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -28,6 +27,7 @@ import net.minecraft.world.level.storage.LevelStorageException;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.LevelSummary;
 import org.slf4j.Logger;
+import dev.jilaton.client.gui.design.Ui;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -45,10 +45,6 @@ public final class JilatonWorldsScreen extends JilatonCardScreen<LevelSummary> {
     private final Map<String, FaviconTexture> icons = new HashMap<>();
     private boolean loading;
     private boolean loaded;
-    private Button play;
-    private Button edit;
-    private Button delete;
-    private Button recreate;
 
     public JilatonWorldsScreen(Screen parent) {
         super(Component.literal("Worlds"), "01  WORLDS", parent);
@@ -112,39 +108,27 @@ public final class JilatonWorldsScreen extends JilatonCardScreen<LevelSummary> {
     @Override
     protected String subtitle(int shown) {
         if (loading) return "Loading worlds…";
-        return shown + (shown == 1 ? " world" : " worlds") + "  ·  double-click to play";
+        return shown + (shown == 1 ? " world" : " worlds") + "  ·  Double-click to play";
     }
 
     @Override
     protected Component emptyMessage() {
-        return Component.literal(loading ? "" : "No worlds yet — create one to begin.");
+        return Component.literal(loading ? "" : "No worlds yet. Create one to begin.");
     }
 
     @Override
-    protected void addActions(int y) {
-        int w = Math.min(100, (gridW - 30) / 6);
-        int x = width - margin - (w * 6 + 30);
-        play = addRenderableWidget(Button.builder(Component.literal("Play"), b -> { if (selected != null) activate(selected); })
-                .bounds(x, y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Create"),
-                b -> CreateWorldScreen.openFresh(minecraft, this::returnHere)).bounds(x + (w + 6), y, w, 20).build());
-        edit = addRenderableWidget(Button.builder(Component.literal("Edit"), b -> { if (selected != null) editWorld(selected); })
-                .bounds(x + (w + 6) * 2, y, w, 20).build());
-        delete = addRenderableWidget(Button.builder(Component.literal("Delete"), b -> { if (selected != null) confirmDelete(selected); })
-                .bounds(x + (w + 6) * 3, y, w, 20).build());
-        recreate = addRenderableWidget(Button.builder(Component.literal("Re-create"), b -> { if (selected != null) recreateWorld(selected); })
-                .bounds(x + (w + 6) * 4, y, w, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Back"), b -> onClose()).bounds(x + (w + 6) * 5, y, w, 20).build());
-        selectionChanged();
-    }
+    protected String rowAction() { return "Play"; }
 
     @Override
-    protected void selectionChanged() {
-        if (play == null) return;
-        play.active = selected != null && selected.primaryActionActive();
-        edit.active = selected != null && selected.canEdit();
-        delete.active = selected != null && selected.canDelete();
-        recreate.active = selected != null && selected.canRecreate();
+    protected boolean rowActionActive(LevelSummary item) { return item.primaryActionActive(); }
+
+    @Override
+    protected List<Action> actions() {
+        return List.of(
+                new Action("Create world", false, always(), () -> CreateWorldScreen.openFresh(minecraft, this::returnHere)),
+                new Action("Edit", false, () -> selected != null && selected.canEdit(), () -> editWorld(selected)),
+                new Action("Delete", false, () -> selected != null && selected.canDelete(), () -> confirmDelete(selected)),
+                new Action("Re-create", false, () -> selected != null && selected.canRecreate(), () -> recreateWorld(selected)));
     }
 
     @Override
@@ -247,30 +231,27 @@ public final class JilatonWorldsScreen extends JilatonCardScreen<LevelSummary> {
     }
 
     @Override
-    protected void renderCard(GuiGraphics graphics, LevelSummary item, int x, int y, int w, int h, double hover,
+    protected void renderCard(GuiGraphics graphics, LevelSummary item, float x, float y, float w, float h, double hover,
                               boolean selected, double alpha, long now) {
-        cardSurface(graphics, x, y, w, h, hover, selected, alpha);
         FaviconTexture icon = icons.get(item.getLevelId());
-        cardIcon(graphics, icon == null || icon.isClosed() ? null : icon.textureLocation(), item.getLevelName(), x + 8, y + 8, 48, alpha);
-        int textX = x + 66;
-        int textW = w - 74;
+        cardIcon(graphics, icon == null || icon.isClosed() ? null : icon.textureLocation(), item.getLevelName(), x + 14, y + 14, 48, alpha);
+        float textX = x + 76;
+        float textW = w - 96;
         String badge = badge(item);
-        int badgeW = badge.isEmpty() ? 0 : font.width(badge) + 8;
-        graphics.drawString(font, fit(item.getLevelName(), textW - badgeW), textX, y + 11, JilatonUi.alpha(JilatonUi.TEXT, alpha), false);
+        float badgeW = badge.isEmpty() ? 0 : Ui.spacedWidth(badge, 10, 0.6F, JilatonType.Face.MEDIUM) + 16;
+        String name = Ui.fit(item.getLevelName(), textW - badgeW - 140, 15, JilatonType.Face.SEMIBOLD);
+        Ui.text(graphics, name, textX, y + 17, 15, JilatonType.Face.SEMIBOLD, Ui.alpha(Ui.TEXT, alpha));
         if (!badge.isEmpty()) {
-            int bx = x + w - badgeW - 8;
-            int color = item.isHardcore() || !item.isCompatible() ? JilatonUi.DANGER : JilatonUi.TEXT_3;
-            JilatonUi.strokeRounded(graphics, bx, y + 9, badgeW, 12, 2, JilatonUi.alpha(color, alpha * 0.6));
-            graphics.drawString(font, badge, bx + 4, y + 11, JilatonUi.alpha(color, alpha), false);
+            float bx = textX + Ui.width(name, 15, JilatonType.Face.SEMIBOLD) + 10;
+            int color = item.isHardcore() || !item.isCompatible() ? Ui.DANGER : Ui.TEXT_2;
+            Ui.outline(graphics, bx, y + 16, badgeW, 20, 6, Ui.alpha(Ui.STROKE, alpha));
+            Ui.spaced(graphics, badge, bx + 8, y + 21, 10, 0.6F, JilatonType.Face.MEDIUM, Ui.alpha(color, alpha));
         }
         String mode = capitalize(item.getGameMode().getName()) + (item.hasCommands() ? "  ·  Cheats" : "");
-        graphics.drawString(font, fit(mode, textW), textX, y + 26, JilatonUi.alpha(JilatonUi.TEXT_2, alpha), false);
+        Ui.text(graphics, Ui.fit(mode, textW * 0.6F, 12, JilatonType.Face.REGULAR), textX, y + 43, 12, Ui.alpha(Ui.TEXT_2, alpha));
         String played = item.getLastPlayed() > 0 ? "Played " + ago(item.getLastPlayed()) : item.getLevelId();
-        graphics.drawString(font, fit(played, textW - 40), textX, y + 41, JilatonUi.alpha(JilatonUi.TEXT_4, alpha), false);
-        if (hover > 0.01 && item.primaryActionActive()) {
-            String cue = "PLAY ↗";
-            graphics.drawString(font, cue, x + w - font.width(cue) - 9, y + 41, JilatonUi.alpha(JilatonUi.TEXT, alpha * hover), false);
-        }
+        float pw = Ui.width(played, 11, JilatonType.Face.MONO);
+        Ui.text(graphics, played, x + w - 20 - pw, y + 31, 11, JilatonType.Face.MONO, Ui.alpha(Ui.TEXT_3, alpha));
     }
 
     private static String badge(LevelSummary item) {

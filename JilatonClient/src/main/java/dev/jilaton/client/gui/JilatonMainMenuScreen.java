@@ -1,46 +1,52 @@
 package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
-import net.minecraft.ChatFormatting;
+import dev.jilaton.client.gui.design.Canvas;
+import dev.jilaton.client.gui.design.Ui;
+import dev.jilaton.client.music.MusicCenter;
+import dev.jilaton.client.music.NowPlaying;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.storage.LevelSummary;
+import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Jilaton's title screen: a black editorial canvas with slow light arcs, an oversized wordmark and an
- * index-style navigation list whose rows invert under a white sweep. Entrance and hover motion are
- * time-based and scale with the configured animation intensity.
+ * Title screen, built to the "Main menu" design board (development/GUI_REDESIGN.md §1): a left column with the mark,
+ * wordmark and five text-link rows whose hover brightens them and draws an underline from the left; the player
+ * walks in on the right ({@link MenuAvatar}); a music pill bottom-left and versions bottom-right. Laid out in board
+ * coordinates on a {@link Canvas}.
  */
 public final class JilatonMainMenuScreen extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     private final Font font = JilatonType.font();
-    private static final String TICKER = "COMBAT  ✦  MOVEMENT  ✦  RENDER  ✦  PLAYER  ✦  CLIENT  ✦  ";
-    private final List<MenuAction> actions = new ArrayList<>(5);
-    /** Set on the first frame not covered by the loading overlay, so entrances are actually seen. */
-    private long openedAt;
-    private final AnimatedValue parallaxX = new AnimatedValue();
-    private final AnimatedValue parallaxY = new AnimatedValue();
-    private long frameNanos;
-    private boolean compact;
-    private int margin;
-    private int heroX;
-    private int heroY;
-    private int heroWidth;
-    private int navTop;
+    private static final float NAV_X = 112, NAV_Y = 224, NAV_W = 360, ROW_H = 44;
+    private static final float AVATAR_CX = 990, AVATAR_FLOOR = 528, AVATAR_H = 360;
+
+    private record Row(String label, String hint, boolean muted, Runnable action) { }
+
+    private final Canvas canvas = new Canvas();
+    private final double[] hover = new double[5];
+    private List<Row> rows = List.of();
     private MenuAvatar avatar;
-    private boolean showAvatar;
-    private int avatarCenterX;
-    private int avatarFloorY;
-    private int avatarHeight;
-    private int avatarClipLeft;
-    private int avatarClipRight;
+    private long openedAt;
+    private long lastFrame;
+    private int focused = -1;
+    private String lastWorld;
+    private CompletableFuture<List<LevelSummary>> worlds;
+    private final String version = FabricLoader.getInstance().getModContainer("jilaton")
+            .map(m -> m.getMetadata().getVersion().getFriendlyString()).orElse("dev");
+    private final String loader = FabricLoader.getInstance().getModContainer("fabricloader")
+            .map(m -> m.getMetadata().getVersion().getFriendlyString()).orElse("");
 
     public JilatonMainMenuScreen() {
         super(Component.literal("Jilaton Client"));
@@ -48,280 +54,199 @@ public final class JilatonMainMenuScreen extends Screen {
 
     @Override
     protected void init() {
-        actions.clear();
-        compact = width < 640 || height < 380;
-        margin = Math.max(16, Math.min(48, width / 20));
-        int navWidth;
-        int navX;
-        int navY;
-        int rowHeight;
-        if (compact) {
-            rowHeight = height < 330 ? 20 : 24;
-            navY = height - margin - 18 - rowHeight * 5;
-            heroX = margin;
-            heroWidth = width - margin * 2;
-            heroY = margin / 2 + 6 + 28 + 22;
-            avatarHeight = Math.max(70, Math.min(150, rowHeight * 5 + 24));
-            int slot = Math.round(avatarHeight * 0.55F) + 40;
-            showAvatar = width - margin * 2 - slot >= 230;
-            if (showAvatar) {
-                navWidth = Math.min(320, width - margin * 2 - slot);
-                navX = margin;
-                avatarCenterX = navX + navWidth + slot / 2 + 8;
-                avatarFloorY = navY + rowHeight * 5;
-                avatarClipLeft = navX + navWidth + 6;
-                avatarClipRight = width;
-            } else {
-                navWidth = Math.min(340, width - margin * 2);
-                navX = (width - navWidth) / 2;
-            }
-        } else {
-            navWidth = Math.min(330, Math.max(220, width * 32 / 100));
-            navX = width - margin - navWidth;
-            rowHeight = 30;
-            navY = Math.max(margin + 70, height / 2 - rowHeight * 5 / 2 + 10);
-            heroX = margin;
-            heroWidth = navX - margin - 40;
-            heroY = margin + 62;
-            avatarHeight = Math.max(110, Math.min(200, height * 42 / 100));
-            int slot = Math.round(avatarHeight * 0.55F) + 60;
-            showAvatar = heroWidth - slot >= 320;
-            if (showAvatar) {
-                heroWidth -= slot;
-                avatarCenterX = navX - 30 - slot / 2;
-                avatarFloorY = navY + rowHeight * 5;
-                avatarClipLeft = heroX + heroWidth + 10;
-                avatarClipRight = navX - 12;
-            }
-        }
-        if (showAvatar && avatar == null) {
+        canvas.fit(width, height);
+        rows = List.of(
+                new Row("Singleplayer", lastWorld == null ? "Your worlds" : lastWorld, false,
+                        () -> minecraft.setScreen(new JilatonWorldsScreen(this))),
+                new Row("Multiplayer", "Servers · LAN", false,
+                        () -> minecraft.setScreen(minecraft.options.skipMultiplayerWarning
+                                ? new JilatonServersScreen(this)
+                                : new net.minecraft.client.gui.screens.multiplayer.SafetyScreen(this))),
+                new Row("Client", "Modules · Visuals · Music", false, () -> JilatonClient.openClickGui(this)),
+                new Row("Minecraft settings", "", false,
+                        () -> minecraft.setScreen(new OptionsScreen(this, minecraft.options))),
+                new Row("Quit", "", true, minecraft::stop));
+        if (avatar == null) {
             try {
                 avatar = new MenuAvatar(minecraft);
             } catch (RuntimeException exception) {
-                showAvatar = false;
+                avatar = null;
             }
         }
-        navTop = navY;
-        addAction("Singleplayer", "LOCAL WORLDS", navX, navY, navWidth, rowHeight, true,
-                () -> minecraft.setScreen(new JilatonWorldsScreen(this)));
-        addAction("Multiplayer", "SERVERS", navX, navY + rowHeight, navWidth, rowHeight, false,
-                () -> minecraft.setScreen(minecraft.options.skipMultiplayerWarning
-                        ? new JilatonServersScreen(this) : new net.minecraft.client.gui.screens.multiplayer.SafetyScreen(this)));
-        addAction("Jilaton", "MODULES  ·  THEME", navX, navY + rowHeight * 2, navWidth, rowHeight, false,
-                () -> JilatonClient.openClickGui(this));
-        addAction("Options", "VIDEO  ·  CONTROLS", navX, navY + rowHeight * 3, navWidth, rowHeight, false,
-                () -> minecraft.setScreen(new OptionsScreen(this, minecraft.options)));
-        addAction("Quit", "EXIT GAME", navX, navY + rowHeight * 4, navWidth, rowHeight, false, minecraft::stop);
-    }
-
-    private void addAction(String label, String detail, int x, int y, int rowWidth, int rowHeight,
-                           boolean primary, Runnable action) {
-        Button button = Button.builder(Component.literal(label), ignored -> action.run())
-                .bounds(x, y, rowWidth, rowHeight)
-                .build();
-        button.setAlpha(0.0F);
-        addRenderableWidget(button);
-        actions.add(new MenuAction(label, detail, x, y, rowWidth, rowHeight, primary, button,
-                new Motion.Transition(0.34, Motion.SETTLE)));
+        if (worlds == null) {
+            try {
+                var source = minecraft.getLevelSource();
+                worlds = source.loadLevelSummaries(source.findLevelCandidates());
+            } catch (Exception exception) {
+                worlds = CompletableFuture.completedFuture(List.of());
+            }
+        }
     }
 
     @Override
+    public boolean shouldCloseOnEsc() { return false; }
+
+    @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        frameNanos = System.nanoTime();
-        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = frameNanos;
+        long now = System.nanoTime();
+        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = now;
+        double dt = lastFrame == 0 ? 0 : Math.min(0.1, (now - lastFrame) / 1e9);
+        lastFrame = now;
         boolean reduced = JilatonClient.clientConfig().reducedMotion();
-        double intensity = JilatonClient.clientConfig().animationIntensity();
-        double time = reduced ? 0.0 : (frameNanos - openedAt) / 1_000_000_000.0;
-        double px = parallaxX.update(Motion.amount((mouseX - width / 2.0) / Math.max(1, width), intensity, reduced), frameNanos, reduced);
-        double py = parallaxY.update(Motion.amount((mouseY - height / 2.0) / Math.max(1, height), intensity, reduced), frameNanos, reduced);
-        renderBackdrop(graphics, time, px, py, reduced);
-        renderChrome(graphics, reduced, intensity, time);
-        renderHero(graphics, reduced, intensity, px, py);
-        if (showAvatar && avatar != null) {
-            avatar.render(graphics, avatarCenterX, avatarFloorY, avatarHeight, avatarClipLeft, avatarClipRight,
-                    openedAt, frameNanos, mouseX, mouseY, reduced, intensity);
-            double label = entrance(1.9, reduced);
-            String name = avatar.name().toUpperCase(java.util.Locale.ROOT);
-            graphics.drawString(font, name, avatarCenterX - font.width(name) / 2, avatarFloorY + 10,
-                    JilatonUi.alpha(JilatonUi.TEXT_2, label), false);
-            if (!compact) {
-                String hint = "DRAG TO TURN";
-                graphics.drawString(font, hint, avatarCenterX - font.width(hint) / 2, avatarFloorY + 22,
-                        JilatonUi.alpha(JilatonUi.TEXT_4, label), false);
+        resolveLastWorld();
+        int accent = Ui.accent();
+        double mx = canvas.x(mouseX), my = canvas.y(mouseY);
+
+        graphics.fill(0, 0, width, height, Ui.BACKDROP);
+        canvas.begin(graphics);
+        backdrop(graphics, accent);
+
+        // Brand row.
+        double brandIn = stagger(now, 0.05, reduced);
+        float lift = (float) (10 * (1 - brandIn));
+        Ui.markTile(graphics, NAV_X, 132 + lift, 52, 14, true, accent);
+        Ui.spaced(graphics, "JILATON", NAV_X + 68, 140 + lift, 22, 7, JilatonType.Face.BOLD,
+                Ui.alpha(Ui.TEXT, brandIn));
+        Ui.text(graphics, "Client · Minecraft 1.21.11", NAV_X + 68, 168 + lift, 12, Ui.alpha(Ui.TEXT_2, brandIn));
+
+        // Navigation rows: text links, hover = accent + underline growing from the left.
+        int hoveredRow = -1;
+        for (int i = 0; i < rows.size(); i++) {
+            float y = NAV_Y + i * ROW_H;
+            if (Ui.inside(mx, my, NAV_X, y, NAV_W, ROW_H - 4)) hoveredRow = i;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            Row row = rows.get(i);
+            boolean on = i == hoveredRow || (hoveredRow < 0 && i == focused);
+            hover[i] = Ui.approach(hover[i], on ? 1 : 0, dt, 14, reduced);
+            double in = stagger(now, 0.25 + i * 0.04, reduced);
+            float y = NAV_Y + i * ROW_H + (float) (8 * (1 - in));
+            int base = row.muted() ? Ui.TEXT_2 : Ui.TEXT;
+            int color = Ui.alpha(Ui.mix(base, accent, hover[i]), in);
+            Ui.text(graphics, row.label(), NAV_X, y + 10, 17,
+                    hover[i] > 0.5 ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM, color);
+            if (!row.hint().isEmpty()) {
+                String hint = Ui.fit(row.hint(), 170, 12, JilatonType.Face.REGULAR);
+                Ui.textRight(graphics, hint, NAV_X + NAV_W, y + 14, 12, JilatonType.Face.REGULAR,
+                        Ui.alpha(Ui.mix(Ui.TEXT_3, Ui.TEXT_2, hover[i]), in));
+            }
+            if (hover[i] > 0.01) {
+                float line = (float) (120 * hover[i]);
+                Ui.rect(graphics, NAV_X, y + 34, line, 1, Ui.alpha(accent, in));
+                Ui.rect(graphics, NAV_X, y + 33, line, 3, Ui.alpha(accent, 0.18 * hover[i] * in));
             }
         }
-        renderNavigation(graphics, mouseX, mouseY, reduced, intensity);
-        renderTicker(graphics, reduced, intensity, time);
-        super.render(graphics, mouseX, mouseY, partialTick);
-    }
 
-    private double entrance(double delay, boolean reduced) {
-        return reduced ? 1.0 : Motion.staggered(openedAt, frameNanos, delay, 0.85, Motion.SETTLE);
-    }
+        // Account chip above the player.
+        String name = minecraft.getUser().getName();
+        float chipW = 48 + Ui.width(name, 13, JilatonType.Face.MEDIUM);
+        float chipX = AVATAR_CX - chipW / 2, chipY = 96;
+        boolean chipHover = Ui.inside(mx, my, chipX, chipY, chipW, 36);
+        Ui.card(graphics, chipX, chipY, chipW, 36, 10, Ui.alpha(chipHover ? Ui.RAISED : Ui.CARD, 0.85), Ui.STROKE);
+        Ui.circle(graphics, chipX + 18, chipY + 18, 4, Ui.ONLINE);
+        Ui.text(graphics, name, chipX + 30, chipY + 12, 13, JilatonType.Face.MEDIUM, Ui.TEXT);
+        Ui.text(graphics, "⌄", chipX + chipW - 16, chipY + 9, 13, Ui.TEXT_2);
 
-    private int rise(double progress, double intensity, boolean reduced) {
-        return (int) Math.round(Motion.amount(14, intensity, reduced) * (1 - progress));
-    }
-
-    private void renderBackdrop(GuiGraphics graphics, double time, double px, double py, boolean reduced) {
-        JilatonBackdrop.render(graphics, width, height, time, px, py, entrance(0.0, reduced));
-    }
-
-    private void renderChrome(GuiGraphics graphics, boolean reduced, double intensity, double time) {
-        double p = entrance(0.0, reduced);
-        int top = margin / 2 + 6 - rise(p, intensity, reduced) / 2;
-        int markSize = 12;
-        JilatonUi.strokeRounded(graphics, margin, top - 3, markSize + 6, markSize + 6, 3, JilatonUi.alpha(JilatonUi.HAIRLINE_STRONG, p));
-        JilatonLogo.draw(graphics, margin + 3, top, markSize, JilatonUi.alpha(JilatonUi.TEXT, p));
-        graphics.drawString(font, "JILATON", margin + markSize + 14, top + 2, JilatonUi.alpha(JilatonUi.TEXT, p), false);
-        graphics.drawString(font, "— 0.1", margin + markSize + 18 + font.width("JILATON"), top + 2,
-                JilatonUi.alpha(JilatonUi.TEXT_3, p), false);
-
-        String status = JilatonClient.moduleManager().all().size() + " MODULES  ·  READY";
-        int pillWidth = font.width(status) + 26;
-        int pillX = width - margin - pillWidth;
-        JilatonUi.strokeRounded(graphics, pillX, top - 4, pillWidth, 18, 3, JilatonUi.alpha(JilatonUi.HAIRLINE_STRONG, p));
-        double pulse = reduced ? 1 : 0.55 + 0.45 * Math.sin(time * 2.4);
-        graphics.fill(pillX + 9, top + 3, pillX + 12, top + 6, JilatonUi.alpha(JilatonUi.TEXT, p * pulse));
-        graphics.drawString(font, status, pillX + 17, top + 1, JilatonUi.alpha(JilatonUi.TEXT_2, p), false);
-
-        double q = entrance(0.08, reduced);
-        int labelY = top + 28 - rise(q, intensity, reduced) / 2;
-        graphics.drawString(font, "00 — MAIN MENU", margin, labelY, JilatonUi.alpha(JilatonUi.TEXT_3, q), false);
-        if (!compact) {
-            String right = "FABRIC  ·  MINECRAFT 1.21.11";
-            graphics.drawString(font, right, width - margin - font.width(right), labelY, JilatonUi.alpha(JilatonUi.TEXT_3, q), false);
+        // Chips under the player: only ones that lead somewhere.
+        float chipsY = AVATAR_FLOOR + 30;
+        String[] chips = {"Skin", "3D character"};
+        float total = 0;
+        for (String c : chips) total += Ui.width(c, 12, JilatonType.Face.MEDIUM) + 24 + 8;
+        float cx = AVATAR_CX - (total - 8) / 2;
+        for (String c : chips) {
+            float w = Ui.width(c, 12, JilatonType.Face.MEDIUM) + 24;
+            boolean h = Ui.inside(mx, my, cx, chipsY, w, 28);
+            if (h) Ui.round(graphics, cx, chipsY, w, 28, 8, Ui.RAISED);
+            Ui.outline(graphics, cx, chipsY, w, 28, 8, Ui.STROKE);
+            Ui.text(graphics, c, cx + 12, chipsY + 9, 12, JilatonType.Face.MEDIUM, h ? Ui.TEXT : Ui.TEXT_2);
+            cx += w + 8;
         }
-        int lineWidth = (int) Math.round((width - margin * 2) * q);
-        graphics.fill(margin, labelY + 13, margin + lineWidth, labelY + 14, JilatonUi.HAIRLINE);
-    }
 
-    private void renderHero(GuiGraphics graphics, boolean reduced, double intensity, double px, double py) {
-        Component word = Component.literal("JILATON").withStyle(ChatFormatting.BOLD);
-        int wordWidth = font.width(word);
-        float scale = (float) Math.max(2.0, Math.min(compact ? 4.0 : 7.0, heroWidth * 0.92 / wordWidth));
-        boolean subtitle = true;
-        if (compact) {
-            // Fit wordmark + subtitle into the space above the navigation; drop the subtitle if it cannot fit.
-            int available = navTop - 8 - heroY;
-            scale = (float) Math.min(scale, (available - 8) / 12.06);
-            if (scale < 2.2F) {
-                subtitle = false;
-                scale = (float) Math.min(heroWidth * 0.92 / wordWidth, available / 9.0);
-            }
-            scale = Math.max(1.0F, scale);
-        }
-        double p = entrance(0.14, reduced);
-        int y = heroY + rise(p, intensity, reduced);
-        float shiftX = (float) (px * 10);
-        float shiftY = (float) (py * 6);
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(heroX + shiftX, y + shiftY);
-        graphics.pose().scale(scale, scale);
-        graphics.drawString(font, word, 0, 0, JilatonUi.alpha(JilatonUi.TEXT, p), false);
-        graphics.pose().popMatrix();
+        musicPill(graphics, mx, my);
+        Ui.textRight(graphics, "Jilaton " + version, 1240, 650, 11, JilatonType.Face.MONO, Ui.TEXT_3);
+        Ui.textRight(graphics, "Fabric " + loader, 1240, 668, 11, JilatonType.Face.MONO, Ui.TEXT_3);
+        canvas.end(graphics);
 
-        if (!subtitle) return;
-        int below = y + Math.round(9 * scale) + 8;
-        double q = entrance(0.24, reduced);
-        float subScale = Math.max(1.0F, scale * 0.34F);
-        int subY = below + rise(q, intensity, reduced);
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(heroX + shiftX * 0.6F, subY + shiftY * 0.6F);
-        graphics.pose().scale(subScale, subScale);
-        Component client = Component.literal("client").withStyle(ChatFormatting.ITALIC);
-        graphics.drawString(font, client, 1, 0, JilatonUi.alpha(JilatonUi.TEXT_3, q), false);
-        Component edition = Component.literal("  for java edition");
-        graphics.drawString(font, edition, 1 + font.width(client), 0, JilatonUi.alpha(JilatonUi.TEXT_4, q), false);
-        graphics.pose().popMatrix();
-        if (compact) return;
-
-        double r = entrance(0.32, reduced);
-        int textY = subY + Math.round(9 * subScale) + 26 + rise(r, intensity, reduced);
-        Component tagline = Component.literal("Built for the fight, ")
-                .append(Component.literal("drawn in the dark.").withStyle(ChatFormatting.ITALIC));
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(heroX, textY);
-        graphics.pose().scale(1.5F, 1.5F);
-        graphics.drawString(font, tagline, 0, 0, JilatonUi.alpha(JilatonUi.TEXT, r), false);
-        graphics.pose().popMatrix();
-        double s = entrance(0.4, reduced);
-        int bodyY = textY + 24 + rise(s, intensity, reduced);
-        graphics.drawString(font, "Combat, movement and render modules behind one", heroX, bodyY,
-                JilatonUi.alpha(JilatonUi.TEXT_2, s), false);
-        graphics.drawString(font, "quiet, monochrome interface. Tune everything; keep it yours.", heroX, bodyY + 12,
-                JilatonUi.alpha(JilatonUi.TEXT_2, s), false);
-    }
-
-    private void renderNavigation(GuiGraphics graphics, int mouseX, int mouseY, boolean reduced, double intensity) {
-        for (int index = 0; index < actions.size(); index++) {
-            MenuAction action = actions.get(index);
-            double p = entrance(0.22 + index * 0.055, reduced);
-            int offset = (int) Math.round(Motion.amount(18, intensity, reduced) * (1 - p));
-            int x = action.x() + offset;
-            int y = action.y();
-            int w = action.width();
-            int h = action.height();
-            boolean hovered = mouseX >= action.x() && mouseX < action.x() + w && mouseY >= y && mouseY < y + h;
-            boolean active = hovered || action.button().isFocused();
-            double sweep = action.hover().update(active, frameNanos, reduced);
-            if (index == 0) graphics.fill(x, y, x + (int) Math.round(w * p), y + 1, JilatonUi.HAIRLINE_STRONG);
-            graphics.fill(x, y + h - 1, x + (int) Math.round(w * p), y + h, JilatonUi.HAIRLINE_STRONG);
-            int fillWidth = (int) Math.round(w * sweep);
-            if (fillWidth > 0) graphics.fill(x, y + 1, x + fillWidth, y + h - 1, JilatonUi.alpha(JilatonUi.TEXT, p));
-
-            int light = action.label().equals("Quit") ? JilatonUi.TEXT_2 : JilatonUi.TEXT;
-            drawRow(graphics, action, index, x, y, w, h, JilatonUi.alpha(light, p), JilatonUi.alpha(JilatonUi.TEXT_3, p),
-                    JilatonUi.alpha(JilatonUi.TEXT_4, p), sweep);
-            if (fillWidth > 0) {
-                graphics.enableScissor(x, y + 1, x + fillWidth, y + h - 1);
-                int ink = JilatonUi.alpha(0xFF050505, p);
-                drawRow(graphics, action, index, x, y, w, h, ink, JilatonUi.alpha(0xFF3A3A3A, p), JilatonUi.alpha(0xFF5A5A5A, p), sweep);
-                graphics.disableScissor();
-            }
+        if (avatar != null) {
+            int floor = canvas.screenY(AVATAR_FLOOR);
+            avatar.render(graphics, canvas.screenX(AVATAR_CX), floor, Math.round(AVATAR_H * canvas.scale()),
+                    canvas.screenX(700), width, openedAt, now, mouseX, mouseY, reduced,
+                    JilatonClient.clientConfig().animationIntensity());
         }
     }
 
-    private void drawRow(GuiGraphics graphics, MenuAction action, int index, int x, int y, int w, int h,
-                         int primary, int secondary, int tertiary, double sweep) {
-        int textY = y + (h - 8) / 2;
-        graphics.drawString(font, String.format("%02d", index + 1), x + 2, textY, tertiary, false);
-        int labelX = x + 28 + (int) Math.round(6 * sweep);
-        graphics.drawString(font, action.label(), labelX, textY, primary, false);
-        if (action.primary()) {
-            int dotX = labelX + font.width(action.label()) + 6;
-            graphics.fill(dotX, textY + 3, dotX + 3, textY + 6, primary);
-        }
-        String arrow = "↗";
-        int arrowX = x + w - font.width(arrow) - 4 - (int) Math.round(2 * sweep);
-        graphics.drawString(font, arrow, arrowX, textY - (int) Math.round(2 * sweep), primary, false);
-        if (!compact) {
-            graphics.drawString(font, action.detail(), arrowX - 10 - font.width(action.detail()), textY, secondary, false);
-        }
+    private void backdrop(GuiGraphics graphics, int accent) {
+        Ui.glow(graphics, 1010, 230, 450, accent & 0xFFFFFF, 0.07);
+        Ui.glow(graphics, 120, 640, 380, 0xFFFFFF, 0.03);
+        Ui.vGradient(graphics, 0, 540, Canvas.W, 180, 0x000B0A0E, Ui.DEEP);
+        int[][] stars = {{700, 90, 2}, {1120, 160, 2}, {980, 60, 1}, {1210, 330, 2}, {860, 40, 1}, {560, 120, 1}};
+        for (int[] s : stars) Ui.rect(graphics, s[0], s[1], s[2], s[2], Ui.alpha(Ui.TEXT, s[2] == 2 ? 0.35 : 0.5));
     }
 
-    private void renderTicker(GuiGraphics graphics, boolean reduced, double intensity, double time) {
-        double p = entrance(0.5, reduced);
-        int baseline = height - margin / 2 - 10;
-        if (!compact) {
-            int stripY = baseline - 22;
-            graphics.fill(0, stripY, width, stripY + 1, JilatonUi.alpha(JilatonUi.HAIRLINE, p));
-            int tickerWidth = font.width(TICKER);
-            int offset = (int) Math.round((time * 18.0) % tickerWidth);
-            for (int x = -offset; x < width; x += tickerWidth) {
-                graphics.drawString(font, TICKER, x, stripY + 7, JilatonUi.alpha(JilatonUi.TEXT_4, p), false);
-            }
-            graphics.fill(0, stripY + 21, width, stripY + 22, JilatonUi.alpha(JilatonUi.HAIRLINE, p));
-        }
-        graphics.drawString(font, "RIGHT SHIFT — OPEN MENU", margin, baseline + 6, JilatonUi.alpha(JilatonUi.TEXT_4, p), false);
-        if (compact && showAvatar) return;
-        String right = "MONOCHROME BY DEFAULT";
-        graphics.drawString(font, right, width - margin - font.width(right), baseline + 6, JilatonUi.alpha(JilatonUi.TEXT_4, p), false);
+    private void musicPill(GuiGraphics graphics, double mx, double my) {
+        MusicCenter music = MusicCenter.get();
+        NowPlaying now = music.nowPlaying();
+        boolean off = music.source() == MusicCenter.Source.OFF;
+        String title = off ? "Music is off" : now.hasTrack() ? now.title() : "Nothing playing";
+        String sub = off ? "Press M to pick a source" : now.hasTrack() ? now.source() : "Press M to open Music";
+        float w = 60 + Math.max(Ui.width(title, 12, JilatonType.Face.MEDIUM), Ui.width(sub, 11, JilatonType.Face.REGULAR));
+        w = Math.min(w, 320);
+        float x = NAV_X, y = 640;
+        boolean h = Ui.inside(mx, my, x, y, w, 40);
+        Ui.card(graphics, x, y, w, 40, 12, Ui.alpha(h ? Ui.RAISED : Ui.CARD, 0.7), Ui.STROKE);
+        Ui.round(graphics, x + 6, y + 6, 28, 28, 7, Ui.RAISED);
+        Ui.text(graphics, "♪", x + 15, y + 13, 13, Ui.TEXT_2);
+        Ui.text(graphics, Ui.fit(title, w - 56, 12, JilatonType.Face.MEDIUM), x + 46, y + 7, 12, JilatonType.Face.MEDIUM, Ui.TEXT);
+        Ui.text(graphics, Ui.fit(sub, w - 56, 11, JilatonType.Face.REGULAR), x + 46, y + 22, 11, Ui.TEXT_2);
+    }
+
+    private void resolveLastWorld() {
+        if (lastWorld != null || worlds == null || !worlds.isDone()) return;
+        List<LevelSummary> list = worlds.getNow(List.of());
+        lastWorld = list.stream().max(Comparator.comparingLong(LevelSummary::getLastPlayed))
+                .map(LevelSummary::getLevelName).orElse("Create a world");
+        rows = List.of(new Row(rows.get(0).label(), lastWorld, false, rows.get(0).action()),
+                rows.get(1), rows.get(2), rows.get(3), rows.get(4));
+    }
+
+    private double stagger(long now, double delay, boolean reduced) {
+        return reduced ? 1 : Motion.staggered(openedAt, now, delay, 0.5, Motion.SETTLE);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (showAvatar && avatar != null && event.button() == 0 && avatar.mouseClicked(event.x(), event.y())) return true;
+        if (event.button() == 0) {
+            double mx = canvas.x(event.x()), my = canvas.y(event.y());
+            for (int i = 0; i < rows.size(); i++) {
+                if (Ui.inside(mx, my, NAV_X, NAV_Y + i * ROW_H, NAV_W, ROW_H - 4)) {
+                    rows.get(i).action().run();
+                    return true;
+                }
+            }
+            String name = minecraft.getUser().getName();
+            float chipW = 48 + Ui.width(name, 13, JilatonType.Face.MEDIUM);
+            if (Ui.inside(mx, my, AVATAR_CX - chipW / 2, 96, chipW, 36)) {
+                minecraft.setScreen(new AccountsScreen(this));
+                return true;
+            }
+            float chipsY = AVATAR_FLOOR + 30;
+            float skinW = Ui.width("Skin", 12, JilatonType.Face.MEDIUM) + 24;
+            float charW = Ui.width("3D character", 12, JilatonType.Face.MEDIUM) + 24;
+            float cx = AVATAR_CX - (skinW + charW + 8) / 2;
+            if (Ui.inside(mx, my, cx, chipsY, skinW, 28)) {
+                minecraft.setScreen(new AccountsScreen(this));
+                return true;
+            }
+            if (Ui.inside(mx, my, cx + skinW + 8, chipsY, charW, 28)) {
+                JilatonClient.openClickGui(this);
+                return true;
+            }
+            if (Ui.inside(mx, my, NAV_X, 640, 320, 40)) {
+                minecraft.setScreen(new MusicCenterScreen(this));
+                return true;
+            }
+            if (avatar != null && avatar.mouseClicked(event.x(), event.y())) return true;
+        }
         return super.mouseClicked(event, doubleClick);
     }
 
@@ -338,11 +263,20 @@ public final class JilatonMainMenuScreen extends Screen {
     }
 
     @Override
-    public boolean shouldCloseOnEsc() {
-        return false;
-    }
-
-    private record MenuAction(String label, String detail, int x, int y, int width, int height,
-                              boolean primary, Button button, Motion.Transition hover) {
+    public boolean keyPressed(KeyEvent event) {
+        int key = event.key();
+        if (key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_TAB) {
+            focused = (focused + 1) % rows.size();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_UP) {
+            focused = focused <= 0 ? rows.size() - 1 : focused - 1;
+            return true;
+        }
+        if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_SPACE) && focused >= 0) {
+            rows.get(focused).action().run();
+            return true;
+        }
+        return super.keyPressed(event);
     }
 }

@@ -4,8 +4,8 @@ package dev.jilaton.client.gui.hud;
 public final class HudDesign {
     public static final int SEGMENTS = 9;
     public static final int CHIP_GAP = 4;
-    public static final int VIOLET = 0x8B5CF6;
-    public static final int MAGENTA = 0xEC4899;
+    public static final int VIOLET = 0xF5F5F5;
+    public static final int MAGENTA = 0xA8A8A8;
 
     public static final int COMPACT_TARGET_WIDTH = 184;
     public static final int COMPACT_TARGET_HEIGHT = 44;

@@ -97,9 +97,6 @@ final class MenuAvatar {
         graphics.enableScissor(clipLeft, 0, clipRight, floorY + 4);
         graphics.submitSkinRenderState(model, current.body().texturePath(), scale, -4.0F, (float) yaw, -1.0625F,
                 boxX, top, boxX + boxW, top + boxH);
-        // Emerging from the dark: a fog veil over the far-away figure lifts as it approaches.
-        double fog = reduced ? 0 : Motion.clamp01(1 - s / 0.45);
-        if (fog > 0.01) graphics.fill(boxX, top, boxX + boxW, top + boxH, JilatonUi.alpha(0xFF000000, fog * 0.92));
         graphics.disableScissor();
     }
 

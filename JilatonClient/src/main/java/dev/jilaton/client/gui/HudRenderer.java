@@ -214,6 +214,7 @@ public final class HudRenderer {
                     accent, guiWidth, guiHeight, editorPreview, targetRecentlyAttacked);
         }
 
+        int rightColumnTop = 36;
         if (modules.get("now_playing") instanceof dev.jilaton.client.module.impl.NowPlayingModule nowPlaying
                 && nowPlaying.enabled() && visible("music", editorPreview)
                 && (editorPreview || !(client.screen instanceof HudEditorScreen))) {
@@ -227,6 +228,7 @@ public final class HudRenderer {
                 NowPlayingWidget.render(graphics, font, state, style, x, y, activeStyle.accentColor(accent) & 0xFFFFFF,
                         nowPlaying.artwork(), nowPlaying.device(), System.nanoTime());
                 graphics.pose().popMatrix();
+                if (config.hudPosition("music") == null) rightColumnTop = y + height + 6;
             }
         }
 
@@ -241,15 +243,14 @@ public final class HudRenderer {
         int moduleListTop = 8;
         if (hud.watermark() && visible("watermark", editorPreview)) {
             String version = "JILATON";
-            int width = font.width(version) + 38;
+            int width = Math.round(dev.jilaton.client.gui.design.Ui.spacedWidth(version, 9, 1.6F, JilatonType.Face.BOLD)) + 34;
             int x = widgetX("watermark", 8, width, guiWidth);
             int y = widgetY("watermark", 8, 22, guiHeight);
             beginWidget(graphics, "watermark", x, y, width, 22, editorPreview);
             accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
             drawPanel(graphics, x, y, width, 22);
-            graphics.fill(x, y, x + 2, y + 22, accent);
-            JilatonLogo.draw(graphics, x + 6, y + 2, 16, accent);
-            graphics.drawString(font, version, x + 27, y + 7, 0xFFF2F2F2);
+            dev.jilaton.client.gui.design.Ui.mark(graphics, x + 8, y + 5, 12, 0xFFF5F5F5);
+            dev.jilaton.client.gui.design.Ui.spaced(graphics, version, x + 26, y + 7, 9, 1.6F, JilatonType.Face.BOLD, 0xFFF5F5F5);
             graphics.pose().popMatrix();
             moduleListTop = activeLayout.y() + activeLayout.height() + 6;
         }
@@ -262,21 +263,18 @@ public final class HudRenderer {
                     continue;
                 }
                 activeModuleScratch.add(active);
-                listWidth = Math.max(listWidth, font.width(active.name()) + 18);
+                listWidth = Math.max(listWidth, font.width(active.name()) + 4);
             }
             if (!activeModuleScratch.isEmpty()) {
-                int listHeight = activeModuleScratch.size() * 20 - 2;
-                int x = widgetX("modules", 8, listWidth, guiWidth);
-                int y = widgetY("modules", moduleListTop, listHeight, guiHeight);
+                int listHeight = activeModuleScratch.size() * 12;
+                int x = widgetX("modules", guiWidth - listWidth - 8, listWidth, guiWidth);
+                int y = widgetY("modules", rightColumnTop, listHeight, guiHeight);
                 beginWidget(graphics, "modules", x, y, listWidth, listHeight, editorPreview);
                 accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
                 for (ClientModule active : activeModuleScratch) {
                     String label = active.name();
-                    int width = font.width(label) + 18;
-                    drawPanel(graphics, x, y, width, 18);
-                    graphics.fill(x, y, x + 2, y + 18, accent);
-                    graphics.drawString(font, label, x + 7, y + 5, 0xFFE2E2E2);
-                    y += 20;
+                    graphics.drawString(font, label, x + listWidth - font.width(label), y + 2, 0xFFF5F5F5, true);
+                    y += 12;
                 }
                 moduleListTop = activeLayout.y() + activeLayout.height() + 6;
                 graphics.pose().popMatrix();
@@ -369,8 +367,8 @@ public final class HudRenderer {
         }
 
         if (hud.keystrokes() && visible("keystrokes", editorPreview)) {
-            int x = widgetX("keystrokes", 8, 70, guiWidth);
-            int y = widgetY("keystrokes", guiHeight - 104, 58, guiHeight);
+            int x = widgetX("keystrokes", guiWidth - 78, 70, guiWidth);
+            int y = widgetY("keystrokes", guiHeight - 160, 58, guiHeight);
             beginWidget(graphics, "keystrokes", x, y, 70, 58, editorPreview);
             accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
             renderKeystrokes(graphics, client, accent, x, y);
@@ -442,13 +440,14 @@ public final class HudRenderer {
             var notice = notices.isEmpty() ? null : notices.get(index);
             String label = notice == null ? "Module notifications" : notice.text();
             int top = y + index * 26;
-            int color = notice == null || notice.enabled() ? accent : 0xFFA5A5A5;
             drawPanel(graphics, x, top, width, 23);
-            graphics.fill(x, top, x + 2, top + 23, color);
-            graphics.drawString(JilatonType.font(), JilatonType.font().plainSubstrByWidth(label, width - 16), x + 8, top + 6, 0xFFE0E0E0);
+            JilatonUi.fillRounded(graphics, x + 8, top + 9, 5, 5, 3, notice == null || notice.enabled() ? 0xFF30A46C : 0xFF5F5F5F);
+            graphics.drawString(JilatonType.font(), JilatonType.font().plainSubstrByWidth(label, width - 26), x + 18, top + 7, 0xFFF0F0F0, false);
             double remaining = notice == null ? 1.0 : Math.max(0, 1.0
                     - (now - notice.createdAt()) / (double) dev.jilaton.client.notification.NotificationCenter.LIFETIME_NANOS);
-            graphics.fill(x + 2, top + 21, x + 2 + (int) Math.round((width - 2) * remaining), top + 23, color);
+            int track = width - 16;
+            JilatonUi.fillRounded(graphics, x + 8, top + 19, Math.max(2, (int) Math.round(track * remaining)), 1, 0,
+                    HudDesign.withAlpha(0xFFF5F5F5, 0.35));
         }
         graphics.pose().popMatrix();
     }
@@ -598,16 +597,13 @@ public final class HudRenderer {
             graphics.pose().popMatrix();
             return;
         }
-        // Near-black panel, violet head outline, and one violet-to-magenta health gradient.
+        // Near-black panel, white head outline, and one white-to-grey health gradient.
         int surface = ((int) Math.round(activeStyle.panelOpacity() * 255) << 24) | 0x09090D;
-        graphics.fill(x, y, x + width, y + height, surface);
-        graphics.fill(x + 1, y + 1, x + width - 1, y + 2, 0x18FFFFFF);
-        graphics.fill(x + 1, y + height - 2, x + width - 1, y + height - 1, 0x10FFFFFF);
+        glass(graphics, x, y, width, height, surface);
 
         int headX = x + card.headX(), headY = y + card.headY(), headSize = card.headSize();
-        graphics.fill(headX - 1, headY - 1, headX + headSize + 1, headY + headSize + 1,
-                recentlyAttacked ? 0xFFD6C7FF : 0xFF9C8BD6);
-        graphics.fill(headX, headY, headX + headSize, headY + headSize, 0xFF0B0B0F);
+        JilatonUi.fillRounded(graphics, headX, headY, headSize, headSize, 6, 0xFF101010);
+        JilatonUi.strokeRounded(graphics, headX, headY, headSize, headSize, 6, recentlyAttacked ? 0xFFFFFFFF : 0x30FFFFFF);
         InventoryScreen.renderEntityInInventoryFollowsMouse(graphics,
                 headX, headY, headX + headSize, headY + headSize, 20, 0.0625F,
                 headX + headSize * 0.5F, headY + headSize * 0.55F, target);
@@ -696,9 +692,8 @@ public final class HudRenderer {
     private void renderCompactTarget(GuiGraphics graphics, Font font, Minecraft client, LivingEntity target,
                                      int x, int y, int width, int height, int accent, boolean recentlyAttacked) {
         int color = activeStyle.accentColor(accent);
-        graphics.fill(x, y, x + width, y + height, activeStyle.panelColor());
-        graphics.fill(x, y, x + 2, y + height, color);
-        graphics.fill(x + 7, y + 7, x + 31, y + 31, 0xFF222222);
+        glass(graphics, x, y, width, height, activeStyle.panelColor());
+        JilatonUi.fillRounded(graphics, x + 7, y + 7, 24, 24, 5, 0xFF1B1B1B);
         if (target instanceof net.minecraft.client.player.AbstractClientPlayer player)
             net.minecraft.client.gui.components.PlayerFaceRenderer.draw(graphics, player.getSkin(), x + 7, y + 7, 24);
         else graphics.drawString(font, font.plainSubstrByWidth(target.getName().getString(), 12), x + 11, y + 14, color);
@@ -794,7 +789,7 @@ public final class HudRenderer {
         graphics.fill(drawX, drawY, drawX + width, drawY + height,
                 HudDesign.withAlpha(style.panelColor(), presence));
         graphics.fill(drawX, drawY, drawX + 2, drawY + height,
-                HudDesign.withAlpha(recentlyAttacked ? 0xFFD6C7FF : style.accentColor(accent), presence));
+                HudDesign.withAlpha(recentlyAttacked ? 0xFFFFFFFF : style.accentColor(accent), presence));
         String name = font.plainSubstrByWidth(target.getName().getString(), width - 46);
         graphics.drawString(font, name, drawX + 7, drawY + 5, HudDesign.withAlpha(0xFFF2F2F2, presence));
         HudNumberPainter painter = numbers(font);
@@ -858,7 +853,7 @@ public final class HudRenderer {
                 graphics.fill(chipX, rowY - 1, chipX + chipWidth, rowY + 10,
                         down ? (accent & 0x00FFFFFF) | 0x66000000 : 0xFF17151D);
                 graphics.drawString(font, key, chipX + (chipWidth - font.width(key)) / 2, rowY + 1,
-                        down ? 0xFFFFFFFF : 0xFFB9A8FF);
+                        down ? 0xFFFFFFFF : 0xFFF5F5F5);
             }
         }
         graphics.pose().popMatrix();
@@ -919,8 +914,7 @@ public final class HudRenderer {
         int y = widgetY("held_item", graphics.guiHeight() - 240, height, graphics.guiHeight());
         beginWidget(graphics, "held_item", x, y, width, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.fill(x, y, x + width, y + height, HudDesign.withAlpha(activeStyle.panelColor(), presence));
-        graphics.fill(x, y, x + 2, y + height, HudDesign.withAlpha(accent, presence));
+        glass(graphics, x, y, width, height, HudDesign.withAlpha(activeStyle.panelColor(), presence));
         String label = fitHeldLabel(font, stack.isEmpty() ? "EMPTY"
                 : stack.getHoverName().getString().toUpperCase(Locale.ROOT));
         if (!stack.isEmpty()) {
@@ -1045,9 +1039,8 @@ public final class HudRenderer {
         int y = widgetY("staff", graphics.guiHeight() - 210, height, graphics.guiHeight());
         beginWidget(graphics, "staff", x, y, width, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.fill(x, y, x + width, y + height, hudSurface());
-        graphics.fill(x, y, x + 2, y + height, accent);
-        graphics.drawString(font, "STAFF", x + 7, y + 6, accent);
+        glass(graphics, x, y, width, height, hudSurface());
+        graphics.drawString(font, "STAFF", x + 7, y + 6, 0xFF8F8F8F);
         staffFade.update(staffCountText.update(detected.size()), nowNanos, config.reducedMotion());
         numbers(font).drawFadeRight(graphics, staffFade, nowNanos, x + width - 7, y + 6, 0xFFB9A8FF);
         if (rows.isEmpty()) {
@@ -1076,8 +1069,7 @@ public final class HudRenderer {
         int y = widgetY("radar", graphics.guiHeight() - 290, height, graphics.guiHeight());
         beginWidget(graphics, "radar", x, y, size, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
-        graphics.fill(x, y, x + size, y + height, hudSurface());
-        graphics.fill(x, y, x + 2, y + height, accent);
+        glass(graphics, x, y, size, height, hudSurface());
         graphics.fill(x + 2, y + size, x + size, y + size + 1, HAIRLINE);
         rangeFade.update(radarRangeText.update((int) Math.round(range)), nowNanos, config.reducedMotion());
         numbers(JilatonType.font()).drawSuffixedFade(graphics, rangeFade, nowNanos, "m", x + size - 6,
@@ -1113,7 +1105,7 @@ public final class HudRenderer {
                 blip.opacity = blip.presence.update(1, nowNanos, config.reducedMotion());
                 blip.drawX = centerX + blip.x.update(point.x(), nowNanos, config.reducedMotion());
                 blip.drawY = centerY + blip.y.update(point.y(), nowNanos, config.reducedMotion());
-                drawBlip(graphics, blip.drawX, blip.drawY, 0xFF9C8BD6, blip.opacity);
+                drawBlip(graphics, blip.drawX, blip.drawY, 0xFF8F8F8F, blip.opacity);
             }
         }
         for (VanishRetention.Snapshot snapshot : retention.snapshot(nowMillis)) {
@@ -1143,7 +1135,7 @@ public final class HudRenderer {
             }
             double opacity = entry.getValue().presence.update(0, nowNanos, config.reducedMotion());
             entry.getValue().opacity = opacity;
-            drawBlip(graphics, entry.getValue().drawX, entry.getValue().drawY, 0xFF9C8BD6, opacity);
+            drawBlip(graphics, entry.getValue().drawX, entry.getValue().drawY, 0xFF8F8F8F, opacity);
             if (opacity < 0.02) {
                 leaving.remove();
             }
@@ -1316,22 +1308,24 @@ public final class HudRenderer {
     private void drawKey(GuiGraphics graphics, Font font, net.minecraft.client.KeyMapping mapping,
                                 int x, int y, int width, int height, int accent) {
         boolean down = mapping.isDown();
-        graphics.fill(x, y, x + width, y + height, down ? (activeStyle.panelColor() & 0xFF000000) | 0x24203D : activeStyle.panelColor());
-        if (down) {
-            graphics.fill(x, y, x + width, y + 2, accent);
-        }
+        if (down) JilatonUi.fillRounded(graphics, x, y, width, height, 5, 0xF2F5F5F5);
+        else glass(graphics, x, y, width, height, activeStyle.panelColor());
         String label = mapping.getTranslatedKeyMessage().getString().toUpperCase(Locale.ROOT);
         if (width <= 22 && label.length() > 3) {
             label = label.substring(0, 3);
         }
         int labelX = x + (width - font.width(label)) / 2;
-        graphics.drawString(font, label, labelX, y + (height - 8) / 2, down ? 0xFFF2F2F2 : 0xFFA3A3A3);
+        graphics.drawString(font, label, labelX, y + (height - 8) / 2, down ? 0xFF0A0A0A : 0xFFB5B5B5, false);
     }
 
     private void drawPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        graphics.fill(x, y, x + width, y + height, activeStyle.panelColor());
-        graphics.fill(x, y, x + 2, y + height,
-                activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent())));
+        glass(graphics, x, y, width, height, activeStyle.panelColor());
+    }
+
+    /** Board HUD surface: rounded 7px ink chip with a faint white hairline. */
+    private static void glass(GuiGraphics graphics, int x, int y, int width, int height, int fill) {
+        JilatonUi.fillRounded(graphics, x, y, width, height, 7, fill);
+        JilatonUi.strokeRounded(graphics, x, y, width, height, 7, HudDesign.withAlpha(0x14FFFFFF, (fill >>> 24) / 255.0));
     }
 
     private record StaffEntry(UUID id, String name, boolean present) { }

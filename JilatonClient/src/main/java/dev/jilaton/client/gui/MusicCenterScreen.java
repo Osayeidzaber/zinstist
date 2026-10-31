@@ -1,9 +1,12 @@
 package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
+import dev.jilaton.client.gui.design.Canvas;
+import dev.jilaton.client.gui.design.Ui;
 import dev.jilaton.client.module.impl.MusicCenterModule;
 import dev.jilaton.client.module.impl.SpatialLyricsModule;
 import dev.jilaton.client.music.LocalLibrary;
+import dev.jilaton.client.music.Lyrics;
 import dev.jilaton.client.music.MusicCenter;
 import dev.jilaton.client.music.NowPlaying;
 import dev.jilaton.client.music.SpotifyConnect;
@@ -22,17 +25,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Music Center: now playing with transport controls, the local library and playlists, Spotify connection
- * and an interactive top-down placement preview for spatial lyrics. Everything writes to the same module
- * settings as the ClickGUI, so changes apply immediately and persist with the profile.
+ * Music Center, built to the "Music Center" design board (development/GUI_REDESIGN.md §7): the source control, album
+ * art, track and transport on the left; synced lyrics with word timing and three info tiles on the right. The
+ * Library, Spotify and Placement tabs take the right column. Everything writes to the same module settings as the
+ * ClickGUI, so changes apply immediately and persist with the profile.
  */
 public final class MusicCenterScreen extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     private final Font font = JilatonType.font();
-    private enum Tab { PLAYING("Now Playing"), LIBRARY("Library"), SPOTIFY("Spotify"), LYRICS("Lyrics");
+    private enum Tab { PLAYING("Now playing"), LIBRARY("Library"), SPOTIFY("Spotify"), LYRICS("Placement");
         final String label; Tab(String label) { this.label = label; } }
 
+    private static final float LEFT = 112, TOP = 56, COL_W = 340, ART = 340, RIGHT_X = 600, RIGHT = 1168,
+            BAR_Y = 578, VOL_X = 700, VOL_W = 220, VOL_Y = 694;
+    /** The older tab bodies draw in their own units, scaled into the right column. */
+    private static final float LEGACY_X = 584, LEGACY_Y = 112, LEGACY_SCALE = 1.3F;
+    private static final String[] SOURCES = {"Off", "Spotify app (no setup)", "Any desktop player", "Local files", "Spotify Web API"};
+    private static final String[] SOURCE_SHORT = {"Off", "Spotify app", "Any player", "Local files", "Web API"};
+
     private final Screen parent;
+    private final Canvas canvas = new Canvas();
+    private final List<Hit> boardHits = new ArrayList<>();
     private final long openedAt = System.nanoTime();
     private Tab tab = Tab.PLAYING;
     private String playlist;
@@ -57,14 +70,17 @@ public final class MusicCenterScreen extends Screen {
 
     @Override
     protected void init() {
-        pw = Math.min(460, width - 24);
-        ph = Math.min(300, height - 24);
-        px = (width - pw) / 2;
-        py = (height - ph) / 2;
+        canvas.fit(width, height);
+        pw = Math.round((RIGHT - LEGACY_X) / LEGACY_SCALE);
+        ph = Math.round((700 - LEGACY_Y) / LEGACY_SCALE);
+        px = 0;
+        py = 0;
         center().ensureScanned();
-        clientIdBox = new EditBox(font, px + 20, py + 92, pw - 40, 18, Component.literal("Client ID"));
+        clientIdBox = new EditBox(font, 0, 0, 200, 10, Component.literal("Client ID"));
         clientIdBox.setMaxLength(64);
-        clientIdBox.setHint(Component.literal("Spotify app Client ID"));
+        clientIdBox.setBordered(false);
+        clientIdBox.setTextColor(Ui.TEXT);
+        clientIdBox.setHint(Component.literal("Spotify app Client ID").withColor(Ui.TEXT_3));
         var setting = JilatonClient.moduleManager().get("music_center").settings().stream()
                 .filter(s -> s.id().equals("spotify_client_id")).findFirst().orElse(null);
         if (setting instanceof dev.jilaton.client.setting.TextSetting text) clientIdBox.setValue(text.value());
@@ -74,91 +90,286 @@ public final class MusicCenterScreen extends Screen {
             }
         });
         addRenderableWidget(clientIdBox);
+        placeClientIdBox();
+    }
+
+    /** The Client ID field sits in the Spotify tab, in screen pixels mapped from its legacy-unit position. */
+    private void placeClientIdBox() {
         clientIdBox.visible = tab == Tab.SPOTIFY;
+        float bx = LEGACY_X + 28 * LEGACY_SCALE, by = LEGACY_Y + 94 * LEGACY_SCALE;
+        clientIdBox.setX(canvas.screenX(bx));
+        clientIdBox.setY(canvas.screenY(by));
+        clientIdBox.setWidth(Math.max(40, canvas.screenX(bx + (pw - 56) * LEGACY_SCALE) - canvas.screenX(bx)));
+    }
+
+    private int sourceIndex() {
+        MusicCenterModule s = settings();
+        if (s == null) return 0;
+        for (int i = 0; i < SOURCES.length; i++) if (SOURCES[i].equals(s.sourceLabel())) return i;
+        return 0;
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         hits.clear();
-        double t = JilatonClient.clientConfig().reducedMotion() ? 1 : Motion.SETTLE.apply(Math.min(1, (System.nanoTime() - openedAt) / 3.2e8));
-        g.fill(0, 0, width, height, JilatonUi.alpha(0xC8000000, t));
-        int rise = (int) Math.round((1 - t) * 8);
-        int x = px, y = py + rise;
-        JilatonUi.shadow(g, x, y, pw, ph, 6, 0.6 * t);
-        JilatonUi.fillRounded(g, x, y, pw, ph, 6, JilatonUi.alpha(0xF5050505, t));
-        JilatonUi.strokeRounded(g, x, y, pw, ph, 6, JilatonUi.HAIRLINE);
-        g.drawString(font, "MUSIC CENTER", x + 20, y + 16, JilatonUi.TEXT_3, false);
-        String source = settings() == null ? "" : settings().sourceLabel();
-        button(g, x + pw - 20 - font.width(source) - 16, y + 11, font.width(source) + 16, 16, source, mouseX, mouseY, true, this::cycleSource);
-        int tabX = x + 20;
-        for (Tab each : Tab.values()) {
-            int w = font.width(each.label) + 18;
-            boolean selected = tab == each;
-            Hit hit = new Hit(tabX, y + 34, w, 18, () -> { tab = each; clientIdBox.visible = each == Tab.SPOTIFY; });
-            hits.add(hit);
-            if (selected) JilatonUi.fillRounded(g, tabX, y + 34, w, 18, 9, JilatonUi.TEXT);
-            else if (hit.contains(mouseX, mouseY)) JilatonUi.fillRounded(g, tabX, y + 34, w, 18, 9, JilatonUi.RAISED);
-            g.drawString(font, each.label, tabX + 9, y + 39, selected ? JilatonUi.INK : JilatonUi.TEXT_2, false);
-            tabX += w + 6;
-        }
-        g.fill(x + 20, y + 60, x + pw - 20, y + 61, JilatonUi.HAIRLINE);
-        clientIdBox.setY(y + 92);
+        boardHits.clear();
+        long now = System.nanoTime();
+        int accent = Ui.accent();
+        double mx = canvas.x(mouseX), my = canvas.y(mouseY);
+        NowPlaying np = center().nowPlaying();
+        g.fill(0, 0, width, height, 0xF00A0A0A);
+        canvas.begin(g);
+        Ui.glow(g, LEFT + ART / 2, 334, 330, 0xFFFFFF, np.hasTrack() ? 0.07 : 0.035);
+
+        // Header: back, title, tabs.
+        boolean backHover = Ui.inside(mx, my, LEFT, TOP, 36, 36);
+        Ui.card(g, LEFT, TOP, 36, 36, 10, Ui.alpha(Ui.RAISED, Ui.ease("music:back", backHover)), Ui.STROKE);
+        Ui.text(g, "\u2039", LEFT + 13, TOP + 8, 17, Ui.SOFT);
+        boardHits.add(new Hit(Math.round(LEFT), Math.round(TOP), 36, 36, this::onClose));
+        Ui.text(g, "Music", LEFT + 52, TOP + 4, 26, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+        String[] tabs = new String[Tab.values().length];
+        for (Tab each : Tab.values()) tabs[each.ordinal()] = each.label;
+        segmented(g, tabs, tab.ordinal(), RIGHT, TOP + 2, true, mx, my, i -> {
+            tab = Tab.values()[i];
+            placeClientIdBox();
+        });
+        segmented(g, SOURCE_SHORT, sourceIndex(), LEFT, 112, false, mx, my, i -> {
+            if (settings() != null) settings().setSource(SOURCES[i]);
+        });
+
+        renderNowPlaying(g, np, now, mx, my, accent);
         switch (tab) {
-            case PLAYING -> renderPlaying(g, x, y, mouseX, mouseY);
-            case LIBRARY -> renderLibrary(g, x, y, mouseX, mouseY);
-            case SPOTIFY -> renderSpotify(g, x, y, mouseX, mouseY);
-            case LYRICS -> renderLyrics(g, x, y, mouseX, mouseY);
+            case PLAYING -> renderLyricsPanel(g, np, now, mx, my);
+            default -> {
+                Ui.card(g, RIGHT_X, 164, RIGHT - RIGHT_X, 536, 18, Ui.DRAWER, Ui.STROKE);
+                g.pose().pushMatrix();
+                g.pose().translate(LEGACY_X, LEGACY_Y);
+                g.pose().scale(LEGACY_SCALE, LEGACY_SCALE);
+                int lmx = (int) Math.round((mx - LEGACY_X) / LEGACY_SCALE), lmy = (int) Math.round((my - LEGACY_Y) / LEGACY_SCALE);
+                JilatonType.withScale(canvas.scale() * LEGACY_SCALE, () -> {
+                    switch (tab) {
+                        case LIBRARY -> renderLibrary(g, 0, 0, lmx, lmy);
+                        case SPOTIFY -> renderSpotify(g, 0, 0, lmx, lmy);
+                        case LYRICS -> renderLyrics(g, 0, 0, lmx, lmy);
+                        default -> { }
+                    }
+                });
+                g.pose().popMatrix();
+                if (tab == Tab.SPOTIFY) {
+                    float bx = LEGACY_X + 20 * LEGACY_SCALE, by = LEGACY_Y + 90 * LEGACY_SCALE;
+                    Ui.card(g, bx, by, (pw - 40) * LEGACY_SCALE, 24, 8, Ui.CARD,
+                            clientIdBox.isFocused() ? Ui.alpha(accent, 0.55) : Ui.STROKE);
+                }
+            }
         }
+        canvas.end(g);
+        if (tab == Tab.SPOTIFY) placeClientIdBox();
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    /** Segmented control; {@code alignRight} anchors its right edge at {@code x}. Hits go to {@code select}. */
+    private void segmented(GuiGraphics g, String[] labels, int selected, float x, float y, boolean alignRight,
+                           double mx, double my, java.util.function.IntConsumer select) {
+        float total = 6;
+        for (String label : labels) total += Ui.width(label, 12, JilatonType.Face.MEDIUM) + 28;
+        float sx = alignRight ? x - total : x;
+        Ui.card(g, sx, y, total, 32, 9, Ui.CARD, Ui.STROKE);
+        float cx = sx + 3;
+        for (int i = 0; i < labels.length; i++) {
+            float w = Ui.width(labels[i], 12, JilatonType.Face.MEDIUM) + 28;
+            boolean over = Ui.inside(mx, my, cx, y + 3, w, 26);
+            double t = Ui.ease("music:seg:" + labels[i], over);
+            if (i == selected) Ui.round(g, cx, y + 3, w, 26, 7, Ui.TEXT);
+            else if (t > 0.01) Ui.round(g, cx, y + 3, w, 26, 7, Ui.alpha(Ui.RAISED, t));
+            Ui.text(g, labels[i], cx + 14, y + 10, 12, JilatonType.Face.MEDIUM,
+                    i == selected ? Ui.DEEP : Ui.mix(Ui.TEXT_2, Ui.TEXT, t));
+            int index = i;
+            boardHits.add(new Hit(Math.round(cx), Math.round(y + 3), Math.round(w), 26, () -> select.accept(index)));
+            cx += w;
+        }
+    }
+
+    private void renderNowPlaying(GuiGraphics g, NowPlaying np, long now, double mx, double my, int accent) {
+        float artY = 164;
+        // Soft drop shadow, then the art (or an ink tile with a music glyph).
+        for (int i = 3; i >= 1; i--)
+            Ui.round(g, LEFT - i * 3, artY - i * 3 + 6, ART + i * 6, ART + i * 6, 18 + i * 3, Ui.alpha(0xFF000000, 0.10));
+        if (np.artwork() != null) {
+            g.blit(np.artwork(), Math.round(LEFT), Math.round(artY), Math.round(LEFT + ART), Math.round(artY + ART), 0, 1, 0, 1);
+            Ui.outline(g, LEFT, artY, ART, ART, 18, Ui.alpha(Ui.TEXT, 0.08));
+        } else {
+            Ui.card(g, LEFT, artY, ART, ART, 18, Ui.CARD, Ui.STROKE);
+            Ui.textCentre(g, "\u266A", LEFT + ART / 2, artY + ART / 2 - 26, 48, JilatonType.Face.REGULAR, Ui.FAINT);
+        }
+        boolean off = center().source() == MusicCenter.Source.OFF;
+        String title = off ? "Music is off" : np.hasTrack() ? np.title() : "Nothing playing";
+        Ui.text(g, Ui.fit(title, COL_W, 22, JilatonType.Face.SEMIBOLD), LEFT, 520, 22, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+        String sub = off ? "Pick a source above" : String.join("  \u00b7  ", java.util.stream.Stream.of(np.artist(), np.device(), np.status())
+                .filter(v -> v != null && !v.isBlank()).toList());
+        Ui.text(g, Ui.fit(sub, COL_W, 13, JilatonType.Face.REGULAR), LEFT, 550, 13, Ui.TEXT_2);
+
+        double progress = np.progress(now);
+        Ui.round(g, LEFT, BAR_Y, COL_W, 4, 2, Ui.STROKE);
+        if (progress > 0) Ui.round(g, LEFT, BAR_Y, (float) (COL_W * progress), 4, 2, Ui.TEXT);
+        boolean barHover = Ui.inside(mx, my, LEFT, BAR_Y - 8, COL_W, 20) || draggingSeek;
+        double knob = Ui.ease("music:seek", barHover);
+        Ui.circle(g, (float) (LEFT + COL_W * progress), BAR_Y + 2, (float) (4 + 2 * knob), Ui.TEXT);
+        boardHits.add(new Hit(Math.round(LEFT), Math.round(BAR_Y - 8), Math.round(COL_W), 20, () -> draggingSeek = true));
+        Ui.text(g, NowPlaying.time(np.positionNow(now)), LEFT, BAR_Y + 12, 11, JilatonType.Face.MONO, Ui.TEXT_3);
+        Ui.textRight(g, NowPlaying.time(np.durationMs()), LEFT + COL_W, BAR_Y + 12, 11, JilatonType.Face.MONO, Ui.TEXT_3);
+
+        float cx = LEFT + COL_W / 2, cy = 632;
+        transport(g, cx - 82, cy, 22, false, mx, my, "prev", center()::previous);
+        transport(g, cx, cy, 30, true, mx, my, np.playing() ? "pause" : "play", center()::togglePause);
+        transport(g, cx + 82, cy, 22, false, mx, my, "next", center()::next);
+
+        MusicCenterModule s = settings();
+        if (s != null && center().source() == MusicCenter.Source.LOCAL) {
+            chip(g, "Shuffle", s.shuffle(), LEFT, 674, mx, my, () -> s.setShuffle(!s.shuffle()));
+            String repeat = "Repeat " + s.repeatLabel();
+            chip(g, repeat, !"Off".equalsIgnoreCase(s.repeatLabel()), LEFT + COL_W - Ui.width(repeat, 12, JilatonType.Face.MEDIUM) - 24,
+                    674, mx, my, s::cycleRepeat);
+        }
+    }
+
+    private void chip(GuiGraphics g, String label, boolean on, float x, float y, double mx, double my, Runnable action) {
+        float w = Ui.width(label, 12, JilatonType.Face.MEDIUM) + 24;
+        Ui.chip(g, label, x, y, w, 26, on, Ui.inside(mx, my, x, y, w, 26), Ui.accent());
+        boardHits.add(new Hit(Math.round(x), Math.round(y), Math.round(w), 26, action));
+    }
+
+    /** Round transport button: white disc for the main one, outline for prev/next; icon drawn from shapes. */
+    private void transport(GuiGraphics g, float cx, float cy, float r, boolean primary, double mx, double my, String icon,
+                           Runnable action) {
+        boolean over = Ui.inside(mx, my, cx - r, cy - r, r * 2, r * 2);
+        double t = Ui.ease("music:" + icon + ":" + Math.round(cx), over);
+        float rr = (float) (r + t * 1.5);
+        int ink;
+        if (primary) {
+            Ui.circle(g, cx, cy, rr, Ui.mix(Ui.TEXT, 0xFFFFFFFF, t));
+            ink = Ui.DEEP;
+        } else {
+            if (t > 0.01) Ui.circle(g, cx, cy, rr, Ui.alpha(Ui.RAISED, t));
+            Ui.ring(g, cx, cy, rr, 1, Ui.mix(Ui.STROKE, Ui.TEXT_2, t));
+            ink = Ui.TEXT;
+        }
+        float s = r * 0.42F;
+        switch (icon) {
+            case "pause" -> {
+                Ui.round(g, cx - s * 0.75F, cy - s, s * 0.5F, s * 2, 1.5F, ink);
+                Ui.round(g, cx + s * 0.25F, cy - s, s * 0.5F, s * 2, 1.5F, ink);
+            }
+            case "play" -> triangle(g, cx - s * 0.6F, cy, s * 2, true, ink);
+            case "next" -> {
+                triangle(g, cx - s * 0.7F, cy, s * 1.5F, true, ink);
+                Ui.rect(g, cx + s * 0.55F, cy - s * 0.75F, Math.max(1.5F, s * 0.22F), s * 1.5F, ink);
+            }
+            default -> {
+                triangle(g, cx + s * 0.7F, cy, s * 1.5F, false, ink);
+                Ui.rect(g, cx - s * 0.55F - Math.max(1.5F, s * 0.22F), cy - s * 0.75F, Math.max(1.5F, s * 0.22F), s * 1.5F, ink);
+            }
+        }
+        boardHits.add(new Hit(Math.round(cx - r), Math.round(cy - r), Math.round(r * 2), Math.round(r * 2), action));
+    }
+
+    /** Isosceles triangle of height {@code h} with its flat side at {@code x}, pointing right (or left). */
+    private static void triangle(GuiGraphics g, float x, float cy, float h, boolean right, int color) {
+        int rows = Math.max(6, Math.round(h));
+        float step = h / rows;
+        for (int i = 0; i < rows; i++) {
+            float half = h / 2 * (1 - (i + 0.5F) / rows);
+            float px = right ? x + i * step : x - (i + 1) * step;
+            Ui.rect(g, px, cy - half, step + 0.01F, half * 2, color);
+        }
+    }
+
+    private void renderLyricsPanel(GuiGraphics g, NowPlaying np, long now, double mx, double my) {
+        SpatialLyricsModule lyrics = lyrics();
+        Ui.spaced(g, "SYNCED LYRICS \u00b7 LRCLIB", RIGHT_X, 166, 11, 1.1F, JilatonType.Face.MEDIUM, Ui.TEXT_3);
+        if (lyrics != null) {
+            String where = lyrics.enabled() ? "Shown in your world: " + lyrics.modeSetting().value() : "Not shown in your world";
+            Ui.textRight(g, where, RIGHT, 165, 12, JilatonType.Face.REGULAR, Ui.TEXT_2);
+        }
+        float panelY = 188, panelH = 392, panelW = RIGHT - RIGHT_X;
+        Ui.card(g, RIGHT_X, panelY, panelW, panelH, 18, Ui.DRAWER, Ui.STROKE);
+        Lyrics text = center().lyrics();
+        float midY = panelY + panelH / 2 - 15;
+        if (!np.hasTrack() || text == null || text.isEmpty()) {
+            String status = center().lyricsStatus();
+            String line = !np.hasTrack() ? "Pick a source to see lyrics here" : status.isEmpty() ? "No synced lyrics for this track" : status;
+            Ui.textCentre(g, line, RIGHT_X + panelW / 2, midY + 8, 14, JilatonType.Face.REGULAR, Ui.TEXT_2);
+        } else {
+            long position = np.positionNow(now) + (lyrics == null ? 0 : Math.round(lyrics.offsetSetting().value()));
+            int index = text.indexAt(position);
+            List<Lyrics.Line> lines = text.lines();
+            float maxW = panelW - 64;
+            for (int k = -2; k <= 2; k++) {
+                int i = index + k;
+                if (i < 0 || i >= lines.size()) continue;
+                Lyrics.Line line = lines.get(i);
+                if (k == 0) {
+                    drawSungLine(g, line, position, RIGHT_X + 32, midY, maxW);
+                } else {
+                    float y = k < 0 ? midY - 44 + (k + 1) * 34 - 8 : midY + 52 + (k - 1) * 34;
+                    Ui.text(g, Ui.fit(line.text(), maxW, 18, JilatonType.Face.MEDIUM), RIGHT_X + 32, y, 18,
+                            JilatonType.Face.MEDIUM, Math.abs(k) == 1 ? Ui.TEXT_3 : Ui.FAINT);
+                }
+            }
+        }
+
+        float tileY = 596, gap = 12, tileW = (panelW - gap * 2) / 3;
+        if (lyrics != null) {
+            tile(g, RIGHT_X, tileY, tileW, "Placement", String.valueOf(lyrics.modeSetting().value()), mx, my,
+                    () -> lyrics.modeSetting().cycle(1));
+            tile(g, RIGHT_X + tileW + gap, tileY, tileW, "Lines kept",
+                    Math.round(lyrics.trailLinesSetting().value()) + " \u00b7 " + Math.round(lyrics.lingerSetting().value()) + " s",
+                    mx, my, () -> { tab = Tab.LYRICS; placeClientIdBox(); });
+            tile(g, RIGHT_X + (tileW + gap) * 2, tileY, tileW, "Timing offset",
+                    String.format("%+.0f ms", lyrics.offsetSetting().value()), mx, my, () -> { tab = Tab.LYRICS; placeClientIdBox(); });
+        }
+        MusicCenterModule s = settings();
+        if (s != null && center().source() == MusicCenter.Source.LOCAL) {
+            Ui.text(g, "Volume", RIGHT_X, VOL_Y - 6, 12, Ui.TEXT_2);
+            Ui.round(g, VOL_X, VOL_Y - 2, VOL_W, 4, 2, Ui.STROKE);
+            Ui.round(g, VOL_X, VOL_Y - 2, (float) (VOL_W * s.volume()), 4, 2, Ui.TEXT);
+            Ui.circle(g, (float) (VOL_X + VOL_W * s.volume()), VOL_Y, 6, Ui.TEXT);
+            boardHits.add(new Hit(Math.round(VOL_X - 6), Math.round(VOL_Y - 10), Math.round(VOL_W + 12), 20, () -> draggingVolume = true));
+        }
+    }
+
+    /** The current line at 30px: words already sung in white, the rest secondary (word timing from Lyrics). */
+    private void drawSungLine(GuiGraphics g, Lyrics.Line line, long position, float x, float y, float maxW) {
+        float size = 30;
+        if (!line.timedWords()) {
+            Ui.text(g, Ui.fit(line.text(), maxW, size, JilatonType.Face.SEMIBOLD), x, y, size, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+            return;
+        }
+        int sung = Lyrics.wordsSung(line, position);
+        float cx = x;
+        float space = Ui.width(" ", size, JilatonType.Face.SEMIBOLD);
+        for (int i = 0; i < line.words().size(); i++) {
+            String word = line.words().get(i).text().strip();
+            float w = Ui.width(word, size, JilatonType.Face.SEMIBOLD);
+            if (cx + w > x + maxW) {
+                Ui.text(g, "\u2026", cx, y, size, JilatonType.Face.SEMIBOLD, Ui.TEXT_2);
+                break;
+            }
+            Ui.text(g, word, cx, y, size, JilatonType.Face.SEMIBOLD, i < sung ? Ui.TEXT : Ui.TEXT_3);
+            cx += w + space;
+        }
+    }
+
+    private void tile(GuiGraphics g, float x, float y, float w, String label, String value, double mx, double my, Runnable action) {
+        boolean over = Ui.inside(mx, my, x, y, w, 76);
+        double t = Ui.ease("music:tile:" + label, over);
+        Ui.card(g, x, y, w, 76, 14, Ui.mix(Ui.CARD, Ui.RAISED, t), Ui.mix(Ui.STROKE, Ui.FAINT, t));
+        Ui.spaced(g, label.toUpperCase(java.util.Locale.ROOT), x + 16, y + 16, 10, 1, JilatonType.Face.MEDIUM, Ui.TEXT_3);
+        Ui.text(g, Ui.fit(value, w - 32, 16, JilatonType.Face.SEMIBOLD), x + 16, y + 40, 16, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+        boardHits.add(new Hit(Math.round(x), Math.round(y), Math.round(w), 76, action));
     }
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) { }
-
-    private void renderPlaying(GuiGraphics g, int x, int y, int mx, int my) {
-        NowPlaying np = center().nowPlaying();
-        long now = System.nanoTime();
-        int art = Math.min(96, ph - 130), ax = x + 20, ay = y + 74;
-        if (np.artwork() != null) g.blit(np.artwork(), ax, ay, ax + art, ay + art, 0, 1, 0, 1);
-        else {
-            JilatonUi.fillRounded(g, ax, ay, art, art, 4, 0xFF111111);
-            g.drawCenteredString(font, "♪", ax + art / 2, ay + art / 2 - 4, JilatonUi.TEXT_3);
-        }
-        int tx = ax + art + 16, tw = x + pw - 20 - tx;
-        g.drawString(font, NowPlayingWidget.clip(font, np.hasTrack() ? np.title() : "Nothing playing", tw), tx, ay + 4, JilatonUi.TEXT, false);
-        g.drawString(font, NowPlayingWidget.clip(font, np.artist(), tw), tx, ay + 18, JilatonUi.TEXT_2, false);
-        g.drawString(font, NowPlayingWidget.clip(font, np.album(), tw), tx, ay + 30, JilatonUi.TEXT_3, false);
-        g.drawString(font, NowPlayingWidget.clip(font, (np.device().isEmpty() ? "" : np.device() + "  ·  ") + np.status(), tw), tx, ay + 44, JilatonUi.TEXT_3, false);
-        // Seek bar (local only; Spotify seeking is not exposed to keep requests minimal).
-        int barY = ay + 66;
-        double progress = np.progress(now);
-        g.fill(tx, barY, tx + tw, barY + 2, 0xFF262626);
-        g.fill(tx, barY, tx + (int) (tw * progress), barY + 2, JilatonUi.TEXT);
-        g.fill(tx + (int) (tw * progress) - 1, barY - 2, tx + (int) (tw * progress) + 2, barY + 4, JilatonUi.TEXT);
-        hits.add(new Hit(tx, barY - 4, tw, 10, () -> draggingSeek = true));
-        g.drawString(font, NowPlaying.time(np.positionNow(now)), tx, barY + 7, JilatonUi.TEXT_3, false);
-        String total = NowPlaying.time(np.durationMs());
-        g.drawString(font, total, tx + tw - font.width(total), barY + 7, JilatonUi.TEXT_3, false);
-        int cy = y + ph - 44, cx = x + pw / 2;
-        button(g, cx - 66, cy, 36, 20, "◀◀", mx, my, true, center()::previous);
-        button(g, cx - 22, cy, 44, 20, np.playing() ? "Pause" : "Play", mx, my, true, center()::togglePause);
-        button(g, cx + 30, cy, 36, 20, "▶▶", mx, my, true, center()::next);
-        boolean local = center().source() == MusicCenter.Source.LOCAL;
-        MusicCenterModule s = settings();
-        if (s != null && local) {
-            button(g, x + 20, cy, 64, 20, s.shuffle() ? "Shuffle ●" : "Shuffle", mx, my, true, () -> s.setShuffle(!s.shuffle()));
-            button(g, x + 88, cy, 74, 20, "Repeat " + s.repeatLabel(), mx, my, true, s::cycleRepeat);
-            int vx = x + pw - 120, vy = cy + 9;
-            g.drawString(font, "VOL", vx - 24, vy - 4, JilatonUi.TEXT_3, false);
-            g.fill(vx, vy, vx + 100, vy + 2, 0xFF262626);
-            g.fill(vx, vy, vx + (int) (100 * s.volume()), vy + 2, JilatonUi.TEXT);
-            hits.add(new Hit(vx - 2, vy - 6, 104, 14, () -> draggingVolume = true));
-        }
-        String lyricsStatus = center().lyricsStatus();
-        String hint = (lyricsStatus.isEmpty() ? "" : lyricsStatus + "  ·  ") + (local ? "Playing from your files"
-                : "Audio plays in the Spotify app; Jilaton shows and controls it");
-        g.drawString(font, NowPlayingWidget.clip(font, hint, pw - 40), x + 20, y + ph - 20, JilatonUi.TEXT_4, false);
-    }
 
     private void renderLibrary(GuiGraphics g, int x, int y, int mx, int my) {
         LocalLibrary library = center().library();
@@ -215,7 +426,7 @@ public final class MusicCenterScreen extends Screen {
     private void renderSpotify(GuiGraphics g, int x, int y, int mx, int my) {
         SpotifyConnect spotify = center().spotify();
         int lx = x + 20;
-        g.drawString(font, "Easiest: choose \"Spotify app (no setup)\" in the source button above.", lx, y + 62, JilatonUi.TEXT, false);
+        g.drawString(font, "Easiest: choose \"Spotify app\" in the source control on the left.", lx, y + 62, JilatonUi.TEXT, false);
         g.drawString(font, "Optional Web API route below. Audio always plays in the Spotify app itself.", lx, y + 70, JilatonUi.TEXT_2, false);
         g.drawString(font, "1. Create an app at developer.spotify.com and paste its Client ID:", lx, y + 80, JilatonUi.TEXT_3, false);
         g.drawString(font, "2. Add this exact Redirect URI to the app:", lx, y + 118, JilatonUi.TEXT_3, false);
@@ -317,12 +528,22 @@ public final class MusicCenterScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (super.mouseClicked(event, doubleClick)) return true;
         if (event.button() != 0) return false;
+        double bx = canvas.x(event.x()), by = canvas.y(event.y());
+        for (int i = boardHits.size() - 1; i >= 0; i--) {
+            Hit hit = boardHits.get(i);
+            if (hit.contains(bx, by)) {
+                clientIdBox.setFocused(false);
+                hit.action().run();
+                if (draggingVolume || draggingSeek) mouseDragged(event, 0, 0);
+                return true;
+            }
+        }
+        double lx = (bx - LEGACY_X) / LEGACY_SCALE, ly = (by - LEGACY_Y) / LEGACY_SCALE;
         for (int i = hits.size() - 1; i >= 0; i--) {
             Hit hit = hits.get(i);
-            if (hit.contains(event.x(), event.y())) {
+            if (hit.contains(lx, ly)) {
                 hit.action().run();
-                if (draggingLyric) updateLyricDrag(event.x(), event.y());
-                if (draggingVolume || draggingSeek) mouseDragged(event, 0, 0);
+                if (draggingLyric) updateLyricDrag(lx, ly);
                 return true;
             }
         }
@@ -331,16 +552,15 @@ public final class MusicCenterScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
-        if (draggingLyric) { updateLyricDrag(event.x(), event.y()); return true; }
+        double bx = canvas.x(event.x()), by = canvas.y(event.y());
+        if (draggingLyric) { updateLyricDrag((bx - LEGACY_X) / LEGACY_SCALE, (by - LEGACY_Y) / LEGACY_SCALE); return true; }
         MusicCenterModule s = settings();
         if (draggingVolume && s != null) {
-            int vx = px + pw - 120;
-            s.setVolume((event.x() - vx) / 100.0);
+            s.setVolume(Math.max(0, Math.min(1, (bx - VOL_X) / VOL_W)));
             return true;
         }
         if (draggingSeek) {
-            int tx = px + 20 + 96 + 16, tw = px + pw - 20 - tx;
-            double fraction = Math.max(0, Math.min(1, (event.x() - tx) / tw));
+            double fraction = Math.max(0, Math.min(1, (bx - LEFT) / COL_W));
             if (center().source() == MusicCenter.Source.LOCAL)
                 center().player().seek((long) (center().player().durationMs() * fraction));
             return true;
@@ -367,7 +587,7 @@ public final class MusicCenterScreen extends Screen {
         if (event.key() == GLFW.GLFW_KEY_SPACE && !clientIdBox.isFocused()) { center().togglePause(); return true; }
         if (event.key() == GLFW.GLFW_KEY_TAB && !clientIdBox.isFocused()) {
             tab = Tab.values()[(tab.ordinal() + 1) % Tab.values().length];
-            clientIdBox.visible = tab == Tab.SPOTIFY;
+            placeClientIdBox();
             return true;
         }
         return super.keyPressed(event);

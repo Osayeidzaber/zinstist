@@ -1,7 +1,8 @@
 package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
-import net.minecraft.ChatFormatting;
+import dev.jilaton.client.gui.design.Canvas;
+import dev.jilaton.client.gui.design.Ui;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -18,35 +19,39 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
- * A Jilaton list screen: editorial header, live search, a scrollable grid of animated cards and a bottom
- * action bar. Subclasses supply the items, how a card looks and what activating one does.
+ * A Jilaton list screen, built to the "Multiplayer · server list" design board (development/GUI_REDESIGN.md §6):
+ * back button, title, optional segmented control and search in the header, 76px rows with the selected one ringed in
+ * accent, and outline actions in the footer. Everything is drawn in board coordinates on a {@link Canvas}; subclasses
+ * supply the items, how a row looks and what activating one does.
  */
 public abstract class JilatonCardScreen<T> extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     protected final Font font = JilatonType.font();
-    protected static final int CARD_HEIGHT = 64;
-    private static final int GAP = 8;
-    private static final int TARGET_CARD_WIDTH = 236;
+    protected static final float LEFT = 112, RIGHT = 1168, TOP = 64, LIST_Y = 128, LIST_BOTTOM = 604, ROW_H = 76,
+            GAP = 10, FOOTER_Y = 628, SEARCH_W = 260;
     private static final long DOUBLE_CLICK_NANOS = 350_000_000L;
+
+    /** A footer action: outline button, or the accent one when {@code primary}. */
+    protected record Action(String label, boolean primary, BooleanSupplier enabled, Runnable run) { }
+
     protected final Screen parent;
-    private final String section;
+    protected final Canvas canvas = new Canvas();
     private final List<T> items = new ArrayList<>();
-    private final Map<T, Motion.Transition> hover = new IdentityHashMap<>();
-    private final AnimatedValue scroll = new AnimatedValue();
-    private double targetScroll;
-    private long openedAt;
-    private long frameNanos;
+    private final Map<T, double[]> hover = new IdentityHashMap<>();
+    private final List<Action> actions = new ArrayList<>();
+    private double scroll, targetScroll;
+    private long openedAt, lastFrame;
     private long lastClickNanos;
     private T lastClicked;
     protected T selected;
     protected EditBox search;
-    protected int margin, gridX, gridY, gridW, gridBottom, columns, cardW, barY;
+    private int segment;
 
     protected JilatonCardScreen(Component title, String section, Screen parent) {
         super(title);
-        this.section = section;
         this.parent = parent;
     }
 
@@ -55,42 +60,52 @@ public abstract class JilatonCardScreen<T> extends Screen {
 
     protected abstract String searchText(T item);
 
-    protected abstract void renderCard(GuiGraphics graphics, T item, int x, int y, int w, int h, double hover,
+    /** Draws one row in board coordinates. */
+    protected abstract void renderCard(GuiGraphics graphics, T item, float x, float y, float w, float h, double hover,
                                        boolean selected, double alpha, long now);
 
     protected abstract void activate(T item);
 
+    /** Footer hint, left of the actions. */
     protected abstract String subtitle(int shown);
 
     protected abstract Component emptyMessage();
 
-    /** Adds the bottom action bar's buttons; called from init after layout. */
-    protected abstract void addActions(int y);
+    /** The footer actions, left to right. */
+    protected abstract List<Action> actions();
 
-    /** Lets subclasses enable/disable buttons that depend on a selection. */
+    /** Label of the accent button inside the selected row ("Join", "Play"). */
+    protected abstract String rowAction();
+
+    /** Whether the selected row's accent button is usable. */
+    protected boolean rowActionActive(T item) { return true; }
+
+    /** Segmented control labels in the header; none by default. */
+    protected List<String> segments() { return List.of(); }
+
+    protected boolean inSegment(T item, int segment) { return true; }
+
+    protected final int segment() { return segment; }
+
     protected void selectionChanged() { }
 
     @Override
     protected void init() {
-        margin = Math.max(16, Math.min(40, width / 20));
-        gridX = margin;
-        gridW = width - margin * 2;
-        gridY = margin + 74;
-        barY = height - margin - 20;
-        gridBottom = barY - 12;
-        columns = Math.max(1, (gridW + GAP) / (TARGET_CARD_WIDTH + GAP));
-        cardW = (gridW - GAP * (columns - 1)) / columns;
+        canvas.fit(width, height);
         String previous = search == null ? "" : search.getValue();
-        int searchW = Math.min(220, Math.max(120, width / 4));
-        search = new EditBox(font, width - margin - searchW, margin + 36, searchW, 18, Component.literal("Search"));
-        search.setHint(Component.literal("Search").withStyle(ChatFormatting.DARK_GRAY));
+        int sx = canvas.screenX(RIGHT - SEARCH_W + 34), sy = canvas.screenY(TOP + 17) - 4;
+        search = new EditBox(font, sx, sy, Math.max(40, canvas.screenX(RIGHT - 70) - sx), 10, Component.literal("Search"));
+        search.setBordered(false);
+        search.setTextColor(Ui.TEXT);
+        search.setHint(Component.literal("Search").withColor(Ui.TEXT_3));
         search.setValue(previous);
         search.setResponder(value -> {
             targetScroll = 0;
             refreshFilter();
         });
         addRenderableWidget(search);
-        addActions(barY);
+        actions.clear();
+        actions.addAll(actions());
         refreshFilter();
     }
 
@@ -98,148 +113,219 @@ public abstract class JilatonCardScreen<T> extends Screen {
     protected final void refreshFilter() {
         String query = search == null ? "" : search.getValue().trim().toLowerCase(Locale.ROOT);
         items.clear();
-        for (T item : source()) if (query.isEmpty() || searchText(item).toLowerCase(Locale.ROOT).contains(query)) items.add(item);
+        for (T item : source())
+            if (inSegment(item, segment) && (query.isEmpty() || searchText(item).toLowerCase(Locale.ROOT).contains(query)))
+                items.add(item);
         if (selected != null && !items.contains(selected)) selected = null;
         selectionChanged();
     }
 
-    protected final long frameNanos() { return frameNanos; }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        frameNanos = System.nanoTime();
-        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = frameNanos;
-        boolean reduced = JilatonWidgets.reducedMotion();
-        double intensity = JilatonClient.clientConfig().animationIntensity();
-        JilatonBackdrop.render(graphics, width, height, JilatonBackdrop.clock(reduced), 0, 0, 1);
-        renderHeader(graphics, reduced, intensity);
-        renderGrid(graphics, mouseX, mouseY, reduced, intensity);
-        graphics.fill(margin, barY - 8, width - margin, barY - 7, JilatonUi.HAIRLINE);
-        super.render(graphics, mouseX, mouseY, partialTick);
-    }
+    protected final int shownCount() { return items.size(); }
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // The card screen paints its own canvas in render.
+        // Painted in render.
     }
 
-    private double entrance(double delay, boolean reduced) {
-        return reduced ? 1 : Motion.staggered(openedAt, frameNanos, delay, 0.7, Motion.SETTLE);
+    private double entrance(double delay, long now, boolean reduced) {
+        if (reduced) return 1;
+        double t = Math.max(0, Math.min(1, ((now - openedAt) / 1e9 - delay) / 0.45));
+        return 1 - Math.pow(1 - t, 3);
     }
 
-    private void renderHeader(GuiGraphics graphics, boolean reduced, double intensity) {
-        double p = entrance(0, reduced);
-        int top = margin / 2 + 4;
-        JilatonLogo.draw(graphics, margin, top, 9, JilatonUi.alpha(JilatonUi.TEXT_2, p));
-        graphics.drawString(font, "JILATON", margin + 14, top + 1, JilatonUi.alpha(JilatonUi.TEXT_2, p), false);
-        graphics.drawString(font, "— " + section, margin + 18 + font.width("JILATON"), top + 1,
-                JilatonUi.alpha(JilatonUi.TEXT_4, p), false);
-        String back = "ESC — BACK";
-        graphics.drawString(font, back, width - margin - font.width(back), top + 1, JilatonUi.alpha(JilatonUi.TEXT_4, p), false);
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        long now = System.nanoTime();
+        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = now;
+        double dt = lastFrame == 0 ? 0 : Math.min(0.1, (now - lastFrame) / 1e9);
+        lastFrame = now;
+        boolean reduced = JilatonClient.clientConfig().reducedMotion();
+        int accent = Ui.accent();
+        double mx = canvas.x(mouseX), my = canvas.y(mouseY);
 
-        double q = entrance(0.06, reduced);
-        int rise = (int) Math.round(Motion.amount(10, intensity, reduced) * (1 - q));
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(margin, margin + 22 + rise);
-        graphics.pose().scale(3, 3);
-        graphics.drawString(font, getTitle().copy().withStyle(ChatFormatting.BOLD), 0, 0, JilatonUi.alpha(JilatonUi.TEXT, q), false);
-        graphics.pose().popMatrix();
-        graphics.drawString(font, subtitle(items.size()), margin + 1, margin + 54 + rise, JilatonUi.alpha(JilatonUi.TEXT_3, q), false);
-        int line = (int) Math.round(gridW * q);
-        graphics.fill(margin, gridY - 8, margin + line, gridY - 7, JilatonUi.HAIRLINE_STRONG);
-    }
+        graphics.fill(0, 0, width, height, Ui.BACKDROP);
+        canvas.begin(graphics);
+        Ui.glow(graphics, 1120, 80, 420, accent & 0xFFFFFF, 0.05);
 
-    private int contentHeight() {
-        int rows = (items.size() + columns - 1) / columns;
-        return rows == 0 ? 0 : rows * (CARD_HEIGHT + GAP) - GAP;
-    }
+        // Header.
+        double p = entrance(0, now, reduced);
+        boolean backHover = Ui.inside(mx, my, LEFT, TOP, 36, 36);
+        Ui.card(graphics, LEFT, TOP, 36, 36, 10, Ui.alpha(Ui.RAISED, Ui.ease("list:back", backHover)), Ui.STROKE);
+        Ui.text(graphics, "‹", LEFT + 13, TOP + 8, 17, Ui.SOFT);
+        Ui.text(graphics, getTitle().getString(), LEFT + 52, TOP + 4, 26, JilatonType.Face.SEMIBOLD, Ui.alpha(Ui.TEXT, p));
+        List<String> segs = segments();
+        if (!segs.isEmpty()) {
+            float sx = LEFT + 68 + Ui.width(getTitle().getString(), 26, JilatonType.Face.SEMIBOLD);
+            Ui.card(graphics, sx, TOP + 2, segmentsWidth(segs), 32, 9, Ui.CARD, Ui.STROKE);
+            float cx = sx + 3;
+            for (int i = 0; i < segs.size(); i++) {
+                float w = Ui.width(segs.get(i), 12, JilatonType.Face.MEDIUM) + 28;
+                if (i == segment) Ui.round(graphics, cx, TOP + 5, w, 26, 7, Ui.RAISED);
+                Ui.text(graphics, segs.get(i), cx + 14, TOP + 12, 12, JilatonType.Face.MEDIUM, i == segment ? Ui.TEXT : Ui.TEXT_2);
+                cx += w;
+            }
+        }
+        boolean searchFocus = search.isFocused();
+        Ui.card(graphics, RIGHT - SEARCH_W, TOP, SEARCH_W, 34, 9, Ui.CARD, searchFocus ? Ui.alpha(accent, 0.55) : Ui.STROKE);
+        Ui.outline(graphics, RIGHT - SEARCH_W + 13, TOP + 11, 10, 10, 5, Ui.TEXT_3);
+        Ui.rect(graphics, RIGHT - SEARCH_W + 22, TOP + 20, 3, 2, Ui.TEXT_3);
+        Ui.outline(graphics, RIGHT - 58, TOP + 8, 46, 18, 5, Ui.STROKE);
+        Ui.text(graphics, "Ctrl F", RIGHT - 52, TOP + 12, 10, JilatonType.Face.MONO, Ui.TEXT_3);
 
-    private int maxScroll() {
-        return Math.max(0, contentHeight() - (gridBottom - gridY));
-    }
-
-    private void renderGrid(GuiGraphics graphics, int mouseX, int mouseY, boolean reduced, double intensity) {
+        // Rows.
         targetScroll = Math.max(0, Math.min(maxScroll(), targetScroll));
-        double offset = scroll.update(targetScroll, frameNanos, reduced);
-        graphics.enableScissor(gridX - 4, gridY - 4, gridX + gridW + 4, gridBottom + 4);
+        scroll = Ui.approach(scroll, targetScroll, dt, 16, reduced);
+        float view = LIST_BOTTOM - LIST_Y;
+        graphics.enableScissor(canvas.screenX(LEFT - 8), canvas.screenY(LIST_Y - 6), canvas.screenX(RIGHT + 8),
+                canvas.screenY(LIST_BOTTOM + 6));
         for (int i = 0; i < items.size(); i++) {
             T item = items.get(i);
-            int x = gridX + (i % columns) * (cardW + GAP);
-            int y = gridY + (i / columns) * (CARD_HEIGHT + GAP) - (int) Math.round(offset);
-            if (y + CARD_HEIGHT < gridY - 4 || y > gridBottom + 4) continue;
-            double p = entrance(0.12 + 0.035 * Math.min(i, 14), reduced);
-            int rise = (int) Math.round(Motion.amount(12, intensity, reduced) * (1 - p));
-            boolean over = mouseY >= gridY && mouseY <= gridBottom && inside(mouseX, mouseY, x, y, cardW, CARD_HEIGHT);
-            double h = hover.computeIfAbsent(item, ignored -> new Motion.Transition(0.2, Motion.SETTLE))
-                    .update(over, frameNanos, reduced);
-            int lift = (int) Math.round(Motion.amount(2, intensity, reduced) * h);
+            float y = (float) (LIST_Y + i * (ROW_H + GAP) - scroll);
+            if (y + ROW_H < LIST_Y - 6 || y > LIST_BOTTOM + 6) continue;
+            double e = entrance(0.06 + 0.03 * Math.min(i, 12), now, reduced);
+            float rise = (float) (10 * (1 - e));
+            boolean over = my >= LIST_Y && my <= LIST_BOTTOM && Ui.inside(mx, my, LEFT, y, RIGHT - LEFT, ROW_H);
+            double[] h = hover.computeIfAbsent(item, ignored -> new double[1]);
+            h[0] = Ui.approach(h[0], over ? 1 : 0, dt, 14, reduced);
             boolean isSelected = item == selected;
-            renderCard(graphics, item, x, y + rise - lift, cardW, CARD_HEIGHT, h, isSelected, p, frameNanos);
+            float rowY = y + rise;
+            int fill = isSelected ? Ui.mix(Ui.CARD, accent, 0.05) : Ui.mix(Ui.CARD, Ui.RAISED, h[0]);
+            Ui.round(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, Ui.alpha(fill, e));
+            if (isSelected) Ui.glowRing(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, accent, e);
+            else Ui.outline(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, Ui.alpha(Ui.STROKE, e));
+            float contentW = RIGHT - LEFT - (isSelected ? 110 : 0);
+            renderCard(graphics, item, LEFT, rowY, contentW, ROW_H, h[0], isSelected, e, now);
+            if (isSelected) {
+                boolean active = rowActionActive(item);
+                boolean btnHover = active && Ui.inside(mx, my, RIGHT - 96, rowY + 20, 80, 36);
+                if (active) Ui.button(graphics, rowAction(), RIGHT - 96, rowY + 20, 80, 36, btnHover, true, accent);
+                else Ui.button(graphics, rowAction(), RIGHT - 96, rowY + 20, 80, 36, false, false, accent);
+            }
         }
         graphics.disableScissor();
         if (items.isEmpty()) {
-            Component message = emptyMessage();
-            graphics.drawString(font, message, gridX + (gridW - font.width(message)) / 2, gridY + 30, JilatonUi.TEXT_3, false);
+            Ui.textCentre(graphics, emptyMessage().getString(), 640, LIST_Y + 60, 13, JilatonType.Face.REGULAR, Ui.TEXT_2);
         }
         int max = maxScroll();
         if (max > 0) {
-            int track = gridBottom - gridY;
-            int thumb = Math.max(20, track * track / (track + max));
-            int thumbY = gridY + (int) Math.round((track - thumb) * offset / max);
-            graphics.fill(width - margin / 2 - 1, gridY, width - margin / 2, gridBottom, JilatonUi.HAIRLINE);
-            graphics.fill(width - margin / 2 - 1, thumbY, width - margin / 2 + 1, thumbY + thumb, JilatonUi.TEXT_3);
+            float thumb = Math.max(24, view * view / (view + max));
+            float thumbY = (float) (LIST_Y + (view - thumb) * scroll / max);
+            Ui.round(graphics, RIGHT + 14, thumbY, 4, thumb, 2, Ui.FAINT);
         }
+
+        // Footer.
+        Ui.hline(graphics, LEFT, FOOTER_Y - 12, RIGHT - LEFT, Ui.STROKE);
+        Ui.text(graphics, subtitle(items.size()), LEFT, FOOTER_Y + 12, 12, Ui.TEXT_3);
+        float bx = RIGHT;
+        for (int i = actions.size() - 1; i >= 0; i--) {
+            Action action = actions.get(i);
+            float w = actionWidth(action);
+            bx -= w;
+            boolean enabled = action.enabled().getAsBoolean();
+            boolean over = enabled && Ui.inside(mx, my, bx, FOOTER_Y, w, 36);
+            if (enabled) Ui.button(graphics, action.label(), bx, FOOTER_Y, w, 36, over, action.primary(), accent);
+            else {
+                Ui.outline(graphics, bx, FOOTER_Y, w, 36, 10, Ui.alpha(Ui.STROKE, 0.6));
+                Ui.textCentre(graphics, action.label(), bx + w / 2, FOOTER_Y + 12, 13, JilatonType.Face.MEDIUM, Ui.FAINT);
+            }
+            bx -= 8;
+        }
+        canvas.end(graphics);
+        search.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    /** Card surface shared by subclasses: lifts and brightens on hover, gets a white edge when selected. */
-    protected static void cardSurface(GuiGraphics graphics, int x, int y, int w, int h, double hover, boolean selected, double alpha) {
-        JilatonUi.fillRounded(graphics, x, y, w, h, 3, JilatonUi.alpha(JilatonUi.mix(0xEE0B0B0B, 0xF5161616, hover), alpha));
-        int border = selected ? 0xFFD9D9D9 : JilatonUi.mix(0xFF212121, 0xFF555555, hover);
-        JilatonUi.strokeRounded(graphics, x, y, w, h, 3, JilatonUi.alpha(border, alpha));
-        if (selected) graphics.fill(x + 1, y + 6, x + 3, y + h - 6, JilatonUi.alpha(JilatonUi.TEXT, alpha));
+    private static float actionWidth(Action action) {
+        return Math.max(84, Ui.width(action.label(), 13, JilatonType.Face.MEDIUM) + 32);
     }
 
-    /** Square icon: a texture when one is available, otherwise a monogram tile. */
-    protected void cardIcon(GuiGraphics graphics, Identifier texture, String name, int x, int y, int size, double alpha) {
+    private static float segmentsWidth(List<String> segs) {
+        float w = 6;
+        for (String s : segs) w += Ui.width(s, 12, JilatonType.Face.MEDIUM) + 28;
+        return w;
+    }
+
+    /** Row surface helpers for subclasses: a square icon, texture or monogram tile, in board coordinates. */
+    protected void cardIcon(GuiGraphics graphics, Identifier texture, String name, float x, float y, int size, double alpha) {
         if (texture != null) {
-            graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0, 0, size, size, size, size, JilatonUi.alpha(0xFFFFFFFF, alpha));
+            graphics.blit(RenderPipelines.GUI_TEXTURED, texture, Math.round(x), Math.round(y), 0, 0, size, size, size, size,
+                    Ui.alpha(0xFFFFFFFF, alpha));
         } else {
-            graphics.fill(x, y, x + size, y + size, JilatonUi.alpha(0xFF141414, alpha));
+            Ui.round(graphics, x, y, size, size, 10, Ui.alpha(Ui.RAISED, alpha));
             String letter = name.isBlank() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
-            graphics.pose().pushMatrix();
-            graphics.pose().translate(x + size / 2F - font.width(letter), y + size / 2F - 8);
-            graphics.pose().scale(2, 2);
-            graphics.drawString(font, letter, 0, 0, JilatonUi.alpha(JilatonUi.TEXT_3, alpha), false);
-            graphics.pose().popMatrix();
+            Ui.textCentre(graphics, letter, x + size / 2F, y + size / 2F - 9, 18, JilatonType.Face.SEMIBOLD, Ui.alpha(Ui.TEXT_2, alpha));
         }
-        JilatonUi.stroke(graphics, x, y, size, size, JilatonUi.alpha(0xFF262626, alpha));
     }
 
-    protected String fit(String text, int width) {
-        return font.width(text) <= width ? text : font.plainSubstrByWidth(text, Math.max(0, width - font.width("…"))) + "…";
+    /** Ellipsises {@code text} for {@code max} board px at {@code size}. */
+    protected static String fit(String text, float max, float size, JilatonType.Face face) {
+        return Ui.fit(text, max, size, face);
     }
 
-    private static boolean inside(double mx, double my, int x, int y, int w, int h) {
-        return mx >= x && mx < x + w && my >= y && my < y + h;
+    private int contentHeight() {
+        return items.isEmpty() ? 0 : Math.round(items.size() * (ROW_H + GAP) - GAP);
     }
 
-    private T itemAt(double mouseX, double mouseY) {
-        if (mouseY < gridY || mouseY > gridBottom) return null;
-        double offset = targetScroll;
-        for (int i = 0; i < items.size(); i++) {
-            int x = gridX + (i % columns) * (cardW + GAP);
-            int y = gridY + (i / columns) * (CARD_HEIGHT + GAP) - (int) Math.round(offset);
-            if (inside(mouseX, mouseY, x, y, cardW, CARD_HEIGHT)) return items.get(i);
-        }
-        return null;
+    private int maxScroll() {
+        return Math.max(0, Math.round(contentHeight() - (LIST_BOTTOM - LIST_Y)));
+    }
+
+    private T itemAt(double mx, double my) {
+        if (my < LIST_Y || my > LIST_BOTTOM || mx < LEFT || mx > RIGHT) return null;
+        int index = (int) Math.floor((my - LIST_Y + targetScroll) / (ROW_H + GAP));
+        if (index < 0 || index >= items.size()) return null;
+        float top = (float) (LIST_Y + index * (ROW_H + GAP) - targetScroll);
+        return my <= top + ROW_H ? items.get(index) : null;
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (super.mouseClicked(event, doubleClick)) return true;
-        if (event.button() != 0) return false;
-        T item = itemAt(event.x(), event.y());
-        if (item == null) return false;
+        if (event.button() != 0) return super.mouseClicked(event, doubleClick);
+        double mx = canvas.x(event.x()), my = canvas.y(event.y());
+        if (Ui.inside(mx, my, LEFT, TOP, 36, 36)) {
+            onClose();
+            return true;
+        }
+        if (Ui.inside(mx, my, RIGHT - SEARCH_W, TOP, SEARCH_W, 34)) {
+            setFocused(search);
+            search.setFocused(true);
+            return super.mouseClicked(event, doubleClick) || true;
+        }
+        search.setFocused(false);
+        List<String> segs = segments();
+        if (!segs.isEmpty()) {
+            float cx = LEFT + 71 + Ui.width(getTitle().getString(), 26, JilatonType.Face.SEMIBOLD);
+            for (int i = 0; i < segs.size(); i++) {
+                float w = Ui.width(segs.get(i), 12, JilatonType.Face.MEDIUM) + 28;
+                if (Ui.inside(mx, my, cx, TOP + 2, w, 32)) {
+                    segment = i;
+                    targetScroll = 0;
+                    refreshFilter();
+                    return true;
+                }
+                cx += w;
+            }
+        }
+        float bx = RIGHT;
+        for (int i = actions.size() - 1; i >= 0; i--) {
+            Action action = actions.get(i);
+            float w = actionWidth(action);
+            bx -= w;
+            if (Ui.inside(mx, my, bx, FOOTER_Y, w, 36)) {
+                if (action.enabled().getAsBoolean()) action.run().run();
+                return true;
+            }
+            bx -= 8;
+        }
+        T item = itemAt(mx, my);
+        if (item == null) return super.mouseClicked(event, doubleClick);
+        if (item == selected && rowActionActive(item)) {
+            int index = items.indexOf(item);
+            float top = (float) (LIST_Y + index * (ROW_H + GAP) - targetScroll);
+            if (Ui.inside(mx, my, RIGHT - 96, top + 20, 80, 36)) {
+                activate(item);
+                return true;
+            }
+        }
         long now = System.nanoTime();
         boolean repeat = item == lastClicked && now - lastClickNanos < DOUBLE_CLICK_NANOS;
         lastClicked = item;
@@ -255,31 +341,35 @@ public abstract class JilatonCardScreen<T> extends Screen {
         selectionChanged();
         int index = items.indexOf(item);
         if (index < 0) return;
-        int top = (index / columns) * (CARD_HEIGHT + GAP);
-        int view = gridBottom - gridY;
+        float top = index * (ROW_H + GAP);
+        float view = LIST_BOTTOM - LIST_Y;
         if (top < targetScroll) targetScroll = top;
-        else if (top + CARD_HEIGHT > targetScroll + view) targetScroll = top + CARD_HEIGHT - view;
+        else if (top + ROW_H > targetScroll + view) targetScroll = top + ROW_H - view;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
-        targetScroll = Math.max(0, Math.min(maxScroll(), targetScroll - vertical * 36));
+        targetScroll = Math.max(0, Math.min(maxScroll(), targetScroll - vertical * 48));
         return true;
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        if (event.key() == GLFW.GLFW_KEY_F && event.hasControlDown()) {
+            setFocused(search);
+            search.setFocused(true);
+            return true;
+        }
         if (search.isFocused() && event.key() != GLFW.GLFW_KEY_ESCAPE && event.key() != GLFW.GLFW_KEY_DOWN)
             return super.keyPressed(event);
         int index = selected == null ? -1 : items.indexOf(selected);
         int move = switch (event.key()) {
-            case GLFW.GLFW_KEY_RIGHT -> 1;
-            case GLFW.GLFW_KEY_LEFT -> -1;
-            case GLFW.GLFW_KEY_DOWN -> columns;
-            case GLFW.GLFW_KEY_UP -> -columns;
+            case GLFW.GLFW_KEY_DOWN -> 1;
+            case GLFW.GLFW_KEY_UP -> -1;
             default -> 0;
         };
         if (move != 0 && !items.isEmpty()) {
+            search.setFocused(false);
             select(items.get(Math.max(0, Math.min(items.size() - 1, index < 0 ? 0 : index + move))));
             return true;
         }
@@ -294,4 +384,7 @@ public abstract class JilatonCardScreen<T> extends Screen {
     public void onClose() {
         minecraft.setScreen(parent);
     }
+
+    /** Small helper: does a supplier-free "always" enabled flag read nicely at call sites. */
+    protected static BooleanSupplier always() { return () -> true; }
 }

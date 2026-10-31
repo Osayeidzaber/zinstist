@@ -113,6 +113,8 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     public ChoiceSetting modeSetting() { return mode; }
     public NumberSetting offsetSetting() { return offset; }
     public NumberSetting spreadSetting() { return spread; }
+    public NumberSetting trailLinesSetting() { return trailLines; }
+    public NumberSetting lingerSetting() { return linger; }
 
     public LyricLayout.Params params(boolean firstPerson, double time, double bodyYaw) {
         return new LyricLayout.Params(mode.value(), radius.value(), height.value(), side.value(), spread.value(),

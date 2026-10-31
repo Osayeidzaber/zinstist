@@ -192,6 +192,7 @@ public final class ClickGuiScreen extends Screen {
 
     @Override
     protected void init() {
+        fitBoard();
         initialising = true;
         String previousQuery = search == null ? restoredQuery : search.getValue();
         layout = ShellLayout.compute(width, height);
@@ -230,8 +231,7 @@ public final class ClickGuiScreen extends Screen {
         initialising = false;
     }
 
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    private void renderBoard(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         long now = System.nanoTime();
         double seconds = lastFrameNanos == 0L ? 0.0 : Math.min(0.05, (now - lastFrameNanos) / 1_000_000_000.0);
         lastFrameNanos = now;
@@ -1099,13 +1099,73 @@ public final class ClickGuiScreen extends Screen {
         if (next == Page.CONFIGS) refreshProfiles();
     }
 
+    /*
+     * Board scale (development/GUI_REDESIGN.md §2): the shell is laid out on a virtual screen whose short side is the
+     * design board's (1280x720), then drawn scaled to the real window, so the panel, cards and type keep the board's
+     * proportions at every window size and GUI scale. Input is mapped back into board coordinates.
+     */
+    private float boardScale = 1;
+
+    private void fitBoard() {
+        int realW = minecraft.getWindow().getGuiScaledWidth(), realH = minecraft.getWindow().getGuiScaledHeight();
+        // 1024x576 virtual: the shell's 9px type then lands near the board's 11-13px sizes.
+        boardScale = Math.min(realW / 1024F, realH / 576F);
+        width = Math.max(1, Math.round(realW / boardScale));
+        height = Math.max(1, Math.round(realH / boardScale));
+    }
+
+    private MouseButtonEvent toBoard(MouseButtonEvent event) {
+        return new MouseButtonEvent(event.x() / boardScale, event.y() / boardScale, event.buttonInfo());
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.pose().pushMatrix();
+        graphics.pose().scale(boardScale, boardScale);
+        super.renderBackground(graphics, Math.round(mouseX / boardScale), Math.round(mouseY / boardScale), partialTick);
+        graphics.pose().popMatrix();
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.pose().pushMatrix();
+        graphics.pose().scale(boardScale, boardScale);
+        JilatonType.withScale(boardScale, () -> renderBoard(graphics, Math.round(mouseX / boardScale),
+                Math.round(mouseY / boardScale), partialTick));
+        graphics.pose().popMatrix();
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        return clickedBoard(toBoard(event), doubleClick);
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        return draggedBoard(toBoard(event), dragX / boardScale, dragY / boardScale);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        return releasedBoard(toBoard(event));
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        return scrolledBoard(mouseX / boardScale, mouseY / boardScale, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX / boardScale, mouseY / boardScale);
+    }
+
     @Override
     public boolean shouldCloseOnEsc() {
         return false;
     }
 
-    @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    private boolean clickedBoard(MouseButtonEvent event, boolean doubleClick) {
         if (closing) return true;
         if (super.mouseClicked(event, doubleClick)) return true;
         double mouseX = event.x();
@@ -1429,8 +1489,7 @@ public final class ClickGuiScreen extends Screen {
         accent = selectedAccent();
     }
 
-    @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+    private boolean draggedBoard(MouseButtonEvent event, double dragX, double dragY) {
         if (event.button() == 0) {
             if (drag == DragKind.MODULE_NUMBER && dragSetting instanceof NumberSetting numberSetting) {
                 applyModuleSlider(numberSetting, event.x());
@@ -1451,8 +1510,7 @@ public final class ClickGuiScreen extends Screen {
         return super.mouseDragged(event, dragX, dragY);
     }
 
-    @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    private boolean releasedBoard(MouseButtonEvent event) {
         if (drag == DragKind.REORDER && dragModule != null) {
             List<String> current = new ArrayList<>();
             for (ClientModule module : view().modules()) current.add(module.id());
@@ -1496,8 +1554,7 @@ public final class ClickGuiScreen extends Screen {
         return super.mouseReleased(event);
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    private boolean scrolledBoard(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (mouseX >= layout.contentX() && mouseX <= layout.contentRight()
                 && mouseY >= layout.listTop() && mouseY <= layout.listBottom()) {
             targetScroll = Math.max(0, Math.min(scrollLimit(), targetScroll - verticalAmount * 34));

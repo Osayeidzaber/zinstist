@@ -219,18 +219,24 @@ class ShellGeometryTest {
 
     @Test
     void shellTokensMatchTheDirectionAndAreNeverPureBlackOrWhite() {
-        assertEquals(0xFF0E0C12, ShellPalette.PANEL);
-        assertEquals(0xFF14121A, ShellPalette.CARD);
-        assertEquals(0xFF1A1722, ShellPalette.CARD_HOVER);
-        assertEquals(0xFF262231, ShellPalette.STROKE);
-        assertEquals(0xFFF2F0F5, ShellPalette.TEXT);
-        assertEquals(0xFF8E8A9A, ShellPalette.TEXT_2);
-        assertEquals(0xFF5E5A69, ShellPalette.TEXT_3);
-        assertEquals(0xFFA855F7, ShellPalette.ACCENT);
-        assertEquals(0xFF7C3AED, ShellPalette.ACCENT_DEEP);
+        // Black and white (zaber.tech): every surface, text and accent token is a neutral grey.
+        assertEquals(0xFF0E0E0E, ShellPalette.PANEL);
+        assertEquals(0xFF131313, ShellPalette.CARD);
+        assertEquals(0xFF1B1B1B, ShellPalette.CARD_HOVER);
+        assertEquals(0xFF262626, ShellPalette.STROKE);
+        assertEquals(0xFFF5F5F5, ShellPalette.TEXT);
+        assertEquals(0xFF8F8F8F, ShellPalette.TEXT_2);
+        assertEquals(0xFF5F5F5F, ShellPalette.TEXT_3);
+        assertEquals(0xFFF5F5F5, ShellPalette.ACCENT);
+        assertEquals(0xFFBDBDBD, ShellPalette.ACCENT_DEEP);
         assertEquals(0xFFE5484D, ShellPalette.DANGER);
         assertEquals(0xFF30A46C, ShellPalette.ONLINE);
-        assertTrue((ShellPalette.SCRIM & 0xFFFFFF) == 0x08070A, "scrim must be #08070A");
+        assertTrue((ShellPalette.SCRIM & 0xFFFFFF) == 0x070707, "scrim must be #070707");
+        for (int token : List.of(ShellPalette.PANEL, ShellPalette.SIDEBAR, ShellPalette.CARD, ShellPalette.STROKE,
+                ShellPalette.TEXT, ShellPalette.TEXT_2, ShellPalette.TEXT_3, ShellPalette.ACCENT)) {
+            int r = (token >> 16) & 0xFF, g = (token >> 8) & 0xFF, b = token & 0xFF;
+            assertTrue(r == g && g == b, "token must be neutral: " + Integer.toHexString(token));
+        }
         Set<Integer> surfaces = new HashSet<>(List.of(ShellPalette.PANEL, ShellPalette.SIDEBAR,
                 ShellPalette.CARD, ShellPalette.CARD_HOVER, ShellPalette.STROKE));
         for (int color : surfaces) {

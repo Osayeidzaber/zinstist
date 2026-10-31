@@ -37,8 +37,8 @@ public final class ShellChrome {
     public static void searchFrame(GuiGraphics graphics, int x, int y, int w, int h, int accent, boolean focused) {
         JilatonUi.fillRounded(graphics, x, y, w, h, 8, focused
                 ? JilatonUi.mix(ShellPalette.CONTROL, accent, 0.10) : ShellPalette.CONTROL);
-        JilatonUi.strokeRounded(graphics, x, y, w, h, 8, focused ? accent : ShellPalette.STROKE);
-        magnifier(graphics, x + 10, y + h / 2 - 5, focused ? accent : ShellPalette.TEXT_3);
+        JilatonUi.strokeRounded(graphics, x, y, w, h, 8, focused ? JilatonUi.mix(ShellPalette.STROKE, accent, 0.5) : ShellPalette.STROKE);
+        magnifier(graphics, x + 10, y + h / 2 - 5, focused ? ShellPalette.TEXT_2 : ShellPalette.TEXT_3);
     }
 
     public static void magnifier(GuiGraphics graphics, int x, int y, int color) {

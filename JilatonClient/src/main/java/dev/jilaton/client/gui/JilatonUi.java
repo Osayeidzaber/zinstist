@@ -62,45 +62,16 @@ public final class JilatonUi {
     }
 
     /** Horizontal inset of corner row {@code row} for a true circular corner of {@code radius}. */
-    private static int cornerCut(int radius, int row) {
-        double dy = radius - row - 0.5;
-        return (int) Math.round(radius - Math.sqrt(Math.max(0, radius * (double) radius - dy * dy)));
-    }
-
-    /** Rounded rectangle with circular corners, built from whole GUI-pixel rows so it stays crisp. */
+    /** Rounded rectangle with anti-aliased circular corners, snapped to physical pixels. */
     public static void fillRounded(GuiGraphics graphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 0 || height <= 0 || color >>> 24 == 0) return;
-        int inset = Math.min(radius, Math.min(width / 2, height / 2));
-        for (int row = 0; row < inset; row++) {
-            int cut = cornerCut(inset, row);
-            graphics.fill(x + cut, y + row, x + width - cut, y + row + 1, color);
-            graphics.fill(x + cut, y + height - row - 1, x + width - cut, y + height - row, color);
-        }
-        if (height > inset * 2) graphics.fill(x, y + inset, x + width, y + height - inset, color);
+        dev.jilaton.client.gui.design.Paint.round(graphics, x, y, width, height, radius, color);
     }
 
-    /** Hairline outline that follows {@link #fillRounded}'s circular corners without gaps. */
+    /** Hairline outline (about half a GUI pixel, never under one physical pixel) matching {@link #fillRounded}. */
     public static void strokeRounded(GuiGraphics graphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 2 || height <= 2) return;
-        int inset = Math.min(radius, Math.min(width / 2, height / 2));
-        for (int row = 0; row < inset; row++) {
-            int cut = cornerCut(inset, row);
-            // Each corner row spans from its own cut to where the next row starts, so steep and shallow parts of the
-            // arc both stay connected.
-            int span = row == 0 ? width / 2 : Math.max(1, cornerCut(inset, row - 1) - cut);
-            int left = x + cut, right = x + width - cut;
-            if (row == 0) {
-                graphics.fill(left, y, right, y + 1, color);
-                graphics.fill(left, y + height - 1, right, y + height, color);
-            } else {
-                graphics.fill(left, y + row, left + span, y + row + 1, color);
-                graphics.fill(right - span, y + row, right, y + row + 1, color);
-                graphics.fill(left, y + height - row - 1, left + span, y + height - row, color);
-                graphics.fill(right - span, y + height - row - 1, right, y + height - row, color);
-            }
-        }
-        graphics.fill(x, y + inset, x + 1, y + height - inset, color);
-        graphics.fill(x + width - 1, y + inset, x + width, y + height - inset, color);
+        dev.jilaton.client.gui.design.Paint.outline(graphics, x, y, width, height, radius, 0.5F, color);
     }
 
     /** Soft drop shadow: a few expanding, very low-alpha layers beneath a surface. */

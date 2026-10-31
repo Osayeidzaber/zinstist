@@ -82,12 +82,14 @@ class HudDesignTest {
         assertEquals(1, HudDesign.segmentFill(bar.segments() - 1, 1), 1e-9);
     }
 
-    @Test void healthGradientRunsFromVioletToMagenta() {
+    @Test void healthGradientRunsFromWhiteToGreyWithNoHue() {
         assertEquals(HudDesign.VIOLET, HudDesign.segmentColor(0, HudDesign.SEGMENTS));
         assertEquals(HudDesign.MAGENTA, HudDesign.segmentColor(HudDesign.SEGMENTS - 1, HudDesign.SEGMENTS));
         int middle = HudDesign.segmentColor(HudDesign.SEGMENTS / 2, HudDesign.SEGMENTS);
-        assertTrue(((middle >> 16) & 0xFF) >= ((HudDesign.VIOLET >> 16) & 0xFF));
-        assertTrue((middle & 0xFF) <= (HudDesign.VIOLET & 0xFF));
+        int r = (middle >> 16) & 0xFF, g = (middle >> 8) & 0xFF, b = middle & 0xFF;
+        assertEquals(r, g);
+        assertEquals(g, b);
+        assertTrue(r <= ((HudDesign.VIOLET >> 16) & 0xFF) && r >= ((HudDesign.MAGENTA >> 16) & 0xFF));
     }
 
     @Test void presetsOnlyOwnTheFullWidgets() {

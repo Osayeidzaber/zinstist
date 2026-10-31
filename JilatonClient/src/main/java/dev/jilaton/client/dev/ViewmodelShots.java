@@ -160,7 +160,14 @@ public final class ViewmodelShots {
         then(5, () -> enable(false, "cosmetic_knife"));
         shot(60, "fx-baseline");
         then(10, () -> { client.player.setXRot(4); enable(true, "jilaton_gate"); });
-        shot(40, "fx-gate");
+        then(20, () -> {
+            if (JilatonClient.moduleManager().get("jilaton_gate") instanceof dev.jilaton.client.module.impl.JilatonGateModule gate)
+                LOGGER.info("[JilatonShots] gate enabled {} at {} / player {} yaw {}", gate.enabled(), gate.anchorDescription(),
+                        client.player.position(), client.player.getYRot());
+        });
+        shot(20, "fx-gate");
+        then(1, () -> client.player.setYRot(client.player.getYRot() + 35));
+        shot(10, "fx-gate-angle");
         then(1, () -> {
             enable(false, "jilaton_gate");
             client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
@@ -174,16 +181,18 @@ public final class ViewmodelShots {
         then(1, () -> {
             enable(false, "cyberspace");
             client.player.setXRot(35);
+            enable(true, "block_placement");
+        });
+        then(20, () -> {
             if (JilatonClient.moduleManager().get("block_placement") instanceof dev.jilaton.client.module.impl.BlockPlacementModule placing) {
-                placing.setEnabled(true);
                 net.minecraft.core.BlockPos feet = client.player.blockPosition();
                 net.minecraft.core.Direction facing = client.player.getDirection();
                 long now = System.nanoTime();
                 for (int i = 2; i <= 4; i++) placing.recordPlacement(feet.relative(facing, i), now);
             }
         });
-        shot(4, "fx-place-early");
-        shot(10, "fx-place-late");
+        shot(2, "fx-place-early");
+        shot(6, "fx-place-late");
         then(30, () -> {
             enable(false, "block_placement");
             client.player.setXRot(20);
@@ -213,10 +222,28 @@ public final class ViewmodelShots {
         shot(30, "ui-music");
         then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonServersScreen(null)));
         shot(30, "ui-servers");
-        then(1, () -> client.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonPauseScreen()));
         shot(20, "ui-pause");
+        then(1, () -> client.setScreen(new net.minecraft.client.gui.screens.Screen(net.minecraft.network.chat.Component.literal("Loading preview")) {
+            private final long start = System.nanoTime();
+
+            @Override
+            public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+                double t = (System.nanoTime() - start) / 1e9;
+                dev.jilaton.client.gui.JilatonLoadingScene.render(graphics, width, height, 1, (float) Math.min(0.72, t / 2.0), t, true);
+            }
+        }));
+        shot(20, "ui-loading-a");
+        shot(25, "ui-loading-b");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonWorldsScreen(null)));
+        shot(30, "ui-worlds");
         then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen()));
-        shot(60, "ui-mainmenu");
+        shot(3, "ui-menu-enter-a");
+        shot(8, "ui-menu-enter-b");
+        shot(12, "ui-menu-enter-c");
+        shot(40, "ui-mainmenu");
+        then(1, () -> client.setScreen(new dev.jilaton.client.gui.AccountsScreen(null)));
+        shot(40, "ui-accounts");
         then(20, client::stop);
     }
 
