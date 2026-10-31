@@ -66,6 +66,8 @@ public final class SpotifyConnect {
         tokenFile = configDir.resolve("jilaton").resolve("spotify-token.json");
         try {
             if (Files.isRegularFile(tokenFile)) {
+                // Tighten tokens written by older builds before reading them.
+                SpotifyTokenPolicy.secure(tokenFile);
                 JsonObject saved = JsonParser.parseString(Files.readString(tokenFile)).getAsJsonObject();
                 if (saved.has("refresh_token")) refreshToken = saved.get("refresh_token").getAsString();
                 if (saved.has("client_id")) clientId = saved.get("client_id").getAsString();
@@ -166,14 +168,16 @@ public final class SpotifyConnect {
         saved.addProperty("client_id", clientId);
         saved.addProperty("refresh_token", refreshToken);
         Files.createDirectories(tokenFile.getParent());
-        // Write then move, so a crash mid-write never leaves a truncated token file behind.
-        Path temporary = tokenFile.resolveSibling(tokenFile.getFileName() + ".tmp");
-        Files.writeString(temporary, saved.toString());
+        // Write then move, so a crash mid-write never leaves a truncated token file behind. On POSIX
+        // filesystems the temporary file and the token are both owner-only (600).
+        Path temporary = SpotifyTokenPolicy.temporarySibling(tokenFile);
+        SpotifyTokenPolicy.writeOwnerOnly(temporary, saved.toString());
         try {
             Files.move(temporary, tokenFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
             Files.move(temporary, tokenFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
+        SpotifyTokenPolicy.secure(tokenFile);
     }
 
     private boolean ensureToken() throws IOException {
@@ -192,7 +196,10 @@ public final class SpotifyConnect {
     public void disconnect() {
         accessToken = null;
         refreshToken = null;
-        try { Files.deleteIfExists(tokenFile); } catch (IOException ignored) { }
+        lastArtworkUrl = null;
+        try {
+            SpotifyTokenPolicy.deleteTokenFiles(tokenFile);
+        } catch (IOException ignored) { }
         state = NowPlaying.idle("Spotify", "Not connected");
     }
 

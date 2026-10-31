@@ -1,5 +1,6 @@
 package dev.jilaton.client.music;
 
+import dev.jilaton.client.config.ClientConfig;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundSource;
@@ -7,6 +8,7 @@ import net.minecraft.sounds.SoundSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.BooleanSupplier;
 
 /**
  * One place every music surface reads from. The HUD, Music Center screen, spatial lyrics and music visuals
@@ -21,7 +23,10 @@ public final class MusicCenter {
     private final SpotifyConnect spotify;
     private final MediaSessionSource desktop;
     private final OnlineLyrics onlineLyrics;
-    private boolean fetchLyrics = true;
+    /** Third-party lookups stay off until the user's explicit opt-in reaches {@link #setFetchLyrics}. */
+    private boolean fetchLyrics;
+    /** Persisted desktop-bridge opt-in; replaced by {@link #attachConfig} at client start. */
+    private volatile BooleanSupplier desktopBridgeEnabled = () -> false;
     private Source source = Source.LOCAL;
     private Path folder;
     private String scanError = "";
@@ -42,6 +47,21 @@ public final class MusicCenter {
     public LocalMusicPlayer player() { return player; }
     public SpotifyConnect spotify() { return spotify; }
     public MediaSessionSource desktop() { return desktop; }
+
+    /** Binds the persisted desktop-bridge opt-in; until then the gate stays off. */
+    public void attachConfig(ClientConfig config) {
+        desktopBridgeEnabled = config::desktopMediaBridgeEnabled;
+        syncDesktopBridge();
+    }
+
+    /** Test/UI seam for the same gate; the client always uses the persisted value via {@link #attachConfig}. */
+    public void refreshDesktopBridgeGate() { syncDesktopBridge(); }
+
+    /** The desktop bridge may run only while it is selected AND explicitly enabled. */
+    private void syncDesktopBridge() {
+        desktop.setEnabled(source == Source.DESKTOP && desktopBridgeEnabled.getAsBoolean());
+    }
+
     public void setFetchLyrics(boolean fetch) {
         fetchLyrics = fetch;
         // The same opt-out covers the desktop source's cover-art lookup, which also sends the track online.
@@ -65,6 +85,7 @@ public final class MusicCenter {
         if (source != Source.LOCAL) player.stop();
         if (source != Source.DESKTOP) desktop.stop();
         this.source = source;
+        syncDesktopBridge();
     }
 
     public void setFolder(Path folder) {
@@ -92,6 +113,8 @@ public final class MusicCenter {
     }
 
     public void tick(double spotifyIdle, double spotifyActive) {
+        // Re-read the persisted opt-in every tick: revoking it stops the bridge immediately.
+        syncDesktopBridge();
         if (source == Source.DESKTOP) desktop.tick();
         if (source == Source.SPOTIFY) {
             spotify.tick(spotifyIdle, spotifyActive);
@@ -144,7 +167,7 @@ public final class MusicCenter {
 
     public void shutdown() {
         player.stop();
-        desktop.stop();
+        desktop.shutdown();
         spotify.shutdown();
         onlineLyrics.shutdown();
     }

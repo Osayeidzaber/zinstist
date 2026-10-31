@@ -16,29 +16,56 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Reads the desktop player's Windows media session (the data shown in the Windows volume flyout) through a
- * small bundled PowerShell bridge. Works with the Spotify desktop app with no developer app, login or API
- * key, and controls play/pause/skip on that app directly, so audio always comes from Spotify itself. The
- * bridge process only runs while this source is selected and exits on its own if Minecraft exits.
+ * Reads the desktop player's media session (the data shown in the Windows volume flyout) through a
+ * small bundled PowerShell bridge, or AppleScript on macOS. The bridge is a privacy-sensitive feature: it is
+ * only ever created after an explicit opt-in ({@link #setEnabled(boolean)}, persisted in
+ * {@code ClientConfig}), it is never copied or spawned while that opt-in is off, and it is destroyed on
+ * disable, source change and shutdown.
+ *
+ * <p>All file and process work happens on the {@code Jilaton media bridge control} worker; the client thread
+ * only reads the immutable {@link NowPlaying} snapshot. Starts are bounded: after
+ * {@link MediaBridgePolicy#MAX_CONSECUTIVE_STARTS} consecutive starts without a line the bridge gives up and
+ * stays off until the user disables and re-enables it.
  */
 public final class MediaSessionSource {
     private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton Media");
     private final Path scriptDir;
+    private final ExecutorService lifecycle = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "Jilaton media bridge control");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final Object lock = new Object();
     private volatile Process process;
     private volatile Path commandFile;
-    private volatile NowPlaying state = NowPlaying.idle("Spotify", "Starting media bridge…");
+    private volatile Path scriptFile;
+    private volatile NowPlaying state = NowPlaying.idle("Spotify", MediaBridgePolicy.OFF_STATUS);
     private volatile String artKey;
     private volatile long lastLineNanos;
+    private volatile long startedNanos;
+    private volatile boolean starting;
+    private volatile boolean enabled;
     private long restartAfter;
-    /** Consecutive bridge starts that never produced output; drives the restart back-off. */
-    private int failedStarts;
+    /** Starts since the bridge last produced a line; drives the bounded restart policy. */
+    private int consecutiveStarts;
+    /** Incremented on every stop so a start that finishes late can never adopt its process. */
+    private long generation;
     private String filter = "Spotify";
-    private volatile boolean onlineLookups = true;
+    private volatile boolean onlineLookups;
 
     public MediaSessionSource(Path configDir) {
-        scriptDir = configDir.resolve("jilaton");
+        this(configDir, false);
+    }
+
+    public MediaSessionSource(Path configDir, boolean enabled) {
+        this.scriptDir = configDir.resolve("jilaton");
+        this.enabled = enabled;
+        state = NowPlaying.idle("Spotify", MediaBridgePolicy.idleStatus(enabled, supported()));
     }
 
     public static boolean isWindows() {
@@ -55,6 +82,23 @@ public final class MediaSessionSource {
 
     public NowPlaying state() { return state; }
 
+    public boolean enabled() { return enabled; }
+
+    /** The user's opt-in gate. Disabling destroys the process and leaves the status line "bridge is off". */
+    public void setEnabled(boolean enable) {
+        if (this.enabled == enable) return;
+        this.enabled = enable;
+        if (!enable) {
+            stop();
+            artKey = null;
+            state = NowPlaying.idle("Spotify", MediaBridgePolicy.OFF_STATUS);
+        } else {
+            consecutiveStarts = 0;
+            restartAfter = 0;
+            state = NowPlaying.idle("Spotify", "Starting media bridge…");
+        }
+    }
+
     /** Whether a missing cover may be looked up online (iTunes Search), which sends the title and artist. */
     public void setOnlineLookups(boolean allowed) { onlineLookups = allowed; }
 
@@ -64,38 +108,69 @@ public final class MediaSessionSource {
 
     /** Called each client tick while selected: keeps exactly one bridge alive and restarts it if it dies. */
     public void tick() {
-        if (!supported()) { state = NowPlaying.idle("Spotify", "Desktop media sessions are only available on macOS and Windows"); return; }
+        long now = System.nanoTime();
+        if (!enabled) {
+            state = NowPlaying.idle("Spotify", MediaBridgePolicy.OFF_STATUS);
+            return;
+        }
+        if (!supported()) {
+            state = NowPlaying.idle("Spotify", MediaBridgePolicy.UNSUPPORTED_STATUS);
+            return;
+        }
         Process p = process;
-        if (p != null && p.isAlive()) {
-            if (lastLineNanos != 0) failedStarts = 0;
-            if (lastLineNanos != 0 && System.nanoTime() - lastLineNanos > 10_000_000_000L) stop();
+        boolean alive = p != null && p.isAlive();
+        MediaBridgePolicy.Decision decision =
+                MediaBridgePolicy.decide(true, true, alive, now, restartAfter, consecutiveStarts);
+        if (decision == MediaBridgePolicy.Decision.RUNNING) {
+            if (lastLineNanos != 0) consecutiveStarts = 0;
+            if (MediaBridgePolicy.stale(lastLineNanos, startedNanos, now)) {
+                // A bridge that went silent counts as one failed start; the policy bounds the total.
+                consecutiveStarts++;
+                restartAfter = now + MediaBridgePolicy.restartDelayNanos(consecutiveStarts);
+                destroyProcess();
+                return;
+            }
             refreshArtwork();
             return;
         }
-        if (System.nanoTime() < restartAfter) return;
-        // 5 s, doubling per start that never spoke, capped at 5 min: a blocked bridge is not respawned forever.
-        restartAfter = System.nanoTime() + restartDelayNanos(failedStarts);
-        failedStarts++;
-        start();
+        if (starting) return;
+        switch (decision) {
+            case GAVE_UP -> state = NowPlaying.idle("Spotify", MediaBridgePolicy.GAVE_UP_STATUS);
+            case SPAWN -> {
+                consecutiveStarts++;
+                restartAfter = now + MediaBridgePolicy.restartDelayNanos(consecutiveStarts);
+                starting = true;
+                long generationSnapshot;
+                synchronized (lock) { generationSnapshot = generation; }
+                try {
+                    lifecycle.execute(() -> start(generationSnapshot));
+                } catch (RejectedExecutionException shuttingDown) {
+                    starting = false;
+                }
+            }
+            default -> { }
+        }
     }
 
     static long restartDelayNanos(int failedStarts) {
-        return Math.min(300_000_000_000L, 5_000_000_000L << Math.min(Math.max(failedStarts, 0), 6));
+        return MediaBridgePolicy.restartDelayNanos(failedStarts);
     }
 
-    private void start() {
+    private void start(long generationSnapshot) {
+        Process p = null;
         try {
             Files.createDirectories(scriptDir);
             Path commands = scriptDir.resolve("media-command.txt");
             Files.deleteIfExists(commands);
             ProcessBuilder builder;
+            Path script;
             if (isMac()) {
-                Path macScript = scriptDir.resolve("media-session-mac.sh");
-                Files.writeString(macScript, macBridgeScript(commands.toString()));
-                builder = new ProcessBuilder("/bin/sh", macScript.toString());
+                script = scriptDir.resolve("media-session-mac.sh");
+                Files.writeString(script, macBridgeScript(commands.toString()));
+                builder = new ProcessBuilder("/bin/sh", script.toString());
                 builder.redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null")));
             } else {
-                Path script = scriptDir.resolve("media-session.ps1");
+                script = scriptDir.resolve("media-session.ps1");
                 try (InputStream in = MediaSessionSource.class.getResourceAsStream("/assets/jilaton/scripts/media-session.ps1")) {
                     if (in == null) throw new IOException("bridge script missing from the mod");
                     Files.copy(in, script, StandardCopyOption.REPLACE_EXISTING);
@@ -109,16 +184,36 @@ public final class MediaSessionSource {
             }
             builder.redirectErrorStream(false);
             builder.redirectError(ProcessBuilder.Redirect.DISCARD);
-            Process p = builder.start();
-            process = p;
-            commandFile = commands;
-            lastLineNanos = 0;
-            Thread reader = new Thread(() -> read(p), "Jilaton media bridge");
+            p = builder.start();
+            synchronized (lock) {
+                // The opt-in may have been revoked (or the source changed) while the process was starting.
+                if (generationSnapshot != generation || !enabled) {
+                    p.destroy();
+                    return;
+                }
+                process = p;
+                commandFile = commands;
+                scriptFile = script;
+                lastLineNanos = 0;
+                startedNanos = System.nanoTime();
+                starting = false;
+            }
+            Process startedProcess = p;
+            Thread reader = new Thread(() -> read(startedProcess), "Jilaton media bridge");
             reader.setDaemon(true);
             reader.start();
         } catch (IOException exception) {
-            state = NowPlaying.idle("Spotify", "Media bridge failed: " + exception.getMessage());
+            synchronized (lock) {
+                if (generationSnapshot == generation) {
+                    starting = false;
+                    state = NowPlaying.idle("Spotify", "Media bridge failed: " + exception.getMessage());
+                }
+            }
             LOGGER.warn("Could not start the media-session bridge", exception);
+        } finally {
+            synchronized (lock) {
+                if (generationSnapshot == generation) starting = false;
+            }
         }
     }
 
@@ -168,6 +263,7 @@ public final class MediaSessionSource {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                if (!enabled || p != process) return;
                 lastLineNanos = System.nanoTime();
                 if (!line.startsWith("{")) continue;
                 try { accept(JsonParser.parseString(line).getAsJsonObject()); }
@@ -178,6 +274,7 @@ public final class MediaSessionSource {
     }
 
     private void accept(JsonObject json) {
+        if (!enabled) return;
         if (!json.has("active") || !json.get("active").getAsBoolean()) {
             String error = json.has("error") ? json.get("error").getAsString() : "";
             state = NowPlaying.idle("Spotify", error.isEmpty()
@@ -215,11 +312,21 @@ public final class MediaSessionSource {
 
     /** Sends a transport command; if Spotify is not running, opens the desktop app instead. */
     public void control(String command) {
+        if (!enabled) return;
         if (!state.hasTrack() && filter.equals("Spotify") && !command.equals("previous")) {
-            Util.getPlatform().openUri(URI.create("spotify:"));
             state = NowPlaying.idle("Spotify", "Opening Spotify…");
+            // Launching a process is IO: keep it on the control worker like every other bridge action.
+            submit(() -> {
+                if (enabled) Util.getPlatform().openUri(URI.create("spotify:"));
+            });
             return;
         }
+        submit(() -> writeCommand(command));
+    }
+
+    /** Command-file writes happen on the lifecycle worker, never on the client thread. */
+    private void writeCommand(String command) {
+        if (!enabled) return;
         Path file = commandFile;
         if (file == null) return;
         try {
@@ -229,14 +336,74 @@ public final class MediaSessionSource {
         }
     }
 
+    /** Destroys the process and resets the retry budget; the next opt-in starts from a clean slate. */
     public void stop() {
-        Process p = process;
-        process = null;
-        Path file = commandFile;
-        commandFile = null;
-        if (file != null) try { Files.deleteIfExists(file); } catch (IOException ignored) { }
+        Process p;
+        Path file;
+        Path script;
+        synchronized (lock) {
+            generation++;
+            p = process;
+            process = null;
+            file = commandFile;
+            commandFile = null;
+            script = scriptFile;
+            scriptFile = null;
+            starting = false;
+            restartAfter = 0;
+            consecutiveStarts = 0;
+            startedNanos = 0;
+            lastLineNanos = 0;
+        }
         if (p != null) p.destroy();
-        restartAfter = 0;
+        deleteLater(file, script);
+    }
+
+    /** Kills a hung process but keeps the failure count so the bounded policy still applies. */
+    private void destroyProcess() {
+        Process p;
+        Path file;
+        Path script;
+        synchronized (lock) {
+            generation++;
+            p = process;
+            process = null;
+            file = commandFile;
+            commandFile = null;
+            script = scriptFile;
+            scriptFile = null;
+            starting = false;
+            startedNanos = 0;
+            lastLineNanos = 0;
+        }
+        if (p != null) p.destroy();
+        deleteLater(file, script);
+    }
+
+    private void deleteLater(Path... files) {
+        if (files.length == 0) return;
+        Runnable cleanup = () -> {
+            for (Path file : files) {
+                if (file == null) continue;
+                try { Files.deleteIfExists(file); } catch (IOException ignored) { }
+            }
+        };
+        submit(cleanup);
+    }
+
+    private void submit(Runnable task) {
+        try {
+            lifecycle.execute(task);
+        } catch (RejectedExecutionException shuttingDown) {
+            task.run();
+        }
+    }
+
+    /** Stops the bridge and its worker; used when the client shuts down. */
+    public void shutdown() {
+        setEnabled(false);
+        stop();
+        lifecycle.shutdownNow();
     }
 
     private static String str(JsonObject json, String key) {
