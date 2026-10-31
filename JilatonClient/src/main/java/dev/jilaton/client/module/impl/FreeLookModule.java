@@ -23,6 +23,8 @@ public final class FreeLookModule extends ClientModule {
     private final BooleanSetting hold = addSetting(new BooleanSetting("hold", "Hold key", true));
     private final FreeLookRotation rotation = new FreeLookRotation();
     private Object player;
+    /** Captured level identity: a dimension change replaces it and must not reuse the old camera state. */
+    private Object world;
     private CameraType previousPerspective;
     private CameraType ownedPerspective;
     private boolean releasing;
@@ -47,7 +49,9 @@ public final class FreeLookModule extends ClientModule {
     }
 
     private void capture(Minecraft client) {
+        releasing = false;
         player = client.player;
+        world = client.level;
         rotation.reset(client.player.getYRot(), client.player.getXRot());
         previousPerspective = client.options.getCameraType();
         applyPerspective(client);
@@ -61,7 +65,8 @@ public final class FreeLookModule extends ClientModule {
     @Override protected void onTick(Minecraft client) {
         if (client == null) return;
         if (client.player == null || client.level == null
-                || (player != null && player != client.player) || client.player.isSleeping()) {
+                || (player != null && (player != client.player || world != client.level))
+                || !client.player.isAlive() || client.player.isSleeping() || !cameraOnPlayer(client)) {
             setEnabled(false);
             return;
         }
@@ -83,7 +88,8 @@ public final class FreeLookModule extends ClientModule {
 
     /** Freecam and detached camera modes own the camera, so they get an immediate hand-off instead of a blend. */
     private boolean canRejoin(Minecraft client) {
-        if (client == null || client.player == null || client.player != player) {
+        if (client == null || client.player == null || client.player != player || client.level != world
+                || !client.player.isAlive() || !cameraOnPlayer(client)) {
             return false;
         }
         ClientModule freecam = JilatonClient.moduleManager().get("freecam");
@@ -95,20 +101,27 @@ public final class FreeLookModule extends ClientModule {
         if (client != null && previousPerspective != null && client.options.getCameraType() == ownedPerspective)
             client.options.setCameraType(previousPerspective);
         player = null;
+        world = null;
         previousPerspective = ownedPerspective = null;
     }
 
     public boolean active(Minecraft client) {
-        if (client.player == null) return false;
+        if (client == null || client.player == null) return false;
         if (enabled()) {
-            return player != null && client.player == player && client.screen == null
-                    && client.isWindowActive() && !client.player.isSleeping();
+            return player != null && client.player == player && client.level == world
+                    && cameraOnPlayer(client) && client.screen == null
+                    && client.isWindowActive() && client.player.isAlive() && !client.player.isSleeping();
         }
         return releasing && advanceRejoin(client);
     }
 
+    /** The camera entity is the player in every normal mode; spectator's entity-follow view is not freelook. */
+    private static boolean cameraOnPlayer(Minecraft client) {
+        return client.getCameraEntity() == null || client.getCameraEntity() == client.player;
+    }
+
     private boolean advanceRejoin(Minecraft client) {
-        if (client.player != player) {
+        if (client.player != player || client.level != world || !client.player.isAlive() || !cameraOnPlayer(client)) {
             release(client);
             return false;
         }

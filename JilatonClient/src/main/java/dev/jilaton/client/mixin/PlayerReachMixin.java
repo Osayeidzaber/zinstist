@@ -17,8 +17,8 @@ public abstract class PlayerReachMixin {
     private void jilaton$increaseEntityInteractionRange(CallbackInfoReturnable<Double> cir) {
         ReachModule module = reachModule();
         if (module != null && module.enabled() && (Object) this == Minecraft.getInstance().player) {
-            cir.setReturnValue(ReachMath.addBonus(cir.getReturnValue(), true,
-                    module.entityBonus().value(), 5.0));
+            cir.setReturnValue(ReachMath.extendEntityInteractionRange(cir.getReturnValue(), true,
+                    module.entityBonus().value()));
         }
     }
 
@@ -26,8 +26,8 @@ public abstract class PlayerReachMixin {
     private void jilaton$increaseBlockInteractionRange(CallbackInfoReturnable<Double> cir) {
         ReachModule module = reachModule();
         if (module != null && module.enabled() && (Object) this == Minecraft.getInstance().player) {
-            cir.setReturnValue(ReachMath.addBonus(cir.getReturnValue(), true,
-                    module.blockBonus().value(), 64.0));
+            cir.setReturnValue(ReachMath.extendBlockInteractionRange(cir.getReturnValue(), true,
+                    module.blockBonus().value()));
         }
     }
 
