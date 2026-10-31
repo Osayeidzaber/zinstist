@@ -677,6 +677,9 @@ public final class VisualVerifier {
             command(client, "time set 18000");
             command(client, "summon minecraft:zombie " + (studioX + 3.0) + " " + studioY + " " + studioZ
                     + " {NoAI:1b,PersistenceRequired:1b,Silent:1b}");
+            // The hold-key manager revokes a hold module every tick the physical key is up, so the
+            // verifier cannot keep FreeLook alive by enabling it alone.
+            setting("free_look", "hold", false);
             setting("kill_aura", "require_attack_key", false);
             setting("kill_aura", "turn_speed", 12.0);
         });
