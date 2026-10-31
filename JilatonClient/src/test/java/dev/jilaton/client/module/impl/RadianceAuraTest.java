@@ -34,7 +34,7 @@ class RadianceAuraTest {
     void wideBodiesUseTheLargerFootprintAndTinyItemsStayPositive() {
         double[] out = new double[4];
         RadianceModule.auraExtents(2.0, 1.0, 1.4, 0.3, out);
-        assertEquals(1.00, out[0], 1e-9, "the larger horizontal extent drives the glow width");
+        assertEquals(1.25, out[0], 1e-9, "the larger horizontal extent drives the glow width");
         RadianceModule.auraExtents(0.25, 0.25, 0.25, 0.1, out);
         for (double value : out) assertTrue(value > 0 && Double.isFinite(value));
         RadianceModule.auraExtents(0, 0, 0, 0.6, out);

@@ -14,13 +14,20 @@ public final class FxShapes {
 
     /** Camera-facing soft dot: opaque-ish center, transparent rim. */
     public static void softDot(FxFrame f, double x, double y, double z, double radius, int rgb, double alpha, boolean walls) {
-        if (radius <= 0 || alpha <= 0.004) return;
+        softEllipse(f, x, y, z, radius, radius, rgb, alpha, walls);
+    }
+
+    /** Camera-facing soft ellipse: peak alpha at the center, feathered to zero at the rim on both axes. */
+    public static void softEllipse(FxFrame f, double x, double y, double z, double halfWidth, double halfHeight,
+                                   int rgb, double alpha, boolean walls) {
+        if (halfWidth <= 0 || halfHeight <= 0 || alpha <= 0.004) return;
         int sides = f.quality.ordinal() >= 2 ? 10 : 7;
         double cx = x - f.camX, cy = y - f.camY, cz = z - f.camZ;
         int center = argb(rgb, alpha), rim = argb(rgb, 0);
         for (int i = 0; i < sides; i++) {
             double a = i * Math.PI * 2 / sides, b = (i + 1) * Math.PI * 2 / sides;
-            double ax = Math.cos(a) * radius, ay = Math.sin(a) * radius, bx = Math.cos(b) * radius, by = Math.sin(b) * radius;
+            double ax = Math.cos(a) * halfWidth, ay = Math.sin(a) * halfHeight;
+            double bx = Math.cos(b) * halfWidth, by = Math.sin(b) * halfHeight;
             f.batch.quad(cx, cy, cz,
                     cx + f.rightX * ax + f.upX * ay, cy + f.rightY * ax + f.upY * ay, cz + f.rightZ * ax + f.upZ * ay,
                     cx + f.rightX * bx + f.upX * by, cy + f.rightY * bx + f.upY * by, cz + f.rightZ * bx + f.upZ * by,
