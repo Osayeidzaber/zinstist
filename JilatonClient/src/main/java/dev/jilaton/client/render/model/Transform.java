@@ -24,8 +24,11 @@ public final class Transform {
     }
 
     /**
-     * Minecraft-shaped rotation: yaw turns about world up (0 faces +Z), positive pitch looks down, roll
-     * is applied about the resulting forward axis. Matches the basis used by {@link BodyAnchor}.
+     * Minecraft-shaped <em>orientation frame</em>: yaw turns about world up (0 faces +Z), positive pitch looks
+     * down, roll is applied about the resulting forward axis. The columns are (right, up, forward), which is a
+     * left-handed triple in world coordinates, so this is suitable for starting a frame at the world origin
+     * (via {@link #translation} / {@link #identity} and {@link #compose}) but not for rotating an existing
+     * frame; use {@link #localRotation} or {@link #spin} for that.
      */
     public static Transform rotation(double yawDegrees, double pitchDegrees, double rollDegrees) {
         double yaw = Math.toRadians(yawDegrees), pitch = Math.toRadians(pitchDegrees), roll = Math.toRadians(rollDegrees);
@@ -41,6 +44,29 @@ public final class Transform {
             ux = nux; uy = nuy; uz = nuz;
         }
         return new Transform(new double[]{rx, ry, rz, ux, uy, uz, fx, fy, fz, 0, 0, 0});
+    }
+
+    /**
+     * A proper right-handed rotation in <em>local</em> frame coordinates (X right, Y up, Z forward): yaw about
+     * local up, pitch about local right, roll about local forward. Compose it with {@link #compose} when the
+     * rotation is relative to an existing frame; {@link #rotation} is a Minecraft-shaped frame constructor and
+     * must not be used as a relative rotation because its columns (right, up, forward) form a left-handed
+     * triple.
+     */
+    public static Transform localRotation(double yawDegrees, double pitchDegrees, double rollDegrees) {
+        double yaw = Math.toRadians(yawDegrees), pitch = Math.toRadians(pitchDegrees), roll = Math.toRadians(rollDegrees);
+        double cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+        double cr = Math.cos(roll), sr = Math.sin(roll);
+        // Ry(yaw) * Rx(pitch) * Rz(roll), identical to the yaw/pitch/roll order of Transform.rotation.
+        double rx = cy * cr + sy * sp * sr, ry = cp * sr, rz = -sy * cr + cy * sp * sr;
+        double ux = -cy * sr + sy * sp * cr, uy = cp * cr, uz = sy * sr + cy * sp * cr;
+        double fx = sy * cp, fy = -sp, fz = cy * cp;
+        return new Transform(new double[]{rx, ry, rz, ux, uy, uz, fx, fy, fz, 0, 0, 0});
+    }
+
+    /** Composes a proper local rotation onto this frame, keeping the frame handedness intact. */
+    public Transform spin(double yawDegrees, double pitchDegrees, double rollDegrees) {
+        return compose(localRotation(yawDegrees, pitchDegrees, rollDegrees));
     }
 
     /** Frame whose +Z points along {@code forward} and whose +X stays level with {@code upHint}. */

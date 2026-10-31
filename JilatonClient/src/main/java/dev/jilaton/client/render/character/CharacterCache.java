@@ -114,7 +114,7 @@ final class CharacterCache {
    private static void trim() {
       Iterator<CharacterCache.Entry> it = ENTRIES.values().iterator();
 
-      while (ENTRIES.size() > 4 && it.hasNext()) {
+      while (ENTRIES.size() > KEEP && it.hasNext()) {
          CharacterCache.Entry eldest = it.next();
          release(eldest);
          it.remove();

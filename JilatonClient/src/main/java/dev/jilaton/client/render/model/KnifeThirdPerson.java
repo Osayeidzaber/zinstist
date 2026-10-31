@@ -15,9 +15,9 @@ public final class KnifeThirdPerson {
     public static Transform hand(Transform wrist, KnifeMotion.Pose pose) {
         Transform placed = wrist.translate(pose.x() * TRANSLATION, pose.y() * TRANSLATION, pose.z() * TRANSLATION);
         double yaw = pose.yaw(), pitch = pose.pitch(), roll = pose.roll() + pose.spin();
-        // Transform.rotation is Minecraft-shaped and therefore a 180-degree yaw at zero; skip it at rest so the
-        // knife keeps the wrist frame exactly instead of flipping its faces.
+        // Use a proper local rotation: Transform.rotation builds a Minecraft-shaped frame and composing it
+        // onto the wrist would mirror the blade's right axis (and pop 180 degrees once the pose left rest).
         if (Math.abs(yaw) + Math.abs(pitch) + Math.abs(roll) < 1e-9) return placed;
-        return placed.rotate(yaw, pitch, roll);
+        return placed.spin(yaw, pitch, roll);
     }
 }
