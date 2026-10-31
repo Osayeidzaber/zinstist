@@ -84,8 +84,6 @@
     "GameRendererPostEffectAccess",
     "FontProviderAccess",
     "PauseScreenRedirectMixin",
-    "GlyphSamplerMixin",
-    "FontTextureRegistryMixin",
     "HotbarStyleMixin",
     "JilatonTextMixin",
     "JilatonFontWidthMixin",

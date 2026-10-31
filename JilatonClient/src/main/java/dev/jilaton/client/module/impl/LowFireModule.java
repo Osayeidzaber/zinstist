@@ -10,15 +10,15 @@ import dev.jilaton.client.setting.TextSetting;
 import java.util.List;
 
 /**
- * Replaces the vanilla first-person fire overlay with a violet-tinted one that sits lower and smaller,
+ * Replaces the vanilla first-person fire overlay with a softly tinted one (white by default) that sits lower and smaller,
  * so the view and the hotbar stay readable while burning. The drawing lives in {@code LowFireMixin};
  * this module only carries the settings and the resolved tint.
  */
 public final class LowFireModule extends ClientModule {
-    private static final int VIOLET = 0x9A7CFF;
+    private static final int WHITE = 0xF5F5F5;
 
-    private final ChoiceSetting tint = addSetting(new ChoiceSetting("tint", "Tint", List.of("Violet", "Theme", "Custom"), "Violet"));
-    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "9A7CFF"));
+    private final ChoiceSetting tint = addSetting(new ChoiceSetting("tint", "Tint", List.of("White", "Theme", "Custom"), "White"));
+    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F5F5F5"));
     private final NumberSetting lower = addSetting(new NumberSetting("lower", "Lowered by", 0, 0.45, 0.01, 0.2));
     private final NumberSetting size = addSetting(new NumberSetting("size", "Overlay size", 0.55, 1.2, 0.05, 0.95));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.2, 1, 0.05, 0.85));
@@ -32,7 +32,7 @@ public final class LowFireModule extends ClientModule {
         return switch (tint.value()) {
             case "Theme" -> accent & 0xFFFFFF;
             case "Custom" -> EffectPalette.resolve(EffectPalette.CUSTOM, accent, color.value());
-            default -> VIOLET;
+            default -> WHITE;
         };
     }
 

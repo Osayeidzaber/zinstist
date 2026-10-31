@@ -2,7 +2,6 @@ package dev.jilaton.client;
 
 import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.command.JilatonCommands;
-import dev.jilaton.client.gui.ClickGuiScreen;
 import dev.jilaton.client.gui.HudRenderer;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
@@ -65,8 +64,13 @@ public final class JilatonClient implements ClientModInitializer {
         return openMusic == null ? "" : openMusic.getTranslatedKeyMessage().getString();
     }
 
+    /** Key code bound to the ClickGUI, so the open GUI can close on the same key. */
+    public static int clickGuiKeyCode() {
+        return openGui == null ? -1 : ((dev.jilaton.client.mixin.KeyMappingAccessor) openGui).jilaton$getBoundKey().getValue();
+    }
+
     public static void openClickGui(Screen parent) {
-        net.minecraft.client.Minecraft.getInstance().setScreen(new ClickGuiScreen(MODULES, CONFIG, parent));
+        net.minecraft.client.Minecraft.getInstance().setScreen(new dev.jilaton.client.gui.JilatonClickGui(MODULES, CONFIG, parent));
     }
 
     @Override
@@ -148,10 +152,10 @@ public final class JilatonClient implements ClientModInitializer {
                 if (client.screen == null) client.setScreen(new dev.jilaton.client.gui.MusicCenterScreen(null));
             }
             while (openGui.consumeClick()) {
-                if (client.screen instanceof ClickGuiScreen gui) {
+                if (client.screen instanceof dev.jilaton.client.gui.JilatonClickGui gui) {
                     gui.onClose();
                 } else {
-                    client.setScreen(new ClickGuiScreen(MODULES, CONFIG, null));
+                    openClickGui(null);
                 }
             }
         });

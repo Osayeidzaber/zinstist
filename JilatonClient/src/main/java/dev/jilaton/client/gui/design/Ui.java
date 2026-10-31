@@ -125,13 +125,14 @@ public final class Ui {
     public static void toggle(GuiGraphics g, float x, float y, double t, int accent) {
         round(g, x, y, 40, 22, 11, mix(STROKE, accent, t));
         float knob = x + 3 + (float) (18 * t);
-        round(g, knob, y + 3, 16, 16, 8, mix(TEXT_2, TEXT, t));
+        // The knob contrasts with the track: dark on a light accent (white by default), light on a dark one.
+        round(g, knob, y + 3, 16, 16, 8, mix(TEXT_2, JilatonUi.onColor(accent), t));
     }
 
     /** Small toggle for drawers: 32x18. */
     public static void smallToggle(GuiGraphics g, float x, float y, double t, int accent) {
         round(g, x, y, 32, 18, 9, mix(STROKE, accent, t));
-        round(g, x + 2 + (float) (14 * t), y + 2, 14, 14, 7, mix(TEXT_2, TEXT, t));
+        round(g, x + 2 + (float) (14 * t), y + 2, 14, 14, 7, mix(TEXT_2, JilatonUi.onColor(accent), t));
     }
 
     /** Chip / segmented option. Selected = 14% accent fill + 50% accent hairline. */

@@ -262,6 +262,13 @@ public final class ViewmodelShots {
         shot(30, "ui-visuals");
         then(1, () -> {
             client.setScreen(null);
+            JilatonClient.clientConfig().setGuiCategory("Combat");
+            JilatonClient.clientConfig().setGuiExpandedModule("kill_aura");
+            JilatonClient.openClickGui(null);
+        });
+        shot(30, "ui-combat");
+        then(1, () -> {
+            client.setScreen(null);
             JilatonClient.clientConfig().setGuiPage("THEME");
             JilatonClient.openClickGui(null);
         });

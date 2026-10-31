@@ -176,8 +176,8 @@ public abstract class JilatonCardScreen<T> extends Screen {
         targetScroll = Math.max(0, Math.min(maxScroll(), targetScroll));
         scroll = Ui.approach(scroll, targetScroll, dt, 16, reduced);
         float view = LIST_BOTTOM - LIST_Y;
-        graphics.enableScissor(canvas.screenX(LEFT - 8), canvas.screenY(LIST_Y - 6), canvas.screenX(RIGHT + 8),
-                canvas.screenY(LIST_BOTTOM + 6));
+        // Scissor rectangles go through the current pose, so they are given in board coordinates.
+        graphics.enableScissor(Math.round(LEFT - 8), Math.round(LIST_Y - 6), Math.round(RIGHT + 8), Math.round(LIST_BOTTOM + 6));
         for (int i = 0; i < items.size(); i++) {
             T item = items.get(i);
             float y = (float) (LIST_Y + i * (ROW_H + GAP) - scroll);

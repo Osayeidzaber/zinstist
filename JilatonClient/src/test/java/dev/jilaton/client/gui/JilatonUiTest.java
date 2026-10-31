@@ -22,7 +22,7 @@ class JilatonUiTest {
     void textOnAccentKeepsContrast() {
         assertEquals(0xFF050505, JilatonUi.onColor(ClientTheme.OBSIDIAN.accent()));
         assertEquals(JilatonUi.TEXT, JilatonUi.onColor(0xFF1A1A1A));
-        assertEquals(JilatonUi.TEXT, JilatonUi.onColor(ClientTheme.VIOLET.accent()));
+        assertEquals(0xFF050505, JilatonUi.onColor(ClientTheme.GRAPHITE.accent()));
     }
 
     @Test

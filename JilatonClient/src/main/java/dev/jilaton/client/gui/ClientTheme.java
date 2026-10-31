@@ -5,7 +5,6 @@ import java.util.Arrays;
 public enum ClientTheme {
     OBSIDIAN("obsidian", "Obsidian", 0xFFF2F2F2),
     GRAPHITE("graphite", "Graphite", 0xFF9C9C9C),
-    VIOLET("violet", "Violet", 0xFFA855F7),
     BLUE("blue", "Glacier", 0xFF69AFFF),
     CYAN("cyan", "Tide", 0xFF50D5C8),
     ROSE("rose", "Rose", 0xFFFF78AD),

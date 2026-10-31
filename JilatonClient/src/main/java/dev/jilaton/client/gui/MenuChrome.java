@@ -27,7 +27,7 @@ public final class MenuChrome {
 
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
-            if (client.level != null || screen instanceof JilatonMainMenuScreen || screen instanceof ClickGuiScreen
+            if (client.level != null || screen instanceof JilatonMainMenuScreen || screen instanceof ClickGuiScreen || screen instanceof JilatonClickGui
                     || screen instanceof HudEditorScreen || screen instanceof TextSettingScreen
                     || screen instanceof JilatonCardScreen) return;
             OPENED.putIfAbsent(screen, System.nanoTime());

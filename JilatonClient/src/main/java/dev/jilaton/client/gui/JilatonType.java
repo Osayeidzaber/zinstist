@@ -22,30 +22,11 @@ public final class JilatonType {
         REGULAR("ui"), MEDIUM("ui_medium"), SEMIBOLD("ui_semibold"), BOLD("ui_bold"), MONO("mono"), MONO_MEDIUM("mono_medium");
 
         final FontDescription description;
-        /** The same face rasterised at each of {@link #LEVELS} oversample factors. */
-        final FontDescription[] sharp = new FontDescription[LEVELS.length];
 
         Face(String path) {
-            description = resource(path);
-            for (int i = 0; i < LEVELS.length; i++)
-                sharp[i] = LEVELS[i] == 4 ? description : resource(path + "_o" + LEVEL_TAGS[i]);
-        }
-
-        private static FontDescription resource(String path) {
-            return new FontDescription.Resource(Identifier.fromNamespaceAndPath("jilaton", path));
+            description = new FontDescription.Resource(Identifier.fromNamespaceAndPath("jilaton", path));
         }
     }
-
-    /**
-     * Oversample factors shipped for every face (base 4 plus {@code assets/jilaton/font/*_o<tag>.json}): glyph rasters
-     * of 9 * factor physical pixels per em. Text is drawn at a size snapped so its em lands exactly on one of these
-     * rasters, so every glyph is sampled 1:1 (sharp, no dropped rows) at any window size and GUI scale. Neighbouring
-     * levels are at most 25% apart, so a size moves by at most about 12% when snapped.
-     */
-    static final float[] LEVELS = {1, 1.25F, 1.5F, 1.75F, 2, 2.5F, 3, 3.5F, 4, 5, 6, 8, 10};
-    private static final String[] LEVEL_TAGS = {"1", "1q", "1h", "1t", "2", "2h", "3", "3h", "4", "5", "6", "8", "10"};
-    /** On-screen em height below which Regular and Mono draw one weight heavier, so thin strokes stay visible. */
-    private static final double HEAVIER_BELOW_PX = 15;
 
     private static Font inter;
     /** Pose scale, relative to GUI units, that text is currently drawn under ({@link #withScale}, {@code Canvas}). */
@@ -73,56 +54,6 @@ public final class JilatonType {
         contextScale = previous;
     }
 
-    private static double guiScale() {
-        return Minecraft.getInstance().getWindow().getGuiScale();
-    }
-
-    /** Index into {@link #LEVELS} of the raster nearest (in ratio) to an em of {@code emPixels} physical pixels. */
-    static int level(double emPixels) {
-        double wanted = Math.max(1e-3, emPixels / 9.0);
-        int best = 0;
-        for (int i = 1; i < LEVELS.length; i++)
-            if (Math.abs(Math.log(LEVELS[i] / wanted)) < Math.abs(Math.log(LEVELS[best] / wanted))) best = i;
-        return best;
-    }
-
-    /** The largest level whose raster fits {@code emPixels}, for picking a layout scale that lands exactly on one. */
-    public static float levelAtMost(double emPixels) {
-        float best = LEVELS[0];
-        for (float level : LEVELS) if (9 * level <= emPixels * 1.001) best = level;
-        return best;
-    }
-
-    /** The smallest level whose raster covers {@code emPixels}. */
-    public static float levelAtLeast(double emPixels) {
-        for (float level : LEVELS) if (9 * level >= emPixels * 0.999) return level;
-        return LEVELS[LEVELS.length - 1];
-    }
-
-    /** {@code size} snapped so that, at {@code pixelsPerUnit}, the em is exactly one raster level. */
-    static float snap(float size, double pixelsPerUnit) {
-        if (!enabled() || pixelsPerUnit <= 0) return size;
-        return (float) (9 * LEVELS[level(size * pixelsPerUnit)] / pixelsPerUnit);
-    }
-
-    /** Thin faces get one step heavier at small on-screen sizes. */
-    static Face weighted(Face face, double emPixels) {
-        if (emPixels >= HEAVIER_BELOW_PX) return face;
-        return switch (face) {
-            case REGULAR -> Face.MEDIUM;
-            case MONO -> Face.MONO_MEDIUM;
-            default -> face;
-        };
-    }
-
-    private static FontDescription sharpFor(FontDescription description) {
-        double em = 9 * contextScale * guiScale();
-        int level = level(em);
-        if (FontDescription.DEFAULT.equals(description)) return weighted(Face.REGULAR, em).sharp[level];
-        for (Face face : Face.values()) if (face.description.equals(description)) return weighted(face, em).sharp[level];
-        return description;
-    }
-
     private JilatonType() { }
 
     /** Whether the Inter typeface is selected (Theme page, {@code ui.font}). */
@@ -139,9 +70,9 @@ public final class JilatonType {
             inter = new Font(new Font.Provider() {
                 @Override
                 public GlyphSource glyphs(FontDescription description) {
-                    // Each face resolves to the raster that matches today's on-screen size, so plain
-                    // drawString text in Jilaton screens and the HUD is sampled about 1:1 too.
-                    return base.glyphs(sharpFor(description));
+                    // Drawing and measuring go through JilatonText; these glyphs only back what still asks the
+                    // font directly (widget internals), in Inter.
+                    return base.glyphs(FontDescription.DEFAULT.equals(description) ? Face.REGULAR.description : description);
                 }
 
                 @Override
@@ -164,16 +95,11 @@ public final class JilatonType {
         return inter;
     }
 
-    /** The face a style's font id stands for (any raster level of it); {@code bold} upgrades Regular and Medium. */
+    /** The face a style's font id stands for; {@code bold} upgrades Regular and Medium. */
     public static Face faceOf(FontDescription description, boolean bold) {
         Face found = Face.REGULAR;
-        if (description != null && !FontDescription.DEFAULT.equals(description)) {
-            search:
-            for (Face face : Face.values()) {
-                if (face.description.equals(description)) { found = face; break; }
-                for (FontDescription level : face.sharp) if (level.equals(description)) { found = face; break search; }
-            }
-        }
+        if (description != null && !FontDescription.DEFAULT.equals(description))
+            for (Face face : Face.values()) if (face.description.equals(description)) found = face;
         if (bold && (found == Face.REGULAR || found == Face.MEDIUM)) return Face.BOLD;
         return found;
     }

@@ -27,7 +27,7 @@ import java.util.Properties;
 public final class ClientConfig {
     private static final String PROFILE_EXTENSION = ".properties";
     private static final String PROFILE_NAME_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,31}";
-    private static final Set<String> THEME_IDS = Set.of("obsidian", "graphite", "violet", "blue", "cyan", "rose", "amber", "custom");
+    private static final Set<String> THEME_IDS = Set.of("obsidian", "graphite", "blue", "cyan", "rose", "amber", "custom");
     private static final Set<String> GUI_PAGES = Set.of("MODULES", "SETTINGS", "CONFIGS", "THEME");
     private static final Set<String> GUI_CATEGORIES = Set.of("All", "Combat", "Movement", "Player", "Visuals", "Client");
     private static final Set<String> HUD_WIDGET_IDS = Set.of("watermark", "modules", "performance", "coordinates", "keystrokes", "target", "armor", "effects", "cps", "notifications", "music", "keybinds", "server", "above_head", "held_item", "staff", "radar");
@@ -291,6 +291,8 @@ public final class ClientConfig {
             FriendManager.replace(List.of(configuredFriends.split(",")));
         }
         String configuredTheme = values.getProperty("ui.theme");
+        // Violet was the accent before the black-and-white redesign; it is gone, so old configs come back white.
+        if ("violet".equals(configuredTheme)) configuredTheme = "obsidian";
         if (configuredTheme != null) {
             try {
                 setThemeId(configuredTheme);

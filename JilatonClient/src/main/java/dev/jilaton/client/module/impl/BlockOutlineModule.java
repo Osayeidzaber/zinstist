@@ -27,11 +27,10 @@ import java.util.List;
 public final class BlockOutlineModule extends ClientModule implements FxEmitter {
     private static final double SNAP_EPSILON = 1e-3;
     private static final double MAX_STEP = 1.0 / 120.0;
-    private static final int VIOLET = 0x9A7CFF;
 
     private final ChoiceSetting colorMode = addSetting(new ChoiceSetting("color_mode", "Color",
-            List.of("Violet", "Mono", "Theme", "Custom"), "Violet"));
-    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "9A7CFF"));
+            List.of("Mono", "Theme", "Custom"), "Mono"));
+    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F5F5F5"));
     private final NumberSetting width = addSetting(new NumberSetting("width", "Line width", 1, 6, 0.5, 2.5));
     private final BooleanSetting glow = addSetting(new BooleanSetting("glow", "Glow halo", true));
     private final NumberSetting fill = addSetting(new NumberSetting("fill", "Face fill", 0, 0.3, 0.01, 0.06));
@@ -77,10 +76,9 @@ public final class BlockOutlineModule extends ClientModule implements FxEmitter 
 
     private int outlineColor(int accent) {
         return switch (colorMode.value()) {
-            case "Mono" -> EffectPalette.MONO_RGB;
             case "Theme" -> accent & 0xFFFFFF;
             case "Custom" -> EffectPalette.resolve(EffectPalette.CUSTOM, accent, color.value());
-            default -> VIOLET;
+            default -> EffectPalette.MONO_RGB;
         };
     }
 
