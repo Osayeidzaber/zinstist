@@ -110,4 +110,18 @@ public final class WingMotion {
     public static double bend(String style) {
         return style.equals("Blade") ? -0.02 : style.equals("Energy") ? -0.14 : -0.06;
     }
+
+    /**
+     * Pose frame of one feather on one side. The fan angle is measured in the wing's left-handed body frame
+     * (local +X is the entity's right), and the flap sweeps that fan up and down, so the leading feather
+     * rises before the tip does. Public so the headless tests can pin the fan direction.
+     */
+    public static Transform featherFrame(Transform pivot, int side, double fanDegrees, double flapDegrees) {
+        double fan = Math.toRadians(fanDegrees);
+        double dirX = side * Math.cos(fan);
+        double dirY = Math.sin(fan);
+        double dirZ = -0.16;
+        return pivot.rotate(0, 0, flapDegrees * side)
+                .compose(Transform.lookAlong(dirX, dirY, dirZ, 0, 1, 0));
+    }
 }
