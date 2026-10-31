@@ -109,7 +109,7 @@ public final class FloatingRelicsModule extends ClientModule implements FxEmitte
             live = 0;
         }
         now = f.now;
-        double dt = Math.min(0.1, Math.max(0, f.dt));
+        double dt = Double.isFinite(f.dt) ? Math.min(0.1, Math.max(0, f.dt)) : 0;
         double ticks = dt * REFERENCE_TICKS;
         ageTicks += ticks;
 

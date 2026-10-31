@@ -1,8 +1,10 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.render.EffectPalette;
+import dev.jilaton.client.render.fx.AmbiencePrecedence;
 import dev.jilaton.client.render.fx.FxEmitter;
 import dev.jilaton.client.render.fx.FxFrame;
 import dev.jilaton.client.render.fx.FxShapes;
@@ -37,7 +39,7 @@ public final class AmbienceModule extends ClientModule implements FxEmitter {
     private final Random random = new Random(7);
 
     public AmbienceModule() {
-        super("ambience", "Ambience", "Drifting snow, dust, fireflies, embers and stardust around the camera.", ModuleCategory.RENDER);
+        super("ambience", "Ambience", "Drifting snow, dust, fireflies, embers and stardust around the camera. Accent precedence: Sky > Cyberspace > Glass > Fullbright > theme.", ModuleCategory.RENDER);
     }
 
     @Override protected void onDisable(Minecraft client) { seeded = false; }
@@ -47,7 +49,8 @@ public final class AmbienceModule extends ClientModule implements FxEmitter {
         var level = f.client.level;
         if (level == null) return;
         if (overworldOnly.value() && level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
-        if (nightOnly.value() && level.isBrightOutside()) return;
+        Chain chain = chain();
+        if (AmbiencePrecedence.nightGateApplies(nightOnly.value(), chain.fullbright != null) && level.isBrightOutside()) return;
         double r = radius.value();
         int n = (int) Math.min(MAX, MAX * density.value() * f.quality.density());
         if (!seeded) {
@@ -59,7 +62,8 @@ public final class AmbienceModule extends ClientModule implements FxEmitter {
             }
             seeded = true;
         }
-        int rgb = EffectPalette.resolve(colorMode.value(), f.accent, color.value());
+        int rgb = resolvedAccent(f.accent, chain);
+        boolean skyStreaks = AmbiencePrecedence.drawsSkyStreaks(chain.owner);
         String s = style.value();
         double a = opacity.value() * f.intensity;
         double dt = f.dt * speed.value() * (f.reducedMotion ? 0.3 : 1);
@@ -99,7 +103,7 @@ public final class AmbienceModule extends ClientModule implements FxEmitter {
                     FxShapes.star(f, x[i], y[i], z[i], 0.05 * sz * (0.6 + tw * 0.4), ph + t * 0.3, 4, rgb, a * fade * tw, false);
                 }
                 case "Light streaks" -> {
-                    if (i % 6 != 0) continue;
+                    if (!skyStreaks || i % 6 != 0) continue;
                     FxShapes.spark(f, x[i], y[i], z[i], Math.cos(ph) * 2.5, -6, Math.sin(ph) * 2.5, 3.5 * sz, 0.02 * sz, rgb, a * fade * 0.8, false);
                 }
                 case "Rain streaks" -> FxShapes.spark(f, x[i], y[i], z[i], 0.08, -1, 0, 0.9 * sz, 0.012 * sz, rgb, a * fade * 0.6, false);
@@ -107,6 +111,37 @@ public final class AmbienceModule extends ClientModule implements FxEmitter {
                 default -> FxShapes.softDot(f, x[i], y[i], z[i], 0.045 * sz * (0.7 + 0.3 * Math.sin(ph)), rgb, a * fade, false);
             }
         }
+    }
+
+    private static ClientModule enabled(String id) {
+        ClientModule module = JilatonClient.moduleManager().get(id);
+        return module != null && module.enabled() ? module : null;
+    }
+
+    /** Enabled providers for one frame; null fields mean "not a provider right now". */
+    private record Chain(AmbiencePrecedence.Scene owner, CustomSkyModule sky,
+                         CyberspaceModule cyberspace, GlassMaterialModule glass, ClientModule fullbright) {}
+
+    private static Chain chain() {
+        CustomSkyModule sky = enabled("custom_sky") instanceof CustomSkyModule module ? module : null;
+        CyberspaceModule cyberspace = enabled("cyberspace") instanceof CyberspaceModule module ? module : null;
+        GlassMaterialModule glass = enabled("glass_material") instanceof GlassMaterialModule module ? module : null;
+        ClientModule fullbright = enabled("fullbright");
+        return new Chain(AmbiencePrecedence.owner(sky != null, cyberspace != null, glass != null, fullbright != null),
+                sky, cyberspace, glass, fullbright);
+    }
+
+    /** The colour the emitter uses right now, so the harness can log the live precedence result. */
+    public int resolvedAccent(int accent) { return resolvedAccent(accent, chain()); }
+
+    /** Theme colour follows the enforced precedence chain; Mono and Custom keep their own value. */
+    private int resolvedAccent(int accent, Chain chain) {
+        if (!colorMode.value().equals(EffectPalette.THEME)) return EffectPalette.resolve(colorMode.value(), accent, color.value());
+        return AmbiencePrecedence.accent(chain.owner,
+                chain.sky == null ? accent : chain.sky.sceneAccent(accent),
+                chain.cyberspace == null ? accent : chain.cyberspace.primaryColor(accent),
+                chain.glass == null ? accent : chain.glass.primaryColor(accent),
+                accent);
     }
 
     private static double wrap(double value, double center, double half) {

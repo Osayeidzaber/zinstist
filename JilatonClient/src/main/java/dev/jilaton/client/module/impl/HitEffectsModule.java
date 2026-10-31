@@ -2,11 +2,13 @@ package dev.jilaton.client.module.impl;
 
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.render.EffectBatch;
 import dev.jilaton.client.render.EffectPalette;
 import dev.jilaton.client.render.fx.FxEmitter;
 import dev.jilaton.client.render.fx.FxFrame;
 import dev.jilaton.client.render.fx.FxParticles;
 import dev.jilaton.client.render.fx.FxShapes;
+import dev.jilaton.client.render.fx.TerrainWave;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
@@ -35,7 +37,7 @@ import java.util.Set;
  * distinct piece of geometry; several can be layered, and presets pick a curated combination.
  */
 public final class HitEffectsModule extends ClientModule implements FxEmitter {
-    public enum Style { SPARKS, BURST, RIPPLE, SHOCKWAVE, STARS, SMOKE, INK, RINGS, ENERGY, MARKERS, DOME }
+    public enum Style { SPARKS, BURST, RIPPLE, SHOCKWAVE, STARS, SMOKE, INK, RINGS, ENERGY, MARKERS, DOME, WORLD_WAVE }
 
     private static final Map<String, Set<Style>> PRESETS = Map.of(
             "Minimal", EnumSet.of(Style.SPARKS, Style.RIPPLE),
@@ -43,7 +45,7 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
             "Monochrome", EnumSet.of(Style.SPARKS, Style.SHOCKWAVE, Style.INK),
             "Cosmic", EnumSet.of(Style.STARS, Style.ENERGY, Style.RINGS, Style.BURST),
             "Splash", EnumSet.of(Style.INK, Style.SHOCKWAVE, Style.BURST, Style.MARKERS),
-            "Impact", EnumSet.of(Style.DOME, Style.SHOCKWAVE, Style.SPARKS, Style.BURST));
+            "Impact", EnumSet.of(Style.DOME, Style.SHOCKWAVE, Style.WORLD_WAVE, Style.SPARKS, Style.BURST));
     private static final int OWNER = FxParticles.ownerId("hit_effects");
 
     private final ChoiceSetting preset = addSetting(new ChoiceSetting("preset", "Preset",
@@ -61,6 +63,9 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     private final BooleanSetting energy = addSetting(new BooleanSetting("style_energy", "Custom: energy spiral", false));
     private final BooleanSetting markers = addSetting(new BooleanSetting("style_markers", "Custom: combo markers", false));
     private final BooleanSetting dome = addSetting(new BooleanSetting("style_dome", "Custom: dome shockwave", false));
+    private final BooleanSetting worldWave = addSetting(new BooleanSetting("style_world_wave", "Custom: terrain shockwave", false));
+    private final NumberSetting worldWaveRadius = addSetting(new NumberSetting("world_wave_radius", "Terrain wave radius", 16, 64, 1, 44));
+    private final NumberSetting worldWaveThickness = addSetting(new NumberSetting("world_wave_thickness", "Terrain wave thickness", 1, 8, 0.5, 3));
     private final ChoiceSetting colorMode = addSetting(EffectPalette.modeSetting("color_mode", "Color"));
     private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F2F2F2"));
     private final TextSetting secondary = addSetting(EffectPalette.hexSetting("secondary", "Secondary RGB hex", "8A8A8A"));
@@ -87,6 +92,8 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     private int combo;
     private long lastComboAt;
     private Object boundLevel;
+    /** Block samples the world wave may spend this frame, shared by every live wave. */
+    private int waveBudget;
 
     public HitEffectsModule() {
         super("hit_effects", "HitEffects", "World-space impact effects: sparks, ripples, shockwaves, ink splashes, rings and combos.", ModuleCategory.RENDER);
@@ -164,6 +171,7 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
         if (energy.value()) set.add(Style.ENERGY);
         if (markers.value()) set.add(Style.MARKERS);
         if (dome.value()) set.add(Style.DOME);
+        if (worldWave.value()) set.add(Style.WORLD_WAVE);
         return set;
     }
 
@@ -203,6 +211,7 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
         if (impacts.isEmpty()) return;
         int rgb = primary(f.accent), rgb2 = secondaryRgb();
         double life = lifetime.value(), alphaScale = opacity.value() * f.intensity, s = size.value();
+        waveBudget = TerrainWave.MAX_BLOCKS_PER_FRAME;
         Iterator<Impact> iterator = impacts.iterator();
         while (iterator.hasNext()) {
             Impact impact = iterator.next();
@@ -237,6 +246,7 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
                 f.batch.ring(impact.x - f.camX, impact.floorY + 0.04 - f.camY, impact.z - f.camZ, r,
                         f.quality.circleSegments(), FxShapes.argb(rgb2, a), 2.2F, false, 0, 0);
             }
+            if (impact.styles.contains(Style.WORLD_WAVE)) worldWave(f, impact, age, rgb, alphaScale);
             if (impact.styles.contains(Style.RINGS)) {
                 double eased = 1 - Math.pow(1 - Math.min(1, t * 1.3), 3);
                 double a = alphaScale * (1 - t);
@@ -258,6 +268,69 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
                         0, impact.combo > 2 ? FxShapes.argb(rgb, a * 0.6) : 0, true, 0, false));
             }
         }
+    }
+
+    /**
+     * One large terrain-following wavefront: every sampled block under the front gets a glowing top face
+     * and outline, joined by a faint ring. Sampling is capped per frame and blocks behind the camera are
+     * culled before the column lookup, so a 64-block wave stays a handful of hundred reads.
+     */
+    /**
+     * The wavefront as a band of real block tops: every column whose centre lies inside the band glows by its
+     * distance to the front, sitting on that column's own surface so the wave climbs and drops with terrain.
+     */
+    private void worldWave(FxFrame f, Impact impact, double age, int rgb, double alphaScale) {
+        if (f.client.level == null || waveBudget <= 0) return;
+        double progress = TerrainWave.progress(age, TerrainWave.MAX_LIFE_SECONDS);
+        if (progress >= 1) return;
+        double radius = TerrainWave.radius(progress, worldWaveRadius.value());
+        double alpha = alphaScale * TerrainWave.alpha(progress);
+        if (radius < 0.5 || alpha < 0.01) return;
+        double thickness = worldWaveThickness.value();
+        int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
+        double outer = radius + 1.2, inner = Math.max(0, radius - thickness);
+        int cx = (int) Math.floor(impact.x), cz = (int) Math.floor(impact.z), span = (int) Math.ceil(outer) + 1;
+        net.minecraft.world.level.Level level = f.client.level;
+        for (int dx = -span; dx <= span && waveBudget > 0; dx++) {
+            for (int dz = -span; dz <= span && waveBudget > 0; dz++) {
+                int bx = cx + dx, bz = cz + dz;
+                double ox = bx + 0.5 - impact.x, oz = bz + 0.5 - impact.z;
+                double distance = Math.sqrt(ox * ox + oz * oz);
+                if (distance > outer || distance < inner) continue;
+                if (distance > 1 && !TerrainWave.inFront(ox / distance, oz / distance, f.forwardX, f.forwardZ, 0.35)) continue;
+                double glow = TerrainWave.frontGlow(distance, radius, thickness) * alpha;
+                if (glow < 0.02) continue;
+                double ground = surface(level, bx + 0.5, impact.floorY, bz + 0.5);
+                if (!Double.isFinite(ground)) continue;
+                waveBudget--;
+                double[] top = TerrainWave.blockTop(bx + 0.5, bz + 0.5, ground);
+                int fill = FxShapes.argb(EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.25 * glow), Math.min(1, 0.85 * glow));
+                // blockTop winds clockwise seen from above; reversed so the face points up and survives culling.
+                f.batch.quad(top[0] - f.camX, top[1] - f.camY, top[2] - f.camZ,
+                        top[9] - f.camX, top[10] - f.camY, top[11] - f.camZ,
+                        top[6] - f.camX, top[7] - f.camY, top[8] - f.camZ,
+                        top[3] - f.camX, top[4] - f.camY, top[5] - f.camZ, fill, fill, fill, fill, false);
+                if (glow / alpha > 0.35) {
+                    int edge = FxShapes.argb(bright, glow);
+                    for (int e = 0; e < 4; e++) {
+                        int p = e * 3, q = ((e + 1) % 4) * 3;
+                        f.batch.glowLine(top[p] - f.camX, top[p + 1] - f.camY, top[p + 2] - f.camZ,
+                                top[q] - f.camX, top[q + 1] - f.camY, top[q + 2] - f.camZ, edge, 1.2F, false);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Walkable surface of a column near {@code nearY}; falls back to the heightmap for cliffs and platforms. */
+    private static double surface(net.minecraft.world.level.Level level, double x, double nearY, double z) {
+        double local = FxParticles.groundY(level, x, nearY + 3, z, 8);
+        if (Double.isFinite(local)) return local;
+        int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                (int) Math.floor(x), (int) Math.floor(z));
+        if (top <= level.getMinY()) return Double.NaN;
+        double exact = FxParticles.groundY(level, x, top + 0.5, z, 2);
+        return Double.isFinite(exact) ? exact : top;
     }
 
     /** Translucent hemisphere rising from the ground; brightest at its rim, larger after long falls (mace slams). */

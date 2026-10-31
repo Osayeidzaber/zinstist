@@ -5,8 +5,6 @@
  */
 package dev.jilaton.client.module.impl;
 
-import dev.jilaton.client.gui.ClickGuiScreen;
-import dev.jilaton.client.gui.HudEditorScreen;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.module.MovementInputEvent;
@@ -46,8 +44,7 @@ public final class InventoryMoveModule extends ClientModule {
         boolean container = screen instanceof AbstractContainerScreen<?>;
         boolean personalInventory = screen instanceof InventoryScreen;
         boolean textInput = screen instanceof ChatScreen
-                || client.screen instanceof ClickGuiScreen
-                || client.screen instanceof HudEditorScreen
+                || InventoryMovePolicy.isJilatonEditor(screen)
                 || screen.getFocused() instanceof EditBox;
         InventoryMovePolicy.Mode mode = InventoryMovePolicy.Mode.valueOf(behavior.value().toUpperCase(java.util.Locale.ROOT));
         if (!InventoryMovePolicy.shouldMove(mode, true, container, personalInventory, textInput)) {

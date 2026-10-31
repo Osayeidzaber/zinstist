@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec2;
 
 public final class ParkourModule extends ClientModule {
     private final NumberSetting edgeLead;
@@ -32,21 +33,18 @@ public final class ParkourModule extends ClientModule {
 
         double forward = (client.options.keyUp.isDown() ? 1.0 : 0.0)
                 - (client.options.keyDown.isDown() ? 1.0 : 0.0);
-        double sideways = (client.options.keyRight.isDown() ? 1.0 : 0.0)
-                - (client.options.keyLeft.isDown() ? 1.0 : 0.0);
+        double sideways = (client.options.keyLeft.isDown() ? 1.0 : 0.0)
+                - (client.options.keyRight.isDown() ? 1.0 : 0.0);
         if (forward == 0.0 && sideways == 0.0) {
             return;
         }
 
-        double yaw = Math.toRadians(player.getYRot());
-        double directionX = -Math.sin(yaw) * forward + Math.cos(yaw) * sideways;
-        double directionZ = Math.cos(yaw) * forward + Math.sin(yaw) * sideways;
-        double directionLength = Math.hypot(directionX, directionZ);
-        if (directionLength < 1.0E-6) {
+        Vec2 direction = SafeWalkPolicy.aheadDirection(player.getYRot(), forward, sideways);
+        if (direction.equals(Vec2.ZERO)) {
             return;
         }
-        directionX /= directionLength;
-        directionZ /= directionLength;
+        double directionX = direction.x;
+        double directionZ = direction.y;
 
         double lead = player.getBbWidth() * 0.5 + edgeLead.value();
         double sideOffset = player.getBbWidth() * 0.24;

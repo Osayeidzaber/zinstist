@@ -63,6 +63,27 @@ class LyricTrailTest {
     }
 
     @Test
+    void everyTrailLineReportsItsOwnLifecycleState() {
+        LyricTrail trail = new LyricTrail();
+        LyricTrail.Entry line = trail.place("one", 0, 0, 64, 0, 0, 0, 1, 3, 0, 5);
+        assertEquals(LyricStates.State.INCOMING, line.state(S / 20, 14, true));
+        assertEquals(LyricStates.State.SETTLING, line.state(S / 5, 14, true));
+        assertEquals(LyricStates.State.ACTIVE, line.state(S, 14, true));
+        assertEquals(LyricStates.State.TRANSITIONING, line.state(5 * S, 14, false));
+        assertEquals(LyricStates.State.FADING, line.state(15 * S, 14, false));
+        assertEquals(LyricStates.State.EXPIRED, line.state(16 * S, 14, false));
+    }
+
+    @Test
+    void anEvictedTrailLineReportsFadingUntilItExpires() {
+        LyricTrail trail = new LyricTrail();
+        LyricTrail.Entry oldest = trail.place("a", 0, 0, 64, 0, 0, 0, 1, 3, 0, 1);
+        trail.place("b", 1, 0, 64, 0, 0, 0, 1, 3, S, 1);
+        assertEquals(LyricStates.State.FADING, oldest.state(S + S / 10, 14, false));
+        assertEquals(LyricStates.State.EXPIRED, oldest.state(S + S / 2, 14, false));
+    }
+
+    @Test
     void linesBeyondTheLimitFadeOutQuicklyInsteadOfPopping() {
         LyricTrail trail = new LyricTrail();
         LyricTrail.Entry oldest = trail.place("a", 0, 0, 64, 0, 0, 0, 1, 3, 0, 2);

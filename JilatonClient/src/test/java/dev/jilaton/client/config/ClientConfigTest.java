@@ -44,6 +44,27 @@ class ClientConfigTest {
     }
 
     @Test
+    void guiBackdropRoundTripsAndClamps() {
+        ClientConfig config = new ClientConfig(temporaryDirectory);
+        assertEquals(0.55, config.backdropOpacity(), 1e-9);
+        assertTrue(config.backdropBlur());
+        config.setBackdropOpacity(0.72);
+        config.setBackdropBlur(false);
+        config.save(new ModuleManager());
+
+        ClientConfig restored = new ClientConfig(temporaryDirectory);
+        restored.load(new ModuleManager());
+        assertEquals(0.7, restored.backdropOpacity(), 1e-9);
+        assertFalse(restored.backdropBlur());
+
+        restored.setBackdropOpacity(5);
+        assertEquals(0.95, restored.backdropOpacity(), 1e-9);
+        restored.setBackdropOpacity(0);
+        assertEquals(0.2, restored.backdropOpacity(), 1e-9);
+        assertThrows(IllegalArgumentException.class, () -> restored.setBackdropOpacity(Double.NaN));
+    }
+
+    @Test
     void missingConfigStartsModulesWithTheirDeclaredDefaults() {
         ModuleManager modules = new ModuleManager();
 

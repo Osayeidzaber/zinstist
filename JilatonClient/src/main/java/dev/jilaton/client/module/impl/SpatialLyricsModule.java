@@ -1,5 +1,7 @@
 package dev.jilaton.client.module.impl;
 
+import dev.jilaton.client.JilatonClient;
+import dev.jilaton.client.gui.design.TextRaster;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.music.Lyrics;
@@ -11,6 +13,7 @@ import dev.jilaton.client.render.fx.FxFrame;
 import dev.jilaton.client.render.fx.FxParticles;
 import dev.jilaton.client.render.fx.FxShapes;
 import dev.jilaton.client.render.fx.LyricLayout;
+import dev.jilaton.client.render.fx.LyricSky;
 import dev.jilaton.client.render.fx.LyricTrail;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
@@ -40,6 +43,8 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private static final int OWNER = FxParticles.ownerId("spatial_lyrics");
     /** "World Trail" places each line where you look and leaves it there; the rest are anchored stacks. */
     static final String WORLD_TRAIL = "World Trail";
+    /** "Sky Lyrics" pins each line to its own compass point in the sky, like the sun and stars. */
+    static final String SKY = "Sky Lyrics";
     private final ChoiceSetting mode = addSetting(new ChoiceSetting("mode", "Position mode", modes(), WORLD_TRAIL));
     private final NumberSetting radius = addSetting(new NumberSetting("radius", "Radius (blocks)", 1.5, 4, 0.05, 2.3));
     private final NumberSetting height = addSetting(new NumberSetting("height", "Height", -1, 2, 0.05, 0.3));
@@ -64,10 +69,11 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private final BooleanSetting floating = addSetting(new BooleanSetting("floating", "Floating motion", true));
     private final BooleanSetting accents = addSetting(new BooleanSetting("accents", "Particle accents on new line", true));
     private final BooleanSetting titleFallback = addSetting(new BooleanSetting("title_fallback", "Show track title when no lyrics", true));
-    private final NumberSetting trailLines = addSetting(new NumberSetting("trail_lines", "World Trail: lines kept", 1, 8, 1, 5));
-    private final NumberSetting linger = addSetting(new NumberSetting("linger", "World Trail: linger (s)", 3, 40, 1, 14));
+    private final NumberSetting trailLines = addSetting(new NumberSetting("trail_lines", "Lines kept (trail & sky)", 1, 8, 1, 5));
+    private final NumberSetting linger = addSetting(new NumberSetting("linger", "Linger (trail & sky, s)", 3, 40, 1, 14));
     private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 0));
     private final LyricTrail trail = new LyricTrail();
+    private final LyricSky sky = new LyricSky();
     private long lastTrailNanos;
 
     private LyricLayout.Anchor anchor;
@@ -93,12 +99,14 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private static List<String> modes() {
         List<String> all = new ArrayList<>();
         all.add(WORLD_TRAIL);
+        all.add(SKY);
         all.addAll(LyricLayout.MODES);
         return List.copyOf(all);
     }
 
     private void resetStack() {
         trail.clear();
+        sky.clear();
         lastTrailNanos = 0;
         anchor = null;
         stackKey = null;
@@ -137,7 +145,11 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
         int index;
         Lyrics.Line active = null;
         if (lyrics.isEmpty()) {
-            if (!titleFallback.value()) return;
+            // Music Visuals already draws the track name in this view; a second copy would double-draw it.
+            if (!titleFallback.value() || musicVisualsShowsTrack(f)) {
+                resetStack();
+                return;
+            }
             index = 0;
         } else {
             index = lyrics.indexAt(position);
@@ -148,10 +160,16 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
         StackKey key = new StackKey(playing.source(), playing.title(), playing.artist(), lyrics, mode.value(),
                 radius.value(), spread.value());
         if (mode.value().equals(WORLD_TRAIL)) {
+            sky.clear();
             emitTrail(f, player, playing, lyrics, index, active, position, key);
             return;
         }
+        if (mode.value().equals(SKY)) {
+            emitSky(f, playing, lyrics, index, active, position, key);
+            return;
+        }
         trail.clear();
+        sky.clear();
         // One anchor per stack: it is placed on the gaze when the stack is born (track, lyrics or layout
         // change) and then never follows the camera. Only a stack that stays out of view or out of reach is
         // moved, as a single eased glide.
@@ -327,6 +345,83 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
         }
     }
 
+    /** Raster em of the sky text: large enough that a sky line reads crisply at {@link LyricSky#RADIUS}. */
+    private static final float SKY_TEXT_EM = 40;
+    /** World blocks per raster pixel; a full line spans roughly a quarter of the sky's width. */
+    private static final double SKY_UNITS_PER_TEXT_PIXEL = 0.018;
+    /** The sky has room for long lines, so it fits wider than a world-space slot before ellipsising. */
+    static final int SKY_MAX_LINE_PIXELS = 360;
+    private static final float[] QUAD_UVS = {0, 1, 1, 1, 1, 0, 0, 0};
+
+    /**
+     * Sky Lyrics: each line is its own fixed point on the celestial sphere, placed along the gaze when it starts
+     * and left there, so turning the camera sweeps past the lines like stars instead of carrying them along. The
+     * text is rasterised into a texture and emitted as sky-layer quads, and it shares the {@link LyricSky}
+     * lifecycle (incoming, settling, active, transitioning, fading, expired) with the other placements.
+     */
+    private void emitSky(FxFrame f, NowPlaying playing, Lyrics lyrics, int index, Lyrics.Line active, long position,
+                         StackKey key) {
+        if (!key.equals(stackKey)) {
+            stackKey = key;
+            sky.clear();
+            trail.clear();
+            lastIndex = Integer.MIN_VALUE;
+        }
+        IntUnaryOperator advance = codePoint -> f.client.font.width(String.valueOf((char) codePoint));
+        if (index != lastIndex) {
+            lastIndex = index;
+            changedAt = f.now;
+            String text;
+            if (lyrics.isEmpty()) {
+                String fallback = playing.artist() == null || playing.artist().isEmpty()
+                        ? playing.title() : playing.title() + "  ·  " + playing.artist();
+                text = fallback.isEmpty() ? null : LyricLayout.fitText(fallback, advance, SKY_MAX_LINE_PIXELS);
+            } else text = index < 0 ? null : fittedLine(lyrics, index, 0, advance, SKY_MAX_LINE_PIXELS);
+            if (text != null && !text.isEmpty())
+                sky.place(text, index, f.forwardX, f.forwardY, f.forwardZ, f.now, (int) trailLines.value());
+        }
+        sky.step(f.now, linger.value(), index);
+        LyricSky.Entry current = sky.active(index);
+        int rgb = EffectPalette.resolve(colorMode.value(), f.accent, color.value());
+        for (LyricSky.Entry e : sky.entries()) {
+            boolean isActive = e == current;
+            double alpha = opacity.value() * f.intensity * LyricSky.alpha(e, f.now, linger.value(), isActive)
+                    * (isActive ? 1 : dim.value());
+            if (alpha < 0.02) continue;
+            double appear = f.reducedMotion ? 1 : LyricSky.appear(e, f.now);
+            List<TextRaster.Run> runs = new ArrayList<>();
+            if (isActive) {
+                boolean timed = active != null && active.timedWords() && active.text().equals(e.text);
+                shineRaster(e.text, timed ? active : null, timed ? Lyrics.wordsSung(active, position) : 0, rgb, runs);
+            } else runs.add(new TextRaster.Run(e.text, 0xFFB4B4B4));
+            if (runs.isEmpty()) continue;
+            TextRaster.Image image = TextRaster.world(runs, TextRaster.Face.SEMIBOLD, SKY_TEXT_EM, SKY_TEXT_EM * 0.09F);
+            double units = SKY_UNITS_PER_TEXT_PIXEL * fontSize.value() * (0.92 + 0.08 * appear);
+            float[] corners = LyricSky.corners(e.azimuth, e.elevation, LyricSky.RADIUS,
+                    image.width() * units, image.height() * units);
+            // The sky pipeline ignores vertex alpha (screen blend), so the fade rides on the vertex brightness.
+            int tone = (int) Math.round(Math.max(0, Math.min(1, alpha)) * 255);
+            f.sky().add(new FxFrame.SkyQuad(image.id(), corners, QUAD_UVS, tone << 24 | tone << 16 | tone << 8 | tone));
+        }
+    }
+
+    /** Opaque runs for sky text: colours are baked into the raster, brightness comes from the quad. */
+    private static void shineRaster(String text, Lyrics.Line timed, int sungWords, int accent, List<TextRaster.Run> runs) {
+        if (timed == null) {
+            runs.add(new TextRaster.Run(text, 0xFFF5F5F5));
+            return;
+        }
+        StringBuilder sung = new StringBuilder(), rest = new StringBuilder();
+        for (int w = 0; w < timed.words().size(); w++) (w < sungWords ? sung : rest).append(timed.words().get(w).text());
+        if (sung.length() > 0) runs.add(new TextRaster.Run(sung.toString(), 0xFF000000 | (accent & 0xFFFFFF)));
+        if (rest.length() > 0) runs.add(new TextRaster.Run(rest.toString(), 0xFFDCDCDC));
+    }
+
+    private static boolean musicVisualsShowsTrack(FxFrame f) {
+        return JilatonClient.moduleManager().get("music_visuals") instanceof MusicVisualsModule visuals
+                && visuals.showsWorldTrackLabel(f.firstPerson);
+    }
+
     private void spawnTrailAccents(FxFrame f, LyricTrail.Entry placed) {
         int rgb = EffectPalette.resolve(colorMode.value(), f.accent, color.value());
         FxParticles.Spec spec = new FxParticles.Spec();
@@ -398,11 +493,16 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
      * blank line — so the caller skips it and never indexes out of range.
      */
     static String fittedLine(Lyrics lyrics, int index, int slot, IntUnaryOperator advance) {
+        return fittedLine(lyrics, index, slot, advance, MAX_LINE_PIXELS);
+    }
+
+    /** Same fit at a caller-chosen width; Sky Lyrics has room for longer lines than a world-space slot. */
+    static String fittedLine(Lyrics lyrics, int index, int slot, IntUnaryOperator advance, int maxWidth) {
         if (lyrics == null || lyrics.isEmpty()) return null;
         int lineIndex = index + slot;
         if (lineIndex < 0 || lineIndex >= lyrics.lines().size()) return null;
         String text = lyrics.lines().get(lineIndex).text();
-        return text.isEmpty() ? null : LyricLayout.fitText(text, advance, MAX_LINE_PIXELS);
+        return text.isEmpty() ? null : LyricLayout.fitText(text, advance, maxWidth);
     }
 
     /** Cubic ease-out over 350 ms for a line appearing; immediate when motion is reduced. */

@@ -52,6 +52,11 @@ public final class GlassMaterialModule extends ClientModule implements FxEmitter
                 ModuleCategory.RENDER);
     }
 
+    /** Resolved tint of the active preset's colour mode, read by the ambience precedence chain. */
+    public int primaryColor(int accent) {
+        return EffectPalette.resolve(colorMode.value(), accent, color.value());
+    }
+
     @Override
     protected void onEnable(Minecraft client) { active = this; }
 

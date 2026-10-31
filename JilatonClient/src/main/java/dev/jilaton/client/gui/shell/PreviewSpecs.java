@@ -213,8 +213,9 @@ public final class PreviewSpecs {
     }
 
     private static PreviewSpec wash(ClientModule module, int accent) {
+        double gamma = Math.max(1.0, Math.min(16.0, num(module, "gamma", 8.0)));
         return new PreviewSpec(PreviewSpec.Motif.WASH, 0, accent, 0xFFFFFF, accent,
-                num(module, "brightness", 1), 0.5, 0.5, 0.2, 0.5, 0.9, 0);
+                (gamma - 1.0) / 15.0, 0.5, 0.5, 0.2, 0.5, 0.9, 0);
     }
 
     private static PreviewSpec steady(ClientModule module, int accent) {

@@ -28,7 +28,6 @@ import java.util.Locale;
 public final class VisualStudioScreen extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     private final Font font = JilatonType.font();
-    private static final int SURFACE = 0xFF0B0B0C;
     private static final int CARD = 0xFF111112;
     private static final int HAIRLINE = 0xFF232323;
 

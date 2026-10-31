@@ -53,6 +53,25 @@ class KnifeMotionTest {
     }
 
     @Test
+    void theDrawOwnsTheHandUntilItFinishes() {
+        KnifeMotion motion = new KnifeMotion();
+        motion.startDraw(0);
+        assertFalse(motion.startInspect(S / 10, 0.5), "an inspect cannot interrupt the draw");
+        assertEquals(KnifeMotion.State.EQUIPPING, motion.classifyState(S / 10, 0.5, false, false, true, 0, 0));
+        assertTrue(motion.startInspect(S, 0.5));
+        assertEquals(KnifeMotion.State.INSPECTING, motion.classifyState(S, 0.5, false, false, true, 0, 0));
+    }
+
+    @Test
+    void aSlashCancelsAnInspectAndHandsTheHandBackAfterwards() {
+        KnifeMotion motion = new KnifeMotion();
+        motion.startInspect(0, 0.5);
+        motion.startSlash(S / 2);
+        assertEquals(KnifeMotion.State.ATTACKING, motion.classifyState(S / 2, 0.5, false, false, true, 0, 0));
+        assertTrue(motion.startInspect(2 * S, 0.5), "inspect is available again once the slash ends");
+    }
+
+    @Test
     void turningDragsTheArmBackAndItSettlesWhenTheViewStops() {
         KnifeMotion motion = new KnifeMotion();
         motion.look(0, 0, 0.016, 1);

@@ -5,6 +5,11 @@ import java.util.Objects;
 
 /** Pure arbitration and smoothing rules, separated for deterministic testing. */
 public final class RotationPolicy {
+    /** Fraction of the remaining error covered per tick once the turn speed no longer binds. */
+    static final float EASE_FRACTION = 0.5F;
+    /** Errors this small are closed in one tick; below a pixel of mouse movement at normal sensitivity. */
+    static final float SNAP_DEGREES = 0.4F;
+
     private RotationPolicy() {
     }
 
@@ -31,11 +36,17 @@ public final class RotationPolicy {
         }
 
         float yawDelta = wrapDegrees(target.yaw() - currentYaw);
-        float pitchDelta = target.pitch() - currentPitch;
-        float nextYaw = wrapDegrees(currentYaw + clamp(yawDelta, -maxDegreesPerTick, maxDegreesPerTick));
-        float nextPitch = clamp(currentPitch + clamp(pitchDelta, -maxDegreesPerTick, maxDegreesPerTick),
-                -90.0F, 90.0F);
-        return new RotationAngles(nextYaw, nextPitch);
+        float pitchDelta = clamp(target.pitch(), -90.0F, 90.0F) - currentPitch;
+        float error = (float) Math.hypot(yawDelta, pitchDelta);
+        if (error <= SNAP_DEGREES) {
+            return new RotationAngles(wrapDegrees(currentYaw + yawDelta), clamp(currentPitch + pitchDelta, -90.0F, 90.0F));
+        }
+        // One vector step: a straight path in yaw/pitch space (no L-shaped turn from per-axis clamps), capped
+        // at the turn speed, and easing out over the last few ticks instead of stopping dead on the target.
+        float step = Math.min(maxDegreesPerTick, Math.max(error * EASE_FRACTION, Math.min(error, SNAP_DEGREES)));
+        float k = step / error;
+        return new RotationAngles(wrapDegrees(currentYaw + yawDelta * k),
+                clamp(currentPitch + pitchDelta * k, -90.0F, 90.0F));
     }
 
     public static float angularError(float currentYaw, float currentPitch, RotationAngles target) {

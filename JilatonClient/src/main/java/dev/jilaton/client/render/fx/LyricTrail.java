@@ -22,9 +22,9 @@ public final class LyricTrail {
     public static final double MIN_DISTANCE = 0.9;
     /** Gap kept between a line and the block surface it was placed against. */
     public static final double WALL_GAP = 0.35;
-    static final double APPEAR_SECONDS = 0.38;
-    static final double FADE_SECONDS = 1.4;
-    static final double EVICT_SECONDS = 0.45;
+    static final double APPEAR_SECONDS = LyricStates.SETTLE_SECONDS;
+    static final double FADE_SECONDS = LyricStates.FADE_SECONDS;
+    static final double EVICT_SECONDS = LyricStates.EVICT_SECONDS;
 
     /** One placed line. Position and facing are fixed at birth; only the stacking lift animates. */
     public static final class Entry {
@@ -58,6 +58,11 @@ public final class LyricTrail {
         public double drawY() { return y + lift; }
 
         public boolean evicted() { return evictedNanos >= 0; }
+
+        /** Explicit lifecycle of this line, shared with every other lyric presentation. */
+        public LyricStates.State state(long now, double lingerSeconds, boolean active) {
+            return LyricStates.state(ageSeconds(this, now), active, lingerSeconds, evictedAge(this, now));
+        }
     }
 
     private final List<Entry> entries = new ArrayList<>();
@@ -132,22 +137,20 @@ public final class LyricTrail {
 
     /** 0..1 visibility from age alone: ease in, hold for the linger time, then fade; eviction fades faster. */
     public static double alpha(Entry e, long now, double lingerSeconds, boolean active) {
-        double age = ageSeconds(e, now);
-        double appear = Math.min(1, age / APPEAR_SECONDS);
-        appear = 1 - Math.pow(1 - appear, 3);
-        double hold = active ? 1 : Math.max(0, Math.min(1, (lingerSeconds + FADE_SECONDS - age) / FADE_SECONDS));
-        double evict = 1;
-        if (e.evicted()) evict = Math.max(0, 1 - (now - e.evictedNanos) / 1e9 / EVICT_SECONDS);
-        return Math.max(0, appear * hold * evict);
+        return LyricStates.alpha(ageSeconds(e, now), active, lingerSeconds, evictedAge(e, now));
     }
 
     /** Appearance progress 0..1, for the rise-in and scale-in of a new line. */
     public static double appear(Entry e, long now) {
-        double t = Math.min(1, ageSeconds(e, now) / APPEAR_SECONDS);
-        return 1 - Math.pow(1 - t, 3);
+        return LyricStates.appear(ageSeconds(e, now));
     }
 
     static double ageSeconds(Entry e, long now) {
         return Math.max(0, (now - e.bornNanos) / 1e9);
+    }
+
+    /** Seconds since eviction, or a negative value while the line is still live. */
+    static double evictedAge(Entry e, long now) {
+        return e.evicted() ? Math.max(0, (now - e.evictedNanos) / 1e9) : -1;
     }
 }

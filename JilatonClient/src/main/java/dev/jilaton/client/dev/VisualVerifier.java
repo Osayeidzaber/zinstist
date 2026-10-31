@@ -2,12 +2,10 @@ package dev.jilaton.client.dev;
 
 import com.mojang.logging.LogUtils;
 import dev.jilaton.client.JilatonClient;
-import dev.jilaton.client.gui.ClickGuiScreen;
-import dev.jilaton.client.gui.shell.ModuleFlow;
-import dev.jilaton.client.gui.shell.ShellLayout;
-import dev.jilaton.client.gui.shell.ShellMetrics;
+import dev.jilaton.client.gui.design.Canvas;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.module.impl.AmbienceModule;
 import dev.jilaton.client.module.impl.HudModule;
 import dev.jilaton.client.render.CombatTargetTracker;
 import dev.jilaton.client.setting.BooleanSetting;
@@ -32,7 +30,6 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Set;
@@ -55,6 +52,8 @@ public final class VisualVerifier {
     private boolean scripted;
     /** HUD preset in force before the harness touches it, restored before the client stops. */
     private String hudPresetBefore = "Minimal";
+    /** Centre of the studio platform built at script start; every world scene re-enters from here. */
+    private double studioX, studioY = Double.NaN, studioZ;
     private int outlineX, outlineY, outlineZ;
 
     private record Step(int delay, Runnable action) { }
@@ -94,8 +93,8 @@ public final class VisualVerifier {
     /** Music-only pass (`-Djilaton.verify.music=true`): lyrics, the Music Center and the lyric pipeline log. */
     private void musicScript(Minecraft client) {
         then(10, () -> {
-            command(client, "gamerule doDaylightCycle false");
-            command(client, "gamerule doWeatherCycle false");
+            command(client, "gamerule advance_time false");
+            command(client, "gamerule advance_weather false");
             command(client, "weather clear");
             command(client, "time set 6000");
             client.options.hideGui = false;
@@ -141,9 +140,9 @@ public final class VisualVerifier {
         then(0, () -> {
             for (ClientModule module : JilatonClient.moduleManager().all()) if (VISUALS.contains(module.id())) module.setEnabled(false);
             if (JilatonClient.moduleManager().get("hud") instanceof HudModule hud) hudPresetBefore = hud.preset();
-            command(client, "gamerule doDaylightCycle false");
-            command(client, "gamerule doWeatherCycle false");
-            command(client, "gamerule doMobSpawning false");
+            command(client, "gamerule advance_time false");
+            command(client, "gamerule advance_weather false");
+            command(client, "gamerule spawn_mobs false");
             command(client, "weather clear");
             command(client, "difficulty easy");
             command(client, "gamemode survival @a");
@@ -157,9 +156,12 @@ public final class VisualVerifier {
             // on every run; then stand at its center facing +Z with the target dummy three blocks ahead.
             int px = Mth.floor(client.player.getX()), pz = Mth.floor(client.player.getZ());
             int py = 140;
-            command(client, "fill " + (px - 8) + " " + (py - 1) + " " + (pz - 8) + " " + (px + 8) + " " + (py - 1) + " " + (pz + 8)
+            command(client, "fill " + (px - 24) + " " + (py - 1) + " " + (pz - 24) + " " + (px + 24) + " " + (py - 1) + " " + (pz + 24)
                     + " minecraft:polished_deepslate");
-            command(client, "fill " + (px - 8) + " " + py + " " + (pz - 8) + " " + (px + 8) + " " + (py + 6) + " " + (pz + 8) + " minecraft:air");
+            command(client, "fill " + (px - 24) + " " + py + " " + (pz - 24) + " " + (px + 24) + " " + (py + 6) + " " + (pz + 24) + " minecraft:air");
+            studioX = px + 0.5;
+            studioY = py;
+            studioZ = pz + 0.5;
             command(client, "tp @a " + (px + 0.5) + " " + py + " " + (pz + 0.5) + " 0 8");
             command(client, "summon husk " + (px + 0.5) + " " + py + " " + (pz + 3.5) + " {NoAI:1b,PersistenceRequired:1b,Silent:1b,"
                     + "Rotation:[180f,0f],Health:1000f,attributes:[{id:\"minecraft:max_health\",base:1000.0}]}");
@@ -356,30 +358,60 @@ public final class VisualVerifier {
         then(5, () -> client.setScreen(null));
         then(5, () -> disable("player_effects"));
 
-        // ClickGUI shell pages, driven through the same layout and click path the shell itself uses.
+        // ClickGUI: the shipping board screen, each state restored from the config the GUI itself persists.
         then(5, () -> {
             client.options.hideGui = false;
             client.setScreen(null);
             createProfiles();
-            JilatonClient.openClickGui(null);
+            openGui("MODULES", "Combat", "");
         });
-        then(20, () -> clickNav(1));
         shot(12, "14-clickgui-combat");
-        then(2, () -> clickNav(4));
+        then(2, () -> openGui("MODULES", "Visuals", ""));
         shot(12, "15-clickgui-visuals");
-        then(2, () -> clickNav(1));
-        then(6, this::expandFirstCombatCard);
+        then(2, () -> openGui("MODULES", "Combat", firstCombatWithSettings()));
         shot(12, "16-clickgui-settings-open");
-        then(2, () -> clickGeneral(2));
+        then(2, () -> openGui("THEME", "Combat", ""));
         shot(12, "17-clickgui-theme");
-        then(2, () -> clickGeneral(1));
+        then(2, () -> openGui("CONFIGS", "Combat", ""));
         shot(12, "18-clickgui-configs");
+
+        // The switch is the only part of a card that may toggle; the body opens the settings drawer.
+        then(2, () -> {
+            openGui("MODULES", "Combat", "");
+            Screen gui = client.screen;
+            if (gui == null) return;
+            Set<String> before = enabledIds();
+            clickAt(gui, CARD_SWITCH_X, CARD_SWITCH_Y);
+            Set<String> after = enabledIds();
+            Set<String> toggled = new java.util.HashSet<>(after);
+            toggled.removeAll(before);
+            Set<String> untoggled = new java.util.HashSet<>(before);
+            untoggled.removeAll(after);
+            LOGGER.info("[JilatonVerify] switch click: toggled={} untoggled={} others={}",
+                    toggled, untoggled, after.size() - toggled.size());
+            if (toggled.size() + untoggled.size() != 1) {
+                LOGGER.error("[JilatonVerify] switch click did not toggle exactly one module");
+            }
+        });
+        shot(12, "18b-clickgui-switch");
+        then(2, () -> {
+            Screen gui = client.screen;
+            if (gui == null) return;
+            Set<String> before = enabledIds();
+            clickAt(gui, CARD_BODY_X, CARD_BODY_Y);
+            if (!before.equals(enabledIds())) {
+                LOGGER.error("[JilatonVerify] clicking the card body toggled a module");
+            } else {
+                LOGGER.info("[JilatonVerify] card body click enabled nothing (drawer path)");
+            }
+        });
+        shot(12, "18c-clickgui-drawer");
         then(5, () -> {
-            if (client.screen != null) client.screen.mouseMoved(5, 5);
             client.setScreen(null);
             deleteProfiles();
         });
 
+        then(1, () -> studio(client));
         // HUD target card: a live mob in front of the camera, Minimal then the Full preset. Night keeps the
         // summoned zombie from burning in the sun, which would otherwise fill the frame with fire particles.
         then(5, () -> {
@@ -404,6 +436,7 @@ public final class VisualVerifier {
         shot(12, "20-hud-full");
         then(4, () -> preset("Minimal"));
 
+        then(1, () -> studio(client));
         // Block Outline: a two-block wall gives the crosshair a deterministic block, then the glide.
         then(5, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
@@ -427,11 +460,12 @@ public final class VisualVerifier {
             client.player.xRotO = -25;
         });
         shot(3, "21b-block_outline-glide");
-        then(3, () -> command(client, "tp @s ~1.4 ~ ~"));
+        then(3, () -> command(client, "execute as @p at @s run tp @s ~1.4 ~ ~"));
         then(3, () -> aimAtBlock(client, outlineX, outlineY, outlineZ));
         shot(8, "21c-block_outline-oblique");
         then(3, () -> disable("block_outline"));
 
+        then(1, () -> studio(client));
         // Low fire: the local player burns for the overlay; cleared again before the next scene.
         then(5, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
@@ -446,6 +480,7 @@ public final class VisualVerifier {
             disable("low_fire");
         });
 
+        then(1, () -> studio(client));
         // Radiance: soft shell on the player and the mob standing in front, seen from behind.
         then(5, () -> {
             client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
@@ -464,6 +499,7 @@ public final class VisualVerifier {
         shot(20, "23-radiance");
         then(3, () -> disable("radiance"));
 
+        then(1, () -> studio(client));
         // Afterglow: a fresh mob dies in front of the camera and dissolves.
         then(5, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
@@ -482,6 +518,7 @@ public final class VisualVerifier {
         shot(8, "24b-afterglow-late");
         then(3, () -> disable("afterglow"));
 
+        then(1, () -> studio(client));
         // Weather: the three selectable modes, one after the other.
         then(5, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
@@ -496,6 +533,174 @@ public final class VisualVerifier {
         then(3, () -> {
             setting("weather", "mode", "Glassy Rain");
             disable("weather");
+        });
+
+        then(1, () -> studio(client));
+        // Fullbright: the lightmap gamma override at midnight. The saved gamma option must be unchanged
+        // before and after, which separates this from the old implementation that wrote options.gamma().
+        then(5, () -> {
+            client.options.hideGui = true;
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "time set 18000");
+            command(client, "weather clear");
+            setting("fullbright", "gamma", 8.0);
+            disable("fullbright");
+            LOGGER.info("[JilatonVerify] fullbright scene: gamma option before={}", client.options.gamma().get());
+        });
+        shot(12, "26-fullbright-off");
+        then(3, () -> enable("fullbright"));
+        shot(8, "26b-fullbright-on");
+        then(3, () -> {
+            LOGGER.info("[JilatonVerify] fullbright scene: gamma option after={}", client.options.gamma().get());
+            disable("fullbright");
+            command(client, "time set 13000");
+        });
+
+        then(1, () -> studio(client));
+        // M41 swing: the Anubis pose captured mid-arc (shot 2 ticks into a ~6 tick swing).
+        then(5, () -> {
+            // F1 (hideGui) also skips the first-person hand pass, which is exactly what this scene must show.
+            client.options.hideGui = false;
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "time set 6000");
+            command(client, "weather clear");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+            setting("swing_animations", "mode", "Slash");
+            setting("swing_animations", "scale", 1.2);
+            setting("swing_animations", "tempo", 1.2);
+            enable("swing_animations");
+        });
+        // Let the vanilla equip animation raise the freshly replaced sword before swinging.
+        then(14, () -> client.player.swing(InteractionHand.MAIN_HAND));
+        shot(2, "27-swing-slash");
+        then(2, () -> setting("swing_animations", "mode", "Spin"));
+        then(2, () -> client.player.swing(InteractionHand.MAIN_HAND));
+        shot(2, "27b-swing-spin");
+        then(3, () -> disable("swing_animations"));
+
+        then(1, () -> studio(client));
+        // M41 terrain shockwave: Custom HitEffects with only the world wave, seen from behind.
+        then(5, () -> {
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "kill @e[type=minecraft:zombie]");
+            double yaw = Math.toRadians(client.player.getYRot());
+            command(client, "summon minecraft:zombie " + (client.player.getX() - Math.sin(yaw) * 2.2) + " "
+                    + client.player.getY() + " " + (client.player.getZ() + Math.cos(yaw) * 2.2)
+                    + " {NoAI:1b,PersistenceRequired:1b,Silent:1b}");
+            setting("hit_effects", "preset", "Custom");
+            setting("hit_effects", "trigger", "Attack attempts");
+            setting("hit_effects", "style_world_wave", true);
+            setting("hit_effects", "world_wave_radius", 44.0);
+            setting("hit_effects", "style_sparks", false);
+            setting("hit_effects", "style_ripple", false);
+            enable("hit_effects");
+        });
+        then(3, () -> aimAt(client, nearestZombie(client)));
+        then(2, () -> {
+            client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            client.player.setXRot(25);
+            client.player.xRotO = 25;
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null && client.gameMode != null) client.gameMode.attack(client.player, zombie);
+            client.player.swing(InteractionHand.MAIN_HAND);
+        });
+        shot(6, "28-terrain-wave");
+        shot(12, "28b-terrain-wave-wide");
+        then(3, () -> {
+            disable("hit_effects");
+            command(client, "kill @e[type=minecraft:zombie]");
+            setting("hit_effects", "preset", "Minimal");
+            setting("hit_effects", "style_world_wave", false);
+        });
+
+        then(1, () -> studio(client));
+        // M41 ambience precedence: Theme colour with no owner, then CustomSky owns it.
+        then(5, () -> {
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "time set 13000");
+            setting("ambience", "style", "Dust");
+            setting("ambience", "density", 0.8);
+            setting("ambience", "radius", 20.0);
+            setting("ambience", "color_mode", "Theme");
+            disable("custom_sky");
+            enable("ambience");
+            logAmbience("29-theme");
+        });
+        shot(40, "29-ambience-theme");
+        then(2, () -> {
+            enable("custom_sky");
+            logAmbience("29b-sky");
+        });
+        shot(40, "29b-ambience-sky");
+        then(3, () -> {
+            disable("ambience");
+            disable("custom_sky");
+            command(client, "time set 13000");
+        });
+
+        // Pharaoh headdress over a worn helmet, seen from the front: the helmet must vanish under the
+        // headdress while the module is on and come back the moment it is switched off.
+        then(1, () -> studio(client));
+        then(5, () -> {
+            command(client, "time set 6000");
+            command(client, "item replace entity @p armor.head with minecraft:iron_helmet");
+            client.options.setCameraType(CameraType.THIRD_PERSON_FRONT);
+            setting("pharaoh_headdress", "style", "Nemes");
+            setting("pharaoh_headdress", "color_mode", "Manual");
+            enable("pharaoh_headdress");
+        });
+        shot(20, "30-pharaoh-helmet-on");
+        then(2, () -> disable("pharaoh_headdress"));
+        shot(10, "30b-pharaoh-helmet-off");
+        then(3, () -> {
+            command(client, "item replace entity @p armor.head with minecraft:air");
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+        });
+
+        // Screenshot [Copy]: drive the real custom-click handler on an earlier shot; the feedback line and the
+        // OS clipboard (checked outside the game) are the evidence.
+        then(5, () -> {
+            client.gui.getChat().clearMessages(false);
+            dev.jilaton.client.screenshot.ScreenshotChatActions.handleCopy(client,
+                    new net.minecraft.network.chat.ClickEvent.Custom(
+                            dev.jilaton.client.screenshot.ScreenshotChatActions.COPY_ID,
+                            java.util.Optional.of(net.minecraft.nbt.StringTag.valueOf("verify-17-clickgui-theme.png"))));
+        });
+        // The "Copied screenshot" / "Copy failed" line lands in chat and therefore in latest.log.
+        shot(60, "31-screenshot-copy-chat");
+
+        // FreeLook + KillAura: the camera stays where FreeLook holds it while the body turns 90 degrees to a
+        // target. Every tick's body yaw/pitch and camera yaw are logged so the motion profile can be checked.
+        then(1, () -> studio(client));
+        then(5, () -> {
+            command(client, "kill @e[type=minecraft:zombie]");
+            command(client, "time set 18000");
+            command(client, "summon minecraft:zombie " + (studioX + 3.0) + " " + studioY + " " + studioZ
+                    + " {NoAI:1b,PersistenceRequired:1b,Silent:1b}");
+            setting("kill_aura", "require_attack_key", false);
+            setting("kill_aura", "turn_speed", 12.0);
+        });
+        then(3, () -> {
+            client.player.setYRot(0);
+            client.player.setXRot(0);
+            enable("free_look");
+            enable("kill_aura");
+        });
+        for (int i = 0; i < 24; i++) {
+            int tick = i;
+            then(1, () -> {
+                float camera = JilatonClient.moduleManager().get("free_look") instanceof dev.jilaton.client.module.impl.FreeLookModule look
+                        ? look.yaw() : Float.NaN;
+                LOGGER.info("[JilatonVerify] aura-freelook t={} bodyYaw={} pitch={} headYaw={} cameraYaw={}", tick,
+                        client.player.getYRot(), client.player.getXRot(), client.player.getYHeadRot(), camera);
+            });
+        }
+        shot(1, "32-freelook-killaura");
+        then(3, () -> {
+            disable("kill_aura");
+            disable("free_look");
+            command(client, "kill @e[type=minecraft:zombie]");
+            client.options.setCameraType(CameraType.FIRST_PERSON);
         });
 
         then(5, () -> {
@@ -598,63 +803,44 @@ public final class VisualVerifier {
         }
     }
 
-    private static ClickGuiScreen clickShell() {
-        Screen screen = Minecraft.getInstance().screen;
-        if (screen instanceof ClickGuiScreen gui) return gui;
-        LOGGER.warn("[JilatonVerify] ClickGUI is not open");
-        return null;
+    /** First card of the 2-column module list while no drawer is open, in Canvas board coordinates. */
+    private static final double CARD_SWITCH_X = 705, CARD_SWITCH_Y = 201;
+    private static final double CARD_BODY_X = 360, CARD_BODY_Y = 190;
+
+    /** Reopens the shipping ClickGUI with a state restored from the config the GUI itself persists. */
+    private static void openGui(String page, String category, String drawer) {
+        Minecraft client = Minecraft.getInstance();
+        client.setScreen(null); // the closed GUI persists its own state in removed(), so close before writing
+        JilatonClient.clientConfig().setGuiPage(page);
+        JilatonClient.clientConfig().setGuiCategory(category);
+        JilatonClient.clientConfig().setGuiExpandedModule(drawer);
+        JilatonClient.clientConfig().setCategoryScroll(category, 0);
+        JilatonClient.openClickGui(null);
     }
 
-    private static ShellLayout shellLayout(ClickGuiScreen gui) {
-        return ShellLayout.compute(gui.width, gui.height);
-    }
-
-    /** Drives one click through the shell's own handler; the moved event keeps the hover state in step. */
-    private static void click(ClickGuiScreen gui, double x, double y) {
-        gui.mouseMoved(x, y);
-        gui.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0)), false);
-    }
-
-    private void clickNav(int index) {
-        ClickGuiScreen gui = clickShell();
-        if (gui == null) return;
-        ShellLayout layout = shellLayout(gui);
-        click(gui, layout.panelX() + 20, layout.navY(index) + layout.rowHeight() / 2.0);
-    }
-
-    private void clickGeneral(int index) {
-        ClickGuiScreen gui = clickShell();
-        if (gui == null) return;
-        ShellLayout layout = shellLayout(gui);
-        click(gui, layout.panelX() + 20, layout.generalY(index) + layout.rowHeight() / 2.0);
-    }
-
-    /** Mirrors the shell's own view() for the Combat page and opens the first card that owns settings. */
-    private void expandFirstCombatCard() {
-        ClickGuiScreen gui = clickShell();
-        if (gui == null) return;
-        ShellLayout layout = shellLayout(gui);
-        List<ClientModule> combat = new ArrayList<>();
+    private static String firstCombatWithSettings() {
         for (ClientModule module : JilatonClient.moduleManager().all()) {
-            if (module.category() == ModuleCategory.COMBAT) combat.add(module);
+            if (module.category() == ModuleCategory.COMBAT && !module.settings().isEmpty()) return module.id();
         }
-        int columns = layout.contentWidth() >= 340 ? 2 : 1;
-        int cardWidth = Math.max(60, (layout.contentWidth() - 10 * (columns - 1)) / columns);
-        ModuleFlow flow = ModuleFlow.layout(combat, null, columns, cardWidth, ShellMetrics.MODULE_CARD_HEIGHT,
-                layout.contentWidth(), 10, 8, 24, 30);
-        for (ClientModule module : combat) {
-            if (module.settings().isEmpty() || module.keyCode() >= 0) continue;
-            ModuleFlow.Card card = flow.cardOf(module);
-            if (card == null) continue;
-            click(gui, layout.contentX() + card.x() + 46, layout.listTop() + card.y() + 45);
-            LOGGER.info("[JilatonVerify] expanded {} settings in the ClickGUI", module.id());
-            return;
-        }
-        LOGGER.warn("[JilatonVerify] no unbound Combat module with settings to expand");
+        return "";
     }
 
-    /** Configs page needs rows to show, so three throwaway profiles are written and removed again. */
-    private static void createProfiles() {
+    private static Set<String> enabledIds() {
+        Set<String> out = new java.util.HashSet<>();
+        for (ClientModule module : JilatonClient.moduleManager().all()) if (module.enabled()) out.add(module.id());
+        return out;
+    }
+
+    /** Sends a real click through the screen at a point given in the 1280x720 board space. */
+    private static void clickAt(Screen screen, double boardX, double boardY) {
+        double scale = Math.min(screen.width / Canvas.W, screen.height / Canvas.H);
+        double x = (screen.width - Canvas.W * scale) / 2 + boardX * scale;
+        double y = (screen.height - Canvas.H * scale) / 2 + boardY * scale;
+        screen.mouseMoved(x, y);
+        screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0)), false);
+    }
+
+    /** Configs page needs rows to show, so three throwaway profiles are written and removed again. */    private static void createProfiles() {
         try {
             for (String name : List.of("verify-a", "verify-b", "verify-c")) {
                 JilatonClient.clientConfig().saveProfile(name, JilatonClient.moduleManager());
@@ -687,7 +873,7 @@ public final class VisualVerifier {
 
     /** Scenes whose subject is drawn by the HUD or the ClickGUI shell rather than the world. */
     private static boolean keepsHud(String name) {
-        return name.startsWith("10-") || name.startsWith("11-") || name.startsWith("12-")
+        return name.startsWith("10-") || name.startsWith("27") || name.startsWith("31") || name.startsWith("11-") || name.startsWith("12-")
                 || name.startsWith("14-") || name.startsWith("15-") || name.startsWith("16-")
                 || name.startsWith("17-") || name.startsWith("18-") || name.startsWith("19-")
                 || name.startsWith("20-");
@@ -742,6 +928,27 @@ public final class VisualVerifier {
                 theme == null ? "?" : theme.value(), pack instanceof BooleanSetting bool ? bool.value() : "?");
     }
 
+    /** Proves the Ambience precedence chain from the run log, not only from pixels. */
+    private static void logAmbience(String label) {
+        ClientModule module = JilatonClient.moduleManager().get("ambience");
+        if (!(module instanceof AmbienceModule ambience)) {
+            LOGGER.warn("[JilatonVerify] ambience {}: module missing", label);
+            return;
+        }
+        ChoiceSetting mode = choice("ambience", "color_mode");
+        LOGGER.info("[JilatonVerify] ambience {}: mode={} accent=#{06X} owners={}", label,
+                mode == null ? "?" : mode.value(), ambience.resolvedAccent(0xA98CFF), ownerList());
+    }
+
+    private static String ownerList() {
+        StringBuilder owners = new StringBuilder();
+        for (String id : List.of("custom_sky", "cyberspace", "glass_material", "fullbright")) {
+            ClientModule module = JilatonClient.moduleManager().get(id);
+            if (module != null && module.enabled()) owners.append(owners.length() == 0 ? "" : ",").append(id);
+        }
+        return owners.length() == 0 ? "none" : owners.toString();
+    }
+
     private static void setting(String moduleId, String settingId, Object value) {
         Setting setting = find(moduleId, settingId);
         if (setting == null) {
@@ -763,6 +970,13 @@ public final class VisualVerifier {
         if (module == null) return null;
         for (Setting setting : module.settings()) if (setting.id().equals(settingId)) return setting;
         return null;
+    }
+
+    /** Back to the studio platform centre facing +Z: earlier scenes walk the player off its edge. */
+    private void studio(Minecraft client) {
+        if (Double.isNaN(studioY)) return;
+        command(client, "tp @a " + studioX + " " + studioY + " " + studioZ + " 0 8");
+        client.player.setDeltaMovement(0, 0, 0);
     }
 
     private static void command(Minecraft client, String command) {

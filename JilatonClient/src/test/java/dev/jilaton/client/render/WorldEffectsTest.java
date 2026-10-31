@@ -91,7 +91,7 @@ class WorldEffectsTest {
                 2.0F, true, true, 0.35
         );
         assertTrue(batch.segments().size() > 24);
-        assertEquals(24, batch.quads().size());
+        assertTrue(batch.quads().size() >= 24 * 3, "Wavefront wall, trailing band and contact shadow per segment");
         double minY = Double.POSITIVE_INFINITY;
         double maxY = Double.NEGATIVE_INFINITY;
         for (EffectBatch.Segment s : batch.segments()) {

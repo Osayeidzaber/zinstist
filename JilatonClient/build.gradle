@@ -18,6 +18,15 @@ loom {
             programArgs "--width", "1920", "--height", "1080"
             vmArg "-Djilaton.visualVerify=true"
         }
+        // Isolated world-FX capture (gate, glass, cyberspace, placement, shockwave): screenshots land in run-fx/screenshots.
+        fxShots {
+            client()
+            name = "FX Shots"
+            runDir = "run-fx"
+            programArgs "--quickPlaySingleplayer", "Jilaton HUD verification"
+            programArgs "--width", "1920", "--height", "1080"
+            vmArg "-Djilaton.viewmodelShots=visuals"
+        }
     }
 }
 

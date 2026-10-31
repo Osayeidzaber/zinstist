@@ -2,6 +2,32 @@
 
 The master specification is **not complete**. This checkpoint preserves a working implementation batch and its limits. Existing uncommitted work was retained; no reset, clean, reference-client launch, dependency installation, or build replacement was performed.
 
+## Interaction + Fullbright batch — switch-only toggling, real lightmap brightening (2026-10-31 ~19:00–19:25)
+
+Three acceptance criteria were addressed; two are now RUNTIME_VERIFIED, the third is BUILD_VERIFIED only.
+
+### Fullbright — real lightmap override (RENDER)
+- **`FullbrightModule`** keeps no `options` reference at all. The old version wrote `Minecraft.options.gamma` from `onEnable`, which runs during config load inside `Minecraft.<init>` where `options` does not exist yet; that produced the boot-time NPE and the silent config rollback. It now exposes one setting — **Gamma, 1.0–16.0 step 0.5, default 8.0** — and `lightmapGamma()`, a pure value accessor.
+- **`mixin/LightTextureFullbrightMixin`** (new, registered after `LowFireMixin` in `jilaton.mixins.json`) is `@ModifyArg` on `LightTexture.updateLightTexture(F)V` at the 7th `Std140Builder.putFloat` call (`ordinal = 6`), the float that vanilla computes as `Math.max(0, options.gamma() - darkness)`. While the module is enabled the argument is replaced by `lightmapGamma()`; the saved option is never read or written. Built refmap: `updateLightTexture(F)V → Lnet/minecraft/class_765;method_3313(F)V`, the same mapping the Anubis reference mixin resolves to.
+- `PreviewSpecs.wash()` normalises the new range (`(gamma − 1) / 15`) so the ClickGUI motif stays meaningful; `ModuleManagerTest.fullbrightGammaSettingUsesLightmapRange` pins min/max/default, the `setValue` clamp and `lightmapGamma()`.
+- **Runtime evidence** (`runVisualVerify`, midnight, `time set 18000`, weather clear, identical framing): `verify-26-fullbright-off.png` mean luminance **15.5 / median 17** → `verify-26b-fullbright-on.png` mean **69.0 / median 85**, while the harness logged `gamma option before=0.5` and `gamma option after=0.5`. The frame brightens; the saved option does not move.
+
+### ClickGUI — enable only through the switch (C's board GUI)
+- `JilatonClickGui.clickModules` now consults `toggleHit(mx,my,x,y,cw,visual)` first: a left click inside the card's switch toggles that module and saves the config; **any other click on the card opens/closes the settings drawer**. Switch geometry has one source of truth, `Ui.TOGGLE_W/H` (40×22) and `Ui.SMALL_TOGGLE_W/H` (32×18), used by both the draw call and the hit test, so the clickable area can never drift from the drawn control.
+- The sidebar's cryptic `on + " / " + total` became `on + " of " + total` ("6 of 95", "2 of 28", "2 of 28 active"), and the footer now states the rule: "Click the switch to toggle · Click a card for settings · Esc to close".
+- `ClickGuiCardHitTest` (new) proves the geometry: regular cards toggle only inside `(x+w−56, y+20, 40, 22)`, visual cards only inside `(x+w−46, y+12, 32, 18)`, with exclusive edges and a point that is inside exactly one of the two rectangles.
+- **Runtime evidence:** the harness now opens the shipping GUI, writes the persisted state, and sends real `mouseMoved`+`mouseClicked` events in board space. Log: `switch click: toggled=[] untoggled=[anti_bot] others=6` (exactly one module changed — anti_bot was on from the previous run's saved config), and `card body click enabled nothing (drawer path)`. `verify-18b` shows the switch flipped; `verify-18c` shows the AntiBot drawer opened by the body click; `verify-16` shows the drawer **restored from config** (AntiBot, keybind + four toggles).
+
+### Harness drift (fixed)
+- The old scenes drove the retired `ClickGuiScreen` and logged "ClickGUI is not open" for shots 14–20. They now persist `guiPage/guiCategory/guiExpandedModule/categoryScroll`, call `JilatonClient.openClickGui(null)` and click through the screen.
+- **Defect found while re-running:** `openGui()` wrote the config *before* `setScreen(null)`; the closed screen's `removed()` → `remember()` then overwrote `guiExpandedModule` with the *old* drawer id, so shot 16 showed no drawer. Closing the screen first and writing the state afterwards fixes the restore — verified by `verify-16` (drawer present, restored solely from persisted config).
+
+### Verification actually performed (this batch)
+- Isolated gate `gradlew --init-script C:/tmp/jilaton-arch/isolated.gradle test build` (Temurin 21, build dir `.isolated-build-arch`): **BUILD SUCCESSFUL**, `:test` executed, **151 suites / 662 tests / 0 failures / 0 errors / 0 skipped**. Newest `TEST-*.xml` 19:24:42 is newer than the newest source file (`VisualVerifier.java` 19:20:45), so the counts belong to this tree state.
+- Artifact `jilaton-client-0.1.0.jar`, 9,685,597 bytes, SHA-256 `c8ebc306a61ba2032360b992c82dd3bf18611a9166de5036a46b9190ebb05f54`.
+- Harness `runVisualVerify` exit 0, `[JilatonVerify] finished`; fullbright luminance, switch/drawer interaction and drawer-restore evidence as quoted above.
+- **Limits:** the screenshots prove the drawer renders and that a restored drawer opens, not every drawer's slider/keybind interaction; click coordinates are board-space constants that assume the 1280×720 canvas mapping; Fullbright is client-side lightmap only and is not a server-visible effect. The batch did not touch `BlockPlacementModule`, `JilatonGateModule`, `JumpCirclesModule` or `WorldEffectsTest`, which are modified in the working tree by other lanes.
+
 ## M21: render port batch — Block Outline, Low Fire, Radiance, Afterglow, Weather (2026-10-30 ~22:20–22:57)
 
 Five render modules were added, then driven through the visual harness. This is the first batch of these modules that has **RUNTIME_VERIFIED** screenshots.
@@ -50,6 +76,21 @@ Several scenes contain geometry from other sessions' concurrent work that is **n
 5. **Dark slab at the top of the sky** — geometry from `render/character/**` (I's lane), not sky or FX. Reported, not edited.
 6. **Harness** — `expandFirstCombatCard` now lays out at `ShellMetrics.MODULE_CARD_HEIGHT` (64) instead of 58 (`VisualVerifier.java:643`); `setting()` warns on a missing id instead of silently doing nothing (`:747`); the sky scene sets `dramatic_skys=false` for theme shots, logs theme+pack immediately before each capture (`:738` `logSky`), and adds `07p-sky-<time>-dramatic_skys` pack shots (`:299`). The harness has **no pixel comparison**: `shot()` writes a PNG and logs the result, and the only assertion is "module stayed enabled" in `report()`. The 22:35–22:36 run wrote **78** PNGs (the folder holds 102 because 24 older sky shots remain) and logged `finished` with no JilatonVerify errors.
 7. **Gate status** — `:compileJava` BUILD SUCCESSFUL with these edits. `:compileTestJava` FAILED on `src/test/java/dev/jilaton/client/render/character/CustomCharactersTest.java:28` (ambiguous `assertDoesNotThrow(CustomCharacters::scan, …)`; I's file), so `test build` did not run in this batch and no fresh test totals or jar exist. Last green measurement before that file landed: 131 suites / 560 tests / 0 failures / 0 errors / 0 skipped; the 8,348,477 B jar at 00:46 is another session's build. Runtime screenshots for the four fixes above are **not yet captured**.
+
+### M41: Anubis swing, Ambience precedence, terrain shockwave, one jump circle (2026-10-31 ~19:45)
+- **SwingAnimations rebuilt from Anubis** (`module/impl/SwingAnimationsModule.java`): styles Slash / Chop / Hook / Spin / Double Tap / Push with the reference pose maths (`crest` attack/release curve, per-style translates and Axis rotations). Setting ids `mode` and `scale` are retained, and the eleven LiquidBounce-era names remain valid values mapped onto the closest Anubis style (`styleIndex`), so an existing saved config does not lose its style; `scale` is now labelled Intensity (0.2–2.0) and `tempo`, `offhand`, `combat_only` were added. `FirstPersonHandsAndItemsMixin` now routes through `covers(mainHand)` and honours the offhand setting.
+- **New mixin needs O to register it**: `src/main/java/dev/jilaton/client/mixin/SwingAnimationMixin.java` applies `swingTicks` to `getCurrentSwingDuration` inside `updateSwingTime`/`swing(Hand,Z)` and latches combat-only on the `swinging` field write. It is **not yet in `jilaton.mixins.json`** (O owns that file), so until O adds `"SwingAnimationMixin",` tempo and the combat latch are inactive at runtime.
+- **Ambience precedence** (`render/fx/AmbiencePrecedence.java` + `AmbienceModule`): enforced order **CustomSky > Cyberspace > GlassMaterial > Fullbright > client accent**. Theme colour resolves through the first enabled provider (Sky exposes `sceneAccent`, Cyberspace and Glass expose `primaryColor`); CustomSky owning the scene suppresses Ambience's light streaks; Fullbright bypasses the night-only gate. The order is printed in the module description, which the ClickGUI card renders.
+- **Terrain shockwave** (`render/fx/TerrainWave.java` + `HitEffectsModule`): new `WORLD_WAVE` style, radius setting 16–64 (default 44), one front per impact, ~1.6 s life. Blocks under the front get a glowing top face plus outline joined by a faint ring; samples are capped at 160/wave and a shared 240-sample frame budget, and behind-camera angles are culled before any block lookup. Added to the `Impact` preset and available as `style_world_wave` in Custom.
+- **JumpCircles** (`JumpCirclePolicy`): the delayed multi-ring Ripple/Shockwave chains were removed — every style now draws one front; a 120 ms per-player cooldown and a 1.5 s landing grace merge the matching landing into the jump that just drew, so one jump produces one effect.
+- **Tests added**: `SwingAnimationMathTest`, `AmbiencePrecedenceTest`, `TerrainWaveTest`, `JumpCirclePolicyTest`; `ModuleManagerTest.swingAnimationsExposeLiveStyleAndScaleSettings` updated for the Anubis defaults.
+- **Harness**: new scenes `27-swing-slash`, `27b-swing-spin`, `28-terrain-wave`, `28b-terrain-wave-wide`, `29-ambience-theme`, `29b-ambience-sky`; O's earlier shipping-GUI and fullbright scenes are untouched. Client launch still requires O's confirmation.
+- **Gate (green, 20:37)**: prescribed `--init-script C:/tmp/jilaton-arch/isolated-b.gradle test build` → **BUILD SUCCESSFUL in 59s**, build dir `.isolated-build-b`: **179 suites / 829 tests / 0 failures / 0 errors / 0 skipped**, jar `.isolated-build-b/root/libs/jilaton-client-0.1.0.jar` **9,750,450 bytes**, SHA-256 `89e30099cba06fec1ca4d12f01ac4f4e9142448b2201feb2c8b544ee890dcf92` (20:37:06). An earlier green run the same evening (20:27) measured 177/810 with jar `da91de08…` before the `AmbienceModule` chain refactor and the harness `logAmbience` hook. Red runs in this batch were only other lanes' files (`ReachMathTest`, `ScreenshotClipboardTest`, `ModuleManagerTest`, `TargetEspGeometry`, `LyricStates`, `ViewModelPreset*`, `KnifeThirdPerson`, `ShellBackdropContrast`, `ScreenshotChatActions`), never this batch's code or tests.
+- **Mixin registration resolved**: O had already added `"SwingAnimationMixin",` at `src/main/resources/jilaton.mixins.json:29`, so tempo and the combat-only latch are live in the 20:37 jar; the jar contains `SwingAnimationMixin.class`, `SwingAnimationsModule.class`, `AmbiencePrecedence.class`, `TerrainWave.class` and `JumpCirclePolicy.class`.
+- **Ambience proof hook**: `AmbienceModule.resolvedAccent(int)` (`:135`) reuses the same private `Chain` (`:122-133`) as `emit`, and the harness logs `mode`, resolved `accent=#RRGGBB` and the enabled `owners=` before shots 29/29b (`VisualVerifier.java:909`), so the precedence order is provable from the run log.
+- **Runtime**: no screenshots yet — the harness scenes are written and compile, but launching the dev client needs O's go-ahead (M41: "only if O confirms the client is free"). Everything above is BUILD_VERIFIED.
+- **Harness launch attempt (20:41–20:44) — BLOCKED by another lane.** With no client and no Gradle wrapper running, `runVisualVerify` was started through the isolated init script (lock held; `.isolated-build-b` only; shared `build/` untouched) and the client died during the first resource reload:
+  `Mixin apply for mod jilaton failed jilaton.mixins.json:PharaohHelmetMixin -> HumanoidArmorLayer`, `InvalidMixinException: … non-private static method playerOf(HumanoidRenderState)Player`, then `Mixin transformation of HumanoidArmorLayer failed` in `EntityRenderDispatcher.onResourceManagerReload`. Offender: `src/main/java/dev/jilaton/client/mixin/PharaohHelmetMixin.java:34` (`static Player playerOf(...)`, mtime 20:37:19) — **not this lane's file, not edited here**. Fix is one word: `private static`. Consequence: the run exited 0 after 2m28s with **zero** new PNGs (newest in `run-verify/screenshots` is still 19:24) and wrote no crash report; the empty 20:33 `run-visualverify.log` run has the same cause. Reported to O at 20:45. Scenes 27/27b, 28/28b, 29/29b and O's own scenes remain uncaptured.
 
 
 ## Loading screen: bar overflow fixed + shine sweep (user request, 2026-10-30 ~20:45)
@@ -352,3 +393,48 @@ REA opened and inspected Anubis as ZIP data (SHA-256 `c5259f9ffee4bbe2511972f794
 - No performance benchmark, multiplayer/server acceptance, complete dependency security audit or whole-client malware-free claim was made. Source/release licensing notices and corresponding-source packaging need a final release audit.
 
 Continue from these files and inventories; preserve the uncommitted working tree. Keep implementation state separate from evidence of game behavior.
+
+## 2026-10-31 ~21:50 — Lead developer takeover (single agent, no lanes)
+
+Recovered from `development/OVERALL-UPDATE-2026-10-31.md`. Its P0 (Pharaoh mixin extraction, "in progress" by lane I) had **not** landed — the mixin still held non-private statics.
+
+**Done and verified this session**
+| Item | Change | Evidence |
+|---|---|---|
+| P0 boot blocker | `playerOf`/`hidesHelmet` moved to `render/character/PharaohHelmetPolicy`; `PharaohHelmetMixin` keeps one private `@Inject`. Old `@Unique` source test replaced by `noMixinDeclaresANonPrivateStaticMethod` (scans every mixin). | `javap -p` shows only ctor + private injector; client booted through resource reload, 0 `InvalidMixinException`/`BootstrapMethodError` in harness log; full harness shot set written 21:38–21:40 |
+| P1 GUI backdrop blur + opacity | `ClientConfig.backdropOpacity` (0.2–0.95, step 0.05, default 0.55, `ui.backdrop_opacity`) and `backdropBlur` (default on, `ui.backdrop_blur`); `JilatonClickGui.renderBackground` uses vanilla `renderBlurredBackground` + scrim; Theme page toggle + slider. No `options.txt` writes. | `ClientConfigTest.guiBackdropRoundTripsAndClamps`; `verify-17-clickgui-theme.png` shows both controls and blurred world |
+| Swing scene was invalid | Scene 27 ran with F1 on (`shot()` forces hideGui unless `keepsHud`), so no hand pass rendered — earlier "scene 27 written" proved nothing. Added `27` to `keepsHud`. | `verify-27-swing-slash.png` vs `verify-27b-swing-spin.png` (21:48): distinct first-person poses → SwingAnimation RUNTIME_VERIFIED |
+| Jump circles | Source audit only: per-player edge trigger, 120 ms cooldown, landing folded into its jump, `limit` cap. No change. | read `JumpCirclesModule.onTick` |
+
+Gate: `.isolated-build/root/test-results` — **180 suites / 836 tests / 0 fail / 0 err / 0 skip**.
+Note: the init script ignores `-Djilaton.isolatedDir=…` here and writes `.isolated-build/` (still never `build/`).
+
+**Open, next in priority order**
+1. Scene 27: `item replace … diamond_sword` did not take (raw beef held). Use `/give` + select slot so the shot shows a sword.
+2. Terrain shockwave (`verify-28*`): only a thin line near the horizon; no visible block glow along the wavefront. Treat as PARTIAL, not verified.
+3. Runtime scenes still missing: Pharaoh with worn helmet, screenshot `[Copy]/[Open]` click, ClickGUI grip reorder, FreeLook+KillAura motion.
+4. Sky Lyrics alpha pipeline (B → A), unchanged.
+5. Anubis/LiquidBounce re-comparison not repeated this session; prior provenance is in `PROVENANCE_AUDIT.md`.
+6. Environment: this machine is **Windows 11**, not macOS; macOS paths (osascript clipboard, `open`) are build-verified only.
+
+### 22:05 — Shockwave rebuild + harness repairs
+| Item | Change | Evidence |
+|---|---|---|
+| Terrain shockwave was floating | `worldWave` looked for ground only 5 blocks below the impact, so off-platform columns fell back to impact height → a 1-block ring of outlines in mid-air. Rewritten as a block-grid band: every column whose centre is inside `[r − thickness, r + 1.2]` glows by `TerrainWave.frontGlow` (sharp leading edge, trailing afterglow), sits on its own surface (`surface()`: local scan, then `MOTION_BLOCKING_NO_LEAVES` heightmap), capped at `TerrainWave.MAX_BLOCKS_PER_FRAME` = 1400. New setting `world_wave_thickness` (1–8, default 3). | `TerrainWaveTest.frontGlowPeaksOnTheFrontAndFadesBehindIt`; `verify-28` 22:03 shows filled block tops stepping up a terrace |
+| Wave fill never visible (old and new) | `blockTop` corners wind clockwise from above → down-facing normal → back-face culled. Quad now emitted in reversed order. | before/after `verify-28` (outline-only → filled tops) |
+| Harness commands silently failing | Commands run as the server source: `@s` matched nothing (`item replace`, `tp`) → now `@p` / `execute as @p at @s`. 1.21.11 renamed game rules: `advance_time`, `advance_weather`, `spawn_mobs` (verified in game classes). Equip animation hid the replaced sword → swing waits 14 ticks. | `latest.log` 0 × "Incorrect argument"; `verify-27-swing-slash` 21:59 shows the diamond sword in the Slash pose |
+
+Gate: 837 tests / 0 fail / 0 err.
+Still open: harness scenes drift because the world persists and scenes move the player — scene 28 framing is now blocked by a tree; pin the scene with an absolute `tp` before shooting. Items 3–6 above unchanged.
+
+### 22:40 — Pinned scenes, Pharaoh + Copy runtime-verified
+| Item | Change | Evidence |
+|---|---|---|
+| Scene drift | Earlier scenes walk the player ~14 blocks east, off the platform, and they fell ~40 blocks (log: tp to y=101). Added `studio()` (absolute tp to the saved platform centre) before every world scene; platform widened ±8 → ±24 so the 44-block wave stays on camera. | latest.log: all 12 studio tps land at y=140 |
+| Shockwave | — | `verify-28` 22:34: glowing band of block tops sweeping across the floor → RUNTIME_VERIFIED |
+| Pharaoh helmet (new scene 30/30b) | Front third-person, iron helmet worn, module on → off. | `verify-30` helmet hidden under the headdress; `verify-30b` helmet back → RUNTIME_VERIFIED |
+| Pharaoh colour default | `color_mode` default `Theme` → `Manual`: with the white default accent, Theme turned the nemes into a white ghost; Manual is its own gold/lapis/gem palette. Existing saved configs keep their choice. | `verify-30` 22:38 gold + lapis stripes + blue gem |
+| Screenshot [Copy] (new scene 31) | Drives the real `ScreenshotChatActions.handleCopy` on `verify-17`. | chat log "Copied screenshot"; Windows clipboard went text sentinel → 1920×1080 image (file is 1920×1080) → RUNTIME_VERIFIED on Windows. macOS `osascript` path still unrun. |
+
+Gate: 837 tests / 0 fail / 0 err.
+Still open: FreeLook+KillAura motion (needs a multi-frame capture, not a still); ClickGUI grip-reorder scene; [Open] click (vanilla `ClickEvent.OpenFile`, untested here); Sky Lyrics alpha pipeline; macOS runtime.

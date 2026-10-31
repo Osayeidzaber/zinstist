@@ -40,6 +40,8 @@ public final class ClientConfig {
     private String customAccent = "F2F2F2";
     private boolean reducedMotion;
     private double animationIntensity = 1.0;
+    private double backdropOpacity = 0.55;
+    private boolean backdropBlur = true;
     /** UI typeface: "inter" (shipped TTF) or "minecraft" (vanilla pixel font). */
     private String uiFont = "inter";
 
@@ -143,6 +145,15 @@ public final class ClientConfig {
         if (!Double.isFinite(intensity)) throw new IllegalArgumentException("Animation intensity must be finite");
         animationIntensity = Math.max(0, Math.min(1.5, Math.round(intensity * 20) / 20.0));
     }
+    /** In-world ClickGUI scrim darkness, 0.2 (see-through) to 0.95 (near-black). */
+    public double backdropOpacity() { return backdropOpacity; }
+    public void setBackdropOpacity(double opacity) {
+        if (!Double.isFinite(opacity)) throw new IllegalArgumentException("Backdrop opacity must be finite");
+        backdropOpacity = Math.max(0.2, Math.min(0.95, Math.round(opacity * 20) / 20.0));
+    }
+    /** Whether the in-world ClickGUI blurs the world behind it (vanilla blur, the player's own radius). */
+    public boolean backdropBlur() { return backdropBlur; }
+    public void setBackdropBlur(boolean backdropBlur) { this.backdropBlur = backdropBlur; }
 
     public ClientConfig(Path configDirectory) {
         this.path = configDirectory.resolve("jilaton.properties");
@@ -286,6 +297,12 @@ public final class ClientConfig {
         } catch (IllegalArgumentException exception) {
             animationIntensity = 1.0;
         }
+        try {
+            setBackdropOpacity(Double.parseDouble(values.getProperty("ui.backdrop_opacity", "0.55")));
+        } catch (IllegalArgumentException exception) {
+            backdropOpacity = 0.55;
+        }
+        backdropBlur = Boolean.parseBoolean(values.getProperty("ui.backdrop_blur", "true"));
         String configuredFriends = values.getProperty("friends.names");
         if (configuredFriends != null) {
             FriendManager.replace(List.of(configuredFriends.split(",")));
@@ -399,6 +416,8 @@ public final class ClientConfig {
         values.setProperty("ui.custom_accent", customAccent);
         values.setProperty("ui.reduced_motion", Boolean.toString(reducedMotion));
         values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
+        values.setProperty("ui.backdrop_opacity", Double.toString(backdropOpacity));
+        values.setProperty("ui.backdrop_blur", Boolean.toString(backdropBlur));
         values.setProperty("ui.font", uiFont);
         values.setProperty("ui.visual_order", String.join(",", visualOrder));
         values.setProperty("ui.module_order", String.join(",", moduleOrder));

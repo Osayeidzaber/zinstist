@@ -63,6 +63,20 @@ class BodyAnchorTest {
     }
 
     @Test
+    void backAnchorFollowsTheCrouchedTorso() {
+        Transform standing = BodyAnchor.composePose(
+                BodyAnchor.Part.BACK, 0, 0, 0, 1.8, 0, 0, 0, false, 0, 0, 0);
+        Transform crouched = BodyAnchor.composePose(
+                BodyAnchor.Part.BACK, 0, 0, 0, 1.8, 0, 0, 0, true, 0, 0, 0);
+        assertEquals(1.8 * 0.74, standing.originY(), EPSILON, "standing keeps the back anchor at torso height");
+        assertTrue(standing.originZ() < -0.1, "the back anchor sits behind the torso");
+        assertEquals(-0.22, crouched.originY() - standing.originY(), EPSILON, "crouching drops the back");
+        assertEquals(standing.originZ(), crouched.originZ(), EPSILON);
+        assertTrue(crouched.forwardY() < -0.4, "the wing plane leans with the crouched torso");
+        assertTrue(crouched.upY() > 0.8);
+    }
+
+    @Test
     void frameStaysOrthonormalForArbitraryAngles() {
         for (int yaw = -180; yaw <= 180; yaw += 37) {
             for (int pitch = -80; pitch <= 80; pitch += 23) {

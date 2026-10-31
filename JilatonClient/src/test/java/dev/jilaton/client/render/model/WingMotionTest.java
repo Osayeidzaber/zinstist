@@ -77,6 +77,15 @@ class WingMotionTest {
     }
 
     @Test
+    void aBrokenFrameDeltaCannotPoisonTheFlapPhase() {
+        assertEquals(1.25, WingMotion.advancedPhase(1.25, Double.NaN, 2, false), 0);
+        assertEquals(1.25, WingMotion.advancedPhase(1.25, 0.016, Double.NaN, false), 0);
+        assertEquals(WingMotion.advancedPhase(0, 0.016, 2, false),
+                WingMotion.advancedPhase(Double.NaN, 0.016, 2, false), 0,
+                "a poisoned phase should recover instead of freezing the wings forever");
+    }
+
+    @Test
     void qualityReducesFeatherAndSegmentCounts() {
         for (String style : WingMotion.STYLES) {
             for (int layer = 0; layer < WingMotion.layers(style); layer++) {

@@ -127,10 +127,18 @@ public final class EntityOverlayRenderer implements AutoCloseable {
             TargetHighlightMotion.State state = highlight.update(tracked, System.nanoTime(), config.reducedMotion());
             if (state != null && client.screen == null && aura.enabled() && aura.showTargetIndicator()) {
                 var target = state.target();
-                halo = new Halo(target.x() - camera.x, target.y() - camera.y, target.z() - camera.z,
-                        target.height(), target.radius(), state.scan(), state.direction(), state.phase(),
-                        state.opacity() * aura.highlightOpacity(), aura.highlightColor(accent), aura.highlightWidth(), aura.highlightHalo());
-                if (aura.highlightCorners()) addCorners(lines, halo);
+                if (aura.markerGeometry()) {
+                    TargetEspGeometry.emit(effects, aura.markerStyle(), new TargetEspGeometry.Marker(
+                            target.x() - camera.x, target.y() - camera.y, target.z() - camera.z,
+                            target.height(), target.radius(), state.phase(),
+                            aura.highlightColor(accent), state.opacity() * aura.highlightOpacity(),
+                            aura.recentlyAttacked(entity) ? 1.0 : 0.0, true), aura.markerMask());
+                } else {
+                    halo = new Halo(target.x() - camera.x, target.y() - camera.y, target.z() - camera.z,
+                            target.height(), target.radius(), state.scan(), state.direction(), state.phase(),
+                            state.opacity() * aura.highlightOpacity(), aura.highlightColor(accent), aura.highlightWidth(), aura.highlightHalo());
+                    if (aura.highlightCorners()) addCorners(lines, halo);
+                }
             }
         }
         context.worldState().setData(KEY, new Frame(List.copyOf(boxes), List.copyOf(lines), halo, effects,

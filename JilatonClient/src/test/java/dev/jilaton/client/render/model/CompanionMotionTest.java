@@ -79,6 +79,21 @@ class CompanionMotionTest {
     }
 
     @Test
+    void brokenInputsCannotPoisonTheOrbitOrTheSpring() {
+        assertEquals(1.4, CompanionMotion.advanceOrbit(1.4, Double.NaN, 2, false), 0);
+        assertEquals(CompanionMotion.advanceOrbit(0, 0.016, 2, false),
+                CompanionMotion.advanceOrbit(Double.NaN, 0.016, 2, false), 0);
+
+        double[] still = CompanionMotion.springStep(1, 2, 3, 4, 5, 6, 0, 0, 0, 11, 8, Double.NaN);
+        assertEquals(1, still[0], 0);
+        assertEquals(6, still[5], 0);
+
+        assertEquals(0, CompanionMotion.bankDegrees(Double.NaN, 1, 16), 0);
+        assertEquals(0, CompanionMotion.bankDegrees(0.5, Double.NaN, 16), 0);
+        assertEquals(0, CompanionMotion.bankDegrees(0.5, 1, Double.NaN), 0);
+    }
+
+    @Test
     void criticalDampingIsTwiceTheRootStiffness() {
         assertEquals(8, CompanionMotion.dampingFor(16, 1), 1e-9);
         assertTrue(CompanionMotion.dampingFor(16, 1.4) > CompanionMotion.dampingFor(16, 0.4));

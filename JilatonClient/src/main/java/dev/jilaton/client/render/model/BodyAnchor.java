@@ -77,7 +77,6 @@ public final class BodyAnchor {
         double x = position.x, y = position.y, z = position.z;
         return switch (part) {
             case HEAD -> compose(Part.HEAD, x, y + height - HEAD_CENTRE, z, body, head, pitch);
-            case BACK -> compose(Part.BACK, x, y + height * BACK_HEIGHT, z, body, head, pitch);
             case SHOULDERS -> compose(Part.SHOULDERS, x, y + height * SHOULDER_HEIGHT, z, body, head, pitch);
             default -> composePose(part, x, y, z, height, body, head, pitch,
                     entity.isCrouching(),

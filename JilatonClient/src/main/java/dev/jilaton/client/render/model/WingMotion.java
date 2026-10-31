@@ -17,8 +17,9 @@ public final class WingMotion {
     private WingMotion() { }
 
     public static double advancedPhase(double previous, double dt, double speed, boolean reducedMotion) {
-        if (reducedMotion) return previous;
-        return previous + Math.max(0, dt) * Math.max(0, speed) * Math.PI * 2;
+        if (!Double.isFinite(previous)) previous = 0;
+        if (reducedMotion || !(dt > 0) || !(speed > 0)) return previous;
+        return previous + dt * speed * Math.PI * 2;
     }
 
     /** Monotonic in the feather index: the leading feather moves first, the tip trails it. */

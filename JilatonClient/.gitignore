@@ -4,5 +4,6 @@ run/
 .idea/
 *.iml
 run-verify/
+run-fx/
 .isolated-build*/
 .wrapcheck-*.txt

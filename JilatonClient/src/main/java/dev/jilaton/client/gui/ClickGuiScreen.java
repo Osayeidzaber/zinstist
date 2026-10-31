@@ -76,12 +76,6 @@ public final class ClickGuiScreen extends Screen {
 
     private record View(List<ClientModule> modules, ModuleFlow flow, int cardHeight, int maxScroll) { }
 
-    /** Where the GUI was when it last closed; reopening resumes there for the rest of the game session. */
-    private record Resume(Page page, String category, String selectedId, String expandedId, boolean enabledOnly,
-                          double scroll, String query) { }
-
-    private static Resume resume;
-
     private record Counts(int[] enabled, int[] total) { }
 
     private record SettingsPage(int hudY, int hudWidth, int hudHeight, int studioY, int studioWidth, int studioHeight,
@@ -191,8 +185,6 @@ public final class ClickGuiScreen extends Screen {
     public void removed() {
         syncStateToConfig();
         config.save(modules);
-        resume = new Resume(page, selectedCategory, selectedId, expandedId, enabledOnly, targetScroll,
-                search == null ? "" : search.getValue());
         super.removed();
     }
 

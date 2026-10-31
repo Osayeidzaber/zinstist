@@ -125,6 +125,16 @@ class HudDesignTest {
         assertTrue(HudDesign.radarRadius(HudDesign.RADAR_DEFAULT_SIZE) > 12);
     }
 
+    @Test void emptyStaffPanelKeepsRoomForItsPlaceholderRow() {
+        int height = HudDesign.staffHeight(1);
+        assertEquals(HudDesign.STAFF_TITLE + HudDesign.STAFF_ROW + HudDesign.STAFF_PADDING, height);
+        assertTrue(HudDesign.staffRowY(0) >= HudDesign.STAFF_TITLE);
+        assertTrue(HudDesign.staffRowY(0) + 9 <= height - HudDesign.STAFF_PADDING,
+                "the empty-state line must fit inside the panel");
+        assertEquals(HudDesign.staffHeight(HudDesign.STAFF_MAX_ROWS),
+                HudDesign.staffHeight(HudDesign.STAFF_MAX_ROWS + 5));
+    }
+
     @Test void staffAndRadarPanelsFitCommonWindows() {
         for (int rows = 0; rows <= HudDesign.STAFF_MAX_ROWS + 3; rows++) {
             int capped = Math.max(0, Math.min(HudDesign.STAFF_MAX_ROWS, rows));

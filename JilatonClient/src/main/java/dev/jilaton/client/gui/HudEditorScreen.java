@@ -3,6 +3,7 @@ package dev.jilaton.client.gui;
 import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.config.HudStyle;
 import dev.jilaton.client.gui.hud.HudPreset;
+import dev.jilaton.client.gui.hud.TargetPreset;
 import dev.jilaton.client.module.ModuleManager;
 import dev.jilaton.client.module.impl.HudModule;
 import net.minecraft.client.gui.Font;
@@ -30,9 +31,11 @@ public final class HudEditorScreen extends Screen {
     private boolean changed;
     private static final Integer[] ACCENTS = {null, 0xF2F2F2, 0x9C9C9C, 0x8878FF, 0x58AEFF, 0x51D6CB, 0xF080A5, 0xE9B65B};
     private static final String[] ACTIONS = {"Scale -", "Scale +", "Panel -", "Panel +", "Color", "Align", "Visible", "Reset"};
-    private static final String HINT = "Drag · TAB select · P preset · M motion · ESC back";
+    private static final String HINT = "Drag · TAB select · P preset · T target · M motion · ESC back";
     private static final int PRESET_Y = 12;
     private static final int PRESET_HEIGHT = 14;
+    private static final int TARGET_PRESET_Y = PRESET_Y + PRESET_HEIGHT + 2;
+    private static final int TARGET_PRESET_HEIGHT = 12;
 
     public HudEditorScreen(ModuleManager modules, ClientConfig config, Screen parent) {
         super(Component.literal("Jilaton HUD Editor"));
@@ -65,11 +68,11 @@ public final class HudEditorScreen extends Screen {
         int toolbarWidth = toolbarWidth();
         int toolbarX = toolbarX();
         int toolbarAccent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
-        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 42, 0xB0111111);
+        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 60, 0xB0111111);
         String title = font.plainSubstrByWidth("HUD EDITOR" + (config.reducedMotion() ? " · Reduced motion" : ""),
-                Math.max(0, presetButtonX(0) - toolbarX - 16));
-        graphics.drawString(font, title, toolbarX + 9, 15, toolbarAccent);
-        graphics.drawString(font, font.plainSubstrByWidth(HINT, toolbarWidth - 18), toolbarX + 9, 28, 0xFFBEBEBE);
+                Math.max(0, Math.min(presetButtonX(0), targetPresetButtonX(0)) - toolbarX - 16));
+        graphics.drawString(font, title, toolbarX + 9, 13, toolbarAccent);
+        graphics.drawString(font, font.plainSubstrByWidth(HINT, toolbarWidth - 18), toolbarX + 9, 44, 0xFFBEBEBE);
         HudModule hud = (HudModule) modules.get("hud");
         for (int index = 0; index < HudPreset.CHOICES.size(); index++) {
             boolean active = hud.preset().equals(HudPreset.CHOICES.get(index));
@@ -81,6 +84,17 @@ public final class HudEditorScreen extends Screen {
                     active ? toolbarAccent : 0x00000000);
             graphics.drawString(font, HudPreset.CHOICES.get(index).toUpperCase(Locale.ROOT), left + 6,
                     PRESET_Y + 3, active ? toolbarAccent : 0xFFB0B0B0);
+        }
+        for (int index = 0; index < TargetPreset.CHOICES.size(); index++) {
+            boolean active = hud.targetPreset().equals(TargetPreset.CHOICES.get(index));
+            int left = targetPresetButtonX(index);
+            int buttonWidth = targetPresetButtonWidth();
+            graphics.fill(left, TARGET_PRESET_Y, left + buttonWidth, TARGET_PRESET_Y + TARGET_PRESET_HEIGHT,
+                    active ? 0xFF2A2338 : 0xFF1C1C1C);
+            graphics.fill(left, TARGET_PRESET_Y + TARGET_PRESET_HEIGHT - 1, left + buttonWidth,
+                    TARGET_PRESET_Y + TARGET_PRESET_HEIGHT, active ? toolbarAccent : 0x00000000);
+            graphics.drawString(font, TargetPreset.CHOICES.get(index).toUpperCase(Locale.ROOT), left + 5,
+                    TARGET_PRESET_Y + 2, active ? toolbarAccent : 0xFFB0B0B0);
         }
         if (selectedWidget != null) {
             renderInspector(graphics, mouseX, mouseY);
@@ -95,6 +109,11 @@ public final class HudEditorScreen extends Screen {
         }
         if (event.button() != 0) {
             return false;
+        }
+        int targetPreset = targetPresetAt(event.x(), event.y());
+        if (targetPreset >= 0) {
+            applyTargetPreset(targetPreset);
+            return true;
         }
         int preset = presetAt(event.x(), event.y());
         if (preset >= 0) {
@@ -193,6 +212,12 @@ public final class HudEditorScreen extends Screen {
             applyPreset((current + 1) % HudPreset.CHOICES.size());
             return true;
         }
+        if (event.key() == GLFW.GLFW_KEY_T) {
+            HudModule hud = (HudModule) modules.get("hud");
+            int current = TargetPreset.CHOICES.indexOf(hud.targetPreset());
+            applyTargetPreset((current + 1) % TargetPreset.CHOICES.size());
+            return true;
+        }
         if (event.key() == GLFW.GLFW_KEY_M) {
             config.setReducedMotion(!config.reducedMotion());
             config.save(modules);
@@ -269,6 +294,40 @@ public final class HudEditorScreen extends Screen {
     private void applyPreset(int index) {
         if (modules.get("hud") instanceof HudModule hud) {
             hud.selectPreset(HudPreset.CHOICES.get(index));
+            config.save(modules);
+        }
+    }
+
+    private int targetPresetButtonWidth() {
+        int widest = 0;
+        for (String label : TargetPreset.CHOICES) {
+            widest = Math.max(widest, font.width(label));
+        }
+        return Math.max(50, widest + 10);
+    }
+
+    private int targetPresetButtonX(int index) {
+        return toolbarX() + toolbarWidth() - 7
+                - targetPresetButtonWidth() * TargetPreset.CHOICES.size()
+                + index * targetPresetButtonWidth();
+    }
+
+    private int targetPresetAt(double mouseX, double mouseY) {
+        if (mouseY < TARGET_PRESET_Y || mouseY >= TARGET_PRESET_Y + TARGET_PRESET_HEIGHT) {
+            return -1;
+        }
+        for (int index = 0; index < TargetPreset.CHOICES.size(); index++) {
+            int left = targetPresetButtonX(index);
+            if (mouseX >= left && mouseX < left + targetPresetButtonWidth()) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private void applyTargetPreset(int index) {
+        if (modules.get("hud") instanceof HudModule hud) {
+            hud.selectTargetPreset(TargetPreset.CHOICES.get(index));
             config.save(modules);
         }
     }

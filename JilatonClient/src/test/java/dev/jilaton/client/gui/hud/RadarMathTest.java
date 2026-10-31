@@ -56,6 +56,21 @@ class RadarMathTest {
         assertEquals(40, edge.x(), EPSILON);
     }
 
+    @Test void behindThePlayerAndTheSameSpotStayWellDefined() {
+        // Yaw 0 faces south (+Z), so -Z is behind and must draw below the centre.
+        RadarMath.Point behind = RadarMath.project(0, -10, 0, false, 20, 100);
+        assertEquals(0, behind.x(), EPSILON);
+        assertEquals(50, behind.y(), EPSILON);
+        RadarMath.Point behindAt180 = RadarMath.project(0, 10, 180, false, 20, 100);
+        assertEquals(0, behindAt180.x(), EPSILON);
+        assertEquals(50, behindAt180.y(), EPSILON);
+        RadarMath.Point sameSpot = RadarMath.project(0, 0, 42, false, 20, 100);
+        assertEquals(0, sameSpot.x(), EPSILON);
+        assertEquals(0, sameSpot.y(), EPSILON);
+        assertEquals(0, sameSpot.distance(), EPSILON);
+        assertTrue(sameSpot.insideRange());
+    }
+
     @Test void northUpIgnoresYaw() {
         RadarMath.Point first = RadarMath.project(3, -4, 0, true, 32, 40);
         RadarMath.Point second = RadarMath.project(3, -4, 137, true, 32, 40);

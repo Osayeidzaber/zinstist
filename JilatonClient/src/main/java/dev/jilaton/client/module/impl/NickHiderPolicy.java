@@ -15,8 +15,7 @@ public final class NickHiderPolicy {
     }
 
     public static String replace(String text, String realName, String replacement) {
-        if (text == null || text.isEmpty() || realName == null || realName.isBlank()
-                || replacement == null || realName.equals(replacement) || !text.contains(realName)) {
+        if (text == null || text.isEmpty() || unusable(realName, replacement) || !text.contains(realName)) {
             return text;
         }
         if (text.equals(realName)) {
@@ -27,8 +26,7 @@ public final class NickHiderPolicy {
     }
 
     public static Component replace(Component source, String realName, String replacement) {
-        if (source == null || realName == null || realName.isBlank()
-                || replacement == null || realName.equals(replacement)) {
+        if (source == null || unusable(realName, replacement)) {
             return source;
         }
         ComponentContents contents = source.getContents();
@@ -49,5 +47,11 @@ public final class NickHiderPolicy {
             result.append(replace(sibling, realName, replacement));
         }
         return result;
+    }
+
+    /** A blank name or replacement must never blank out text: fall back to the real name. */
+    private static boolean unusable(String realName, String replacement) {
+        return realName == null || realName.isBlank() || replacement == null || replacement.isBlank()
+                || realName.equals(replacement);
     }
 }

@@ -57,6 +57,39 @@ class NickHiderPolicyTest {
     }
 
     @Test
+    void blankReplacementOrBlankRealNameNeverErasesText() {
+        Component source = Component.literal("Purixy joined the game");
+        assertEquals("Purixy joined the game", NickHiderPolicy.replace(source, "Purixy", "").getString());
+        assertEquals("Purixy joined the game", NickHiderPolicy.replace(source, "Purixy", "   ").getString());
+        assertSame(source, NickHiderPolicy.replace(source, "Purixy", "  "));
+        assertEquals("Purixy joined the game", NickHiderPolicy.replace(source, "   ", "You").getString());
+        assertEquals("Purixy joined the game", NickHiderPolicy.replace("Purixy joined the game", "Purixy", " "));
+    }
+
+    @Test
+    void longNamesAreReplacedWholeWithoutTruncatingTheRestOfTheText() {
+        String longName = "A".repeat(64);
+        String message = longName + " whispers: the tournament starts in five minutes";
+        assertEquals("You whispers: the tournament starts in five minutes",
+                NickHiderPolicy.replace(message, longName, "You"));
+        String longReplacement = "B".repeat(64);
+        assertEquals(longReplacement + " whispers: the tournament starts in five minutes",
+                NickHiderPolicy.replace(message, longName, longReplacement),
+                "the policy must not truncate a long replacement");
+        assertEquals("X" + longName + "Y", NickHiderPolicy.replace("X" + longName + "Y", longName, "You"),
+                "a name inside a longer word stays untouched");
+    }
+
+    @Test
+    void moduleDisplayNameRewritesSelfOnlyWithTheConfiguredReplacement() {
+        NickHiderModule module = new NickHiderModule();
+        assertEquals("You left the game",
+                module.displayName(Component.literal("Purixy left the game"), "Purixy").getString());
+        assertEquals("Nightfall left the game",
+                module.displayName(Component.literal("Nightfall left the game"), "Purixy").getString());
+    }
+
+    @Test
     void moduleStartsOffAndSanitizesTheReplacementName() {
         NickHiderModule module = new NickHiderModule();
         assertFalse(module.enabled());

@@ -3,43 +3,24 @@ package dev.jilaton.client.module.impl;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.setting.NumberSetting;
-import net.minecraft.client.Minecraft;
 
 public final class FullbrightModule extends ClientModule {
-    private final NumberSetting brightness;
-    private double previousGamma = 1.0;
+    private final NumberSetting gamma;
 
     public FullbrightModule() {
-        super("fullbright", "Fullbright", "Raises local gamma while enabled.", ModuleCategory.RENDER);
-        // Minecraft 1.21.11 models gamma as a unit double and rejects values outside [0, 1].
-        // Keeping the setting in the game's native range also clamps legacy saved values safely.
-        brightness = addSetting(new NumberSetting("brightness", "Brightness", 0.0, 1.0, 0.05, 1.0));
+        super("fullbright", "Fullbright",
+                "Brightens the local lightmap without touching the saved gamma option.",
+                ModuleCategory.RENDER);
+        // Same range as the reference client: the lightmap uniform is a plain float, not the
+        // clamped brightness slider, so values above 1 are legal and are not written to options.
+        gamma = addSetting(new NumberSetting("gamma", "Gamma", 1.0, 16.0, 0.5, 8.0));
     }
 
-    @Override
-    protected void onEnable(Minecraft client) {
-        previousGamma = client.options.gamma().get();
-        apply(client);
+    public NumberSetting gamma() {
+        return gamma;
     }
 
-    @Override
-    protected void onDisable(Minecraft client) {
-        double applied = brightness.value();
-        if (Math.abs(client.options.gamma().get() - applied) < 0.0001) {
-            client.options.gamma().set(previousGamma);
-        }
-    }
-
-    @Override
-    protected void onTick(Minecraft client) {
-        apply(client);
-    }
-
-    public NumberSetting brightness() {
-        return brightness;
-    }
-
-    private void apply(Minecraft client) {
-        client.options.gamma().set(brightness.value());
+    public float lightmapGamma() {
+        return (float) Math.max(1.0, gamma.value());
     }
 }

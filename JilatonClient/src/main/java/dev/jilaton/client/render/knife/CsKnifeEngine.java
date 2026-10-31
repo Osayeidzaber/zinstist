@@ -60,6 +60,8 @@ public final class CsKnifeEngine {
    private Item item;
    private int heldSlot = -1;
    private Item heldItem;
+   private boolean bare;
+   private boolean bareStarted;
    private final float[] state = new float[16];
    private final float[] trailSample = new float[12];
    private final SlashTrail[] trails = new SlashTrail[2];
@@ -90,7 +92,21 @@ public final class CsKnifeEngine {
    public void deactivate() {
       if (active == this) active = null;
       this.mode = 0;
+      this.bare = false;
+      this.bareStarted = false;
       this.clearTrails();
+   }
+
+   /** Whether the knife is drawn in an empty hand this frame; the item path takes over as soon as one is held. */
+   public void setBare(boolean on) {
+      if (on == this.bare) return;
+      this.bare = on;
+      this.bareStarted = false;
+      if (!on && this.mode != 0 && !this.easingOut) this.easeOut();
+   }
+
+   public boolean bare() {
+      return this.bare;
    }
 
    /** Whether the ported engine knows this skin name (Butterfly, Karambit, Katana). */
@@ -122,6 +138,11 @@ public final class CsKnifeEngine {
       }
 
       ItemStack held = player.getMainHandItem();
+      if (this.bare && held.isEmpty()) {
+         if (player.isUsingItem() || KnifeSkin.of(this.cfg.skin()) == null) return false;
+         this.startBare(1, player.getInventory().getSelectedSlot());
+         return true;
+      }
       if (!this.inspectable(held) || player.isUsingItem()) {
          return false;
       }
@@ -175,6 +196,20 @@ public final class CsKnifeEngine {
       this.item = held.getItem();
    }
 
+   /** Starts a skin clip while no item is held: the skin itself supplies inspect and deploy. */
+   private void startBare(int next, int selected) {
+      KnifeSkin knife = KnifeSkin.of(this.cfg.skin());
+      if (knife == null) return;
+      this.clip = next == 2 ? knife.deploy : knife.inspect;
+      this.clipKnife = knife;
+      this.mode = next;
+      this.seconds = this.clip.seconds;
+      this.easingOut = false;
+      this.startedAt = System.nanoTime();
+      this.slot = selected;
+      this.item = Items.AIR;
+   }
+
    private void easeOut() {
       long now = System.nanoTime();
       this.easeFrom = Math.min(this.progress(now), 1.0F);
@@ -187,17 +222,22 @@ public final class CsKnifeEngine {
       if (player == null) {
          this.mode = 0;
          this.heldItem = null;
-      } else {
-         ItemStack held = player.getMainHandItem();
-         int selected = player.getInventory().getSelectedSlot();
-         if (selected != this.heldSlot || !held.is(this.heldItem)) {
-            this.heldSlot = selected;
-            this.heldItem = held.getItem();
-            if (this.cfg.deploy() && isSword(held) && KnifeSkin.of(this.cfg.skin()) != null) {
-               this.start(2, selected, held);
-            } else if (this.mode != 0 && !this.easingOut) {
-               this.easeOut();
-            }
+         return;
+      }
+      ItemStack held = player.getMainHandItem();
+      int selected = player.getInventory().getSelectedSlot();
+      if (this.bare) {
+         if (!held.isEmpty()) {
+            // An item arrived: the item path owns the hand again from this tick.
+            this.bare = false;
+            this.bareStarted = false;
+            return;
+         }
+         this.heldSlot = selected;
+         this.heldItem = Items.AIR;
+         if (this.cfg.deploy() && !this.bareStarted) {
+            this.bareStarted = true;
+            this.startBare(2, selected);
          } else if (this.mode != 0 && !this.easingOut) {
             if (player.swinging) {
                this.mode = 0;
@@ -206,6 +246,24 @@ public final class CsKnifeEngine {
             } else if (this.loopedProgress(System.nanoTime()) >= 1.0F) {
                this.mode = 0;
             }
+         }
+         return;
+      }
+      if (selected != this.heldSlot || !held.is(this.heldItem)) {
+         this.heldSlot = selected;
+         this.heldItem = held.getItem();
+         if (this.cfg.deploy() && isSword(held) && KnifeSkin.of(this.cfg.skin()) != null) {
+            this.start(2, selected, held);
+         } else if (this.mode != 0 && !this.easingOut) {
+            this.easeOut();
+         }
+      } else if (this.mode != 0 && !this.easingOut) {
+         if (player.swinging) {
+            this.mode = 0;
+         } else if (player.isUsingItem()) {
+            this.easeOut();
+         } else if (this.loopedProgress(System.nanoTime()) >= 1.0F) {
+            this.mode = 0;
          }
       }
    }
@@ -232,7 +290,11 @@ public final class CsKnifeEngine {
    }
 
    private float animate(ItemStack stack, KnifeSkin knife, long now) {
-      if (this.mode == 0 || !stack.is(this.item)) {
+      return this.animate(stack, knife, now, false);
+   }
+
+   private float animate(ItemStack stack, KnifeSkin knife, long now, boolean bareMode) {
+      if (this.mode == 0 || (!bareMode && !stack.is(this.item))) {
          return 0.0F;
       }
 
@@ -356,6 +418,25 @@ public final class CsKnifeEngine {
    private static boolean offHandFree() {
       LocalPlayer player = Minecraft.getInstance().player;
       return player != null && player.getOffhandItem().isEmpty();
+   }
+
+   /**
+    * Draws the selected skin and its arm(s) for an empty main hand. The item path cannot reach this pose because
+    * vanilla only offers an item stack to the hand pass; the clip timing, arms and mesh are the same code.
+    */
+   public boolean renderBare(PoseStack pose, SubmitNodeCollector collector, int light) {
+      KnifeSkin knife = KnifeSkin.of(this.cfg.skin());
+      if (knife == null) return false;
+      long now = System.nanoTime();
+      float weight = this.animate(ItemStack.EMPTY, knife, now, true);
+      float[] at = weight > 0.0F ? this.state : REST;
+      FirstPersonArm.Arm arm = this.cfg.showArm() ? FirstPersonArm.arm() : null;
+      KnifeMaterial material = KnifeMaterial.of(ItemStack.EMPTY);
+      pose.pushPose();
+      knife.draw(pose, at, weight, arm != null && arm.slim(), this.cfg.knifeSize(),
+         sink(collector, light, 1, arm, offHandFree(), material, false), null);
+      pose.popPose();
+      return true;
    }
 
    private void swordTrail(Matrix4f pose, int side) {

@@ -1,6 +1,7 @@
 # Orchestration registry
 
-**Last updated:** 2026-10-30 21:49 (session `d0103bcb`, orchestrator / integration owner)
+**Last updated:** 2026-10-31 13:35 (session `56b55ea7`, orchestrator / integration owner; continues
+the role originally registered to `d0103bcb`, which is now cold)
 
 Five Qoder sessions share one checkout at `C:\Users\zaber\Desktop\zinstist`. There are no
 worktrees, no stashes, and the last commit is `f11bfff` — every feature built today lives as
@@ -16,15 +17,15 @@ If a prompt is sent without the tag, the row below is still authoritative.
 
 | Mark | Working name | Session | Scope | State |
 | --- | --- | --- | --- | --- |
-| **O** | **Orchestrator** | `d0103bcb` (this file's owner) | Integration, build ownership, design decisions, registry | active |
-| **A** | **Lyrics** | `93b8be9c` | Spatial lyrics placement rework (M20); also `music/**`, Music Center, Now Playing | BUSY — M20 |
-| **B** | **RenderFX** | `4d91b750` | Idea-005 render pack (block outline, low fire, radiance, afterglow, weather), sky, world FX, harness | BUSY — M21 |
-| **C** | **ClickGUI** | `5f8290c6` | ClickGUI shell + Visuals preview cards | BUSY — M17 |
-| **E** | **HUD** | `93b52a27` | HUD presets/widgets, Nick Hider, radar/staff widgets | BUSY — M18 |
-| **F** | **Cosmetics** | `4c5e92aa` | Player cosmetics: wings, halo, first-person knife, companion; owns new `render/model/**` | BUSY — M23 |
-| **G** | **Combat** | `e035b901` | Attack-side modules + policies (aura/aim/reach/crit/auto-weapon), audit then fixes + math tests | BUSY — M24 |
-| **H** | **Movement** | `6bc3a22e` | Movement/knockback/auto-consume modules + policies, audit then fixes + math tests | BUSY — M25 |
-| **I** | **Models** | `9c45b592` | Port the Anubis 3D character system (`render/character/{kit,gltf,designs}` + renderer + `.anc` assets) into Jilaton | BUSY — M29 |
+| **O** | **Orchestrator** | `56b55ea7` (this file's owner) | Integration, build ownership, design decisions, registry, shared infra (mixins json, ModuleManager, ClientConfig schema, build.gradle) | active |
+| **A** | **Lyrics** | `93b8be9c` | `music/**`, `render/fx/Lyric*`, `gui/MusicCenterScreen.java`, lyrics modules — first-person music display, lyric state machine, Sky Lyrics | BUSY — M40 |
+| **B** | **RenderFX** | `4d91b750` | Anubis SwingAnimation port, Ambience unification, terrain Shockwave, Jump Circles dedupe; sky/world FX. Excludes `render/model/**`, `render/character/**`, Fullbright (already runtime-verified) | BUSY — M41 |
+| **C** | **ClickGUI** | `5f8290c6` | ClickGUI shell + persistence + Visuals preview cards, Target HUD scaling is E's, screenshot chat actions Copy/Open (mixin lines requested from O) | BUSY — M42 |
+| **E** | **HUD** | `93b52a27` | `gui/HudRenderer.java`, `gui/hud/**`, `HudLayout`, `HudEditorScreen`, `module/impl/HudModule.java`, `Nametag*` — M43 Target HUD scaling/presets/labels done and verified; now M48 HUD widgets, Nick Hider, radar/staff list | BUSY — M48 |
+| **F** | **Cosmetics** | `4c5e92aa` | `render/model/**`, `render/knife/**`, CosmeticKnife/ViewModel/Wings/Halo/Companion/FloatingRelics/Spirit modules — M44 done and verified (empty hand always takes the blade, CS item path kept, third-person emitter added, real ViewModel preset codec); now M50 audit of the remaining cosmetics | BUSY — M50 |
+| **G** | **Combat** | `e035b901` | Reach, TargetESP + aura integration, AimAssist, KillAura*, FreeLook + `render/FreeLookRotation` — protocol-honest reach, variants, rotation coordination | BUSY — M45 |
+| **H** | **Movement** | `6bc3a22e` | Movement/knockback modules + policies; then independent QA gate over the whole tree (read-only outside its lane) | BUSY — M46 |
+| **I** | **Models** | `9c45b592` | `render/character/**` + `.anc` assets + `PharaohHeaddressModule`, `CharacterModule` — M47 verified (headdress geometry real and reached, nine designs resolve, rotation table 153 floats); now M51 hiding the worn helmet via a `HumanoidArmorLayer.renderArmorPiece` mixin | BUSY — M51 |
 
 Names change when the task changes, and the row is updated in the same turn the task is assigned.
 
@@ -1067,7 +1068,7 @@ Full findings: `audit/JILATON_AUDIT_REPORT.md` (JA-001…JA-024). Backup taken f
 ## 01:35 — Audit session, batch 2 (user-directed). Re-read before editing.
 
 - **JA-011 (I):** the retired M26 procedural characters are gone. `render/model/asset/Characters.java` was deleted (it is in `.git/snapshots/worktree-20261031-0038.tar.gz`). `ModelAssets` registers knives only, and `ModelAssetGeometryTest` now covers knives only.
-- **JA-013 (C + config):** `ClientConfig.visualOrder()` / `ui.visual_order` persists the ClickGUI Visuals card order. `ClickGuiScreen` loads it and saves on drop. Also, at the user's request, `ClickGuiScreen` now **resumes where it closed** (page, category, selected and expanded module, enabled-only, scroll, search) for the game session (static `Resume`, written in `removed()`).
+- **JA-013 (C + config):** `ClientConfig.visualOrder()` / `ui.visual_order` persists the ClickGUI Visuals card order. `ClickGuiScreen` loads it and saves on drop. Also, at the user's request, `ClickGuiScreen` now **resumes where it closed** (page, category, selected and expanded module, enabled-only, scroll, search) through `ClientConfig`; the older static `Resume` record was dead (written, never read) and was removed in M42.
 - **JA-018 (B):** the sky UV inset is half a texel of the actual GPU texture (`FxFrame.texelInset`, cached per id). The old 1024×683 constants are only the fallback. `SkyUvInsetTest`.
 - **JA-022 (O/build):** `build.gradle` `processResources` reads `project.version` at configuration time, so the "Task.project at execution time" deprecation is gone. The remaining "artifactUrls" deprecation comes from inside Loom 1.14.10 (`LoomRepositoryPlugin.java:83`), and only a Loom upgrade fixes it. That is O's call (1.19.3 is in the Gradle cache).
 - **JA-023 — build rule, proposed by the audit session:** every session builds in its own directory. Either use `.isolated-build-<mark>/` with an init script that points `buildDirectory` there, or build from a private source snapshot outside the repo. Never build into a directory a running client loads from. **Never run `runClient` in `JilatonClient/`** while agents work: the audit session's test client runs from its own snapshot copy with its own `run/`.
@@ -1141,3 +1142,368 @@ The user approved a 12-screen redesign drawn on a design canvas (link inside the
 - Commit `5e06c6b` on the new branch **`jilaton/2026-10-31-work`**, pushed to `origin` (private repo). 436 files: all agent work since `f11bfff` plus the audit session's work. The checkout is **now on that branch**; nothing in the working tree changed, and new edits simply show as uncommitted again.
 - `.gitignore` (root) now also ignores `.isolated-build*/`, `.wrapcheck-*.txt`, `JilatonClient/run-verify/`, `JilatonClient/run-shots/` and `/ideas/assets/` (other clients' screenshots, which are never redistributed).
 - A secret scan of every committed text file found nothing. `main` is untouched; merging is the user's call.
+
+
+## 19:25 — Interaction + Fullbright batch (audit lane). Gate green; two criteria RUNTIME_VERIFIED.
+
+- **Fullbright is real now, without touching options.** `FullbrightModule` no longer holds `Minecraft.options`; its old `onEnable` write ran during config load inside `Minecraft.<init>` (options still null), which is what produced the boot NPE and the rollback. New `mixin/LightTextureFullbrightMixin` uses `@ModifyArg` on `LightTexture.updateLightTexture(F)V` at the 7th `Std140Builder.putFloat` (`ordinal = 6`) and substitutes the Anubis gamma value while enabled. Built refmap: `class_765.method_3313(F)V`. Setting renamed to Gamma 1.0–16.0 step 0.5 default 8.0 (was a 0–1 "Brightness" that could not brighten). Unit test pins range/clamp; `PreviewSpecs.wash()` normalises the new range.
+  - Evidence: midnight scene, `options.gamma()` logged 0.5 before **and** after; screenshot luminance mean 15.5 (median 17) off vs mean 69.0 (median 85) on (`verify-26`, `verify-26b`).
+- **ClickGUI switch-only toggling.** `clickModules` tests `toggleHit(...)` first: clicking the switch toggles + saves; clicking anywhere else on the card opens the settings drawer. Switch geometry now has one source of truth (`Ui.TOGGLE_W/H` 40×22, `Ui.SMALL_TOGGLE_W/H` 32×18) shared by draw and hit test. Sidebar reads "6 of 95 / 2 of 28 active"; footer states the interaction. 3 new tests in `ClickGuiCardHitTest` cover both card layouts and exclusive edges.
+  - Runtime: `switch click: toggled=[] untoggled=[anti_bot] others=6` (the saved config had anti_bot on) and `card body click enabled nothing (drawer path)`; `verify-18b` switch flipped, `verify-18c` drawer opened by body click, `verify-16` drawer **restored from config**.
+- **Harness (`dev/VisualVerifier`) synced to the shipping GUI**, and one real bug found in it: `openGui()` wrote the persisted drawer before `setScreen(null)`, and the closing screen's `removed() → remember()` overwrote it with the old value — that is why the earlier `verify-16` had no drawer. Close first, then write. Scenes 14–18 no longer log "ClickGUI is not open".
+- **Gate:** `gradlew --init-script C:/tmp/jilaton-arch/isolated.gradle test build` → BUILD SUCCESSFUL, **151 suites / 662 tests / 0 failures / 0 errors / 0 skipped**; newest `TEST-*.xml` 19:24:42 > newest source 19:20:45. Jar 9,685,597 B, SHA-256 `c8ebc306a61ba2032360b992c82dd3bf18611a9166de5036a46b9190ebb05f54`. Docs updated: `development/CHECKPOINT.md` (top section), `IMPLEMENTATION_INVENTORY.md:84`, manifest `fullbright` entry.
+- **Not touched:** `BlockPlacementModule`, `JilatonGateModule`, `JumpCirclesModule`, `WorldEffectsTest` carry other lanes' uncommitted edits; the gate ran over them as-is.
+- **Known gap noticed in the logs:** the off/on frame save order is asynchronous (`enabled fullbright -> true` is logged before the *off* file is written by the IO worker); the frames themselves are captured in order, which the luminance split confirms.
+
+## 2026-10-31 13:25–13:35 — full seven-lane dispatch (M40–M47)
+
+User instruction that triggered this: stop doing the work personally, run the real agent operations, and
+supervise continuously. All eight sessions were checked with `list_chat_sessions` first: A/B/C were
+already running the tasks accepted at ~13:20, E/F/G/H/I were `cold` with no queued turn, so each
+received exactly one new task. Every message used `callbackMode: "supervise"`, so completions,
+permission prompts and questions arrive here automatically instead of being polled.
+
+| Sent | Session | Task | Ownership headline |
+| --- | --- | --- | --- |
+| 13:20 | `93b8be9c` A | **M40** first-person music display, lyric state machine, Sky Lyrics | `music/**`, `render/fx/Lyric*`, `MusicCenterScreen`, lyrics modules |
+| 13:20 | `4d91b750` B | **M41** Anubis SwingAnimation port, Ambience unification + precedence, terrain-following Shockwave, Jump Circles dedupe | render FX + those modules; **not** `render/model/**`, `render/character/**`, Fullbright |
+| 13:20 | `5f8290c6` C | **M42** finish ClickGUI acceptance items + screenshot chat actions Copy/Open | `gui/JilatonClickGui.java` and GUI shell; asks O for mixins lines |
+| 13:31 | `93b52a27` E | **M43** Target HUD proportional scaling + presets, label clarity, "1/6 ON" meaning | `gui/HudRenderer`, `gui/hud/**`, `HudModule`, `Nametag*` |
+| 13:31 | `4c5e92aa` F | **M44** knife/katana without a held item, real animations, configurable inspect key, real saveable ViewModel presets | `render/model/**`, `render/knife/**`, cosmetic modules |
+| 13:31 | `e035b901` G | **M45** protocol-honest Reach + block feedback, TargetESP variants wired into the aura, FreeLook+KillAura rotation | combat modules, `TargetEspGeometry`, `FreeLookModule` |
+| 13:31 | `6bc3a22e` H | **M46** finish M25 movement wiring, then independent QA gate over the whole tree (read-only outside its lane) | movement modules + policies |
+| 13:31 | `9c45b592` I | **M47** audit/repair the real `PharaohHeaddressModule`, close M29 character gaps | `render/character/**`, `.anc` assets, `PharaohHeaddressModule` |
+
+Rules encoded in every prompt: one shared tree, no git checkout/reset/clean/stash, no gradle lock
+deletion; build/test only through the lane's private build dir
+`gradlew -I C:/tmp/jilaton-arch/isolated-{a,b,c,e,f,g,h,i}.gradle test`; `runClient`/`runVisualVerify`
+stay with O; O-owned shared infra (`jilaton.mixins.json`, `JilatonClient.java`, ModuleManager registry,
+`ClientConfig` schema, `build.gradle`) must be requested as an exact diff, never edited; every report
+must separate proven from unproven and must not claim runtime evidence that was not produced.
+
+Next O actions on the critical path: (1) apply lane C's two `jilaton.mixins.json` registrations when it
+asks; (2) review each returning lane against the tree and the jar, not the summary; (3) keep
+`development/CHECKPOINT.md` and `IMPLEMENTATION_INVENTORY.md` in sync as lanes land; (4) run one
+consolidated `runVisualVerify` + full gate only after the lanes stop editing.
+
+**O applied during the dispatch (13:37):** `SwingAnimationMixin` registered in
+`src/main/resources/jilaton.mixins.json` (85 entries, JSON revalidated) so lane B's Anubis swing port is
+not inert. Injection points checked against the mapped 1.21.11 jar with `javap -c` before registering:
+`LivingEntity.getCurrentSwingDuration()I` is invoked at offset 12 of `swing(InteractionHand, boolean)`
+and offset 1 of `updateSwingTime()`, and `swinging` is PUTFIELD'd at offset 34 of `swing(...)` — both
+`@ModifyExpressionValue` and the `@Inject` latch therefore have a real target. **Reach decision (lane G):**
+the lane asked for the clamp; decompiled 1.21.11 server checks give entity 3.0 attribute + 3.0 padding =
+6.0 eye-to-hitbox and blocks 4.5 + 1.0 = 5.5, so the server-accurate 6.0/5.5 clamp was chosen over the
+literal 3.0 reading (enabling Reach would otherwise *shorten* vanilla block reach from 4.5 to 3.0).
+
+**O applied 13:50:** lane C's two screenshot mixins registered as `screenshot.ScreenshotGrabMixin`
+(`@ModifyVariable` index 4 on the five-argument `Screenshot.grab`, decorating the chat line) and
+`screenshot.ScreenshotClickMixin` (`@Inject` HEAD + cancel on `Screen.defaultHandleGameClickEvent`, so a
+Copy click never becomes a `ServerboundCustomClickActionPacket`). `jilaton.mixins.json` is now 87 entries
+and parses. C was told the names and that it must not edit the file.
+
+**O took over M51 at 13:55** because lane I (like E and F) now fails every new turn with
+`authentication_failed`. Lane I's own M47 audit found that the headdress never hides the worn helmet.
+O added `PharaohHeaddressModule.active()` (volatile instance set in the constructor, null unless enabled)
+and `mixin/PharaohHelmetMixin.java`: `@Mixin(HumanoidArmorLayer.class)`, `@Inject` HEAD + cancel on
+`renderArmorPiece`, guarded to `EquipmentSlot.HEAD && state instanceof AvatarRenderState && active() != null`,
+so zombies and other humanoids keep their helmets. Registered in `jilaton.mixins.json` (88 entries). The
+handler's parameter list was matched against `javap -s`: the target descriptor is
+`(PoseStack, SubmitNodeCollector, ItemStack, EquipmentSlot, int, HumanoidRenderState)V`, identical to the
+handler. `./gradlew -I isolated-o.gradle compileJava` → exit 0 (only the pre-existing fullbright refmap
+warning), so the code compiles; mixin application itself is a runtime property and is not yet demonstrated.
+
+### H (M46) returned 13:43 — verified, gate numbers confirmed from its XML
+
+Movement lane fixed one real bug: `SafeWalkPolicy.aheadDirection` (new pure helper, also used by
+`ParkourModule`) replaces a right-positive sideways axis with vanilla's left-positive `xxa` convention,
+so strafing no longer probes the wrong side. O read the helper (yaw 0 → forward +Z, sideways +1 → +X) and
+confirmed both call sites; `SafeWalkPolicyTest` +2 and `MovementMathBoundaryTest` +4 cover yaw wrap and
+NaN guards. Its Phase-2 gate was re-parsed by O directly from
+`.isolated-build-h/root/test-results/test/TEST-*.xml` (not from its summary): **170 suites / 762 tests /
+15 failures / 0 errors / 0 skipped**, newest XML 19:42:53. The 15 failures are all outside the movement
+lane and are listed here so they can be routed when each owner stops: swing default `Slash` vs tests
+`Smooth`/legacy choice `Power` (B — and `Power` removal needs a saved-config migration, not just a test
+update); Reach 8.0→6.0 and default 5.0→3.0 (G, expected after the clamp decision); ViewModel preset
+round-trip, knife third-person ±1.0, `CosmeticKnifeStylesTest` ExceptionInInitializerError (F);
+`TargetCardScalingTest` last row past the panel at 0.5 (E); `LyricStatesTest` ACTIVE vs SETTLING (A);
+four `TargetEspGeometryTest` counts/radii (G). None are in `ModuleManagerTest` rows H does not own beyond
+the swing/Reach defaults above. H is idle now; it gets the re-run task once the tree stops moving.
+
+### 2026-10-31 20:10 local (14:10Z) — O consolidated gate over the whole current tree
+
+`./gradlew -I C:/tmp/jilaton-arch/isolated-o.gradle test --continue` against the shared working tree
+(not a lane's stale snapshot). Parsed by O from `.isolated-build-o/root/test-results/test/TEST-*.xml`,
+newest result `14:10:29Z`: **175 suites / 792 tests / 5 failures / 0 errors / 0 skipped**. Every failure
+is in the GUI/screenshot lane and each has a named cause:
+
+- `ShellBackdropContrastTest.typeKeepsItsContrastFloorOnEveryShellSurface` — `Ui.FAINT = 0x4A4A4A` is
+  2.10:1 on `#131313` (CARD), below the 3:1 floor the test encodes. O changed `FAINT` to `0xFF6A6A6A`
+  (about 3.4:1 on `#131313` and 3.7:1 on `#0A0A0A`) at 20:13:32. This is C's file; C was live and about to
+  make the same edit, so the value may be rewritten — the invariant is 3:1 on the brightest shell
+  surface, not the literal byte.
+- `ScreenshotMixinTargetsTest.bothMixinsNameTheirVanillaTargets` — the test reads `@Mixin` with
+  `AnnotationVisitor.visit`, but `@Mixin(Screenshot.class)` is a class array and ASM delivers it via
+  `visitArray`, so the target read as null. Test bug, not a mixin bug.
+- `ScreenshotChatActionsTest.pathsOutsideTheScreenshotsDirectoryAreNotDecorated` — it asserted the
+  unguarded 3-arg overload was unguarded; the path pin lives in the 1-arg production entry point.
+- `ScreenshotClipboardTest.otherPlatformsHaveNoCommandAndCopyReportsIt` — called `copy(Path)` on a
+  Windows host, so it really ran PowerShell instead of exercising `Os.OTHER`.
+- `ScreenshotClipboardTest.macosReadsThePosixFileAsPngf` — expected the raw path, but `appleEscape`
+  doubles backslashes (correct AppleScript), so the assertion was platform-dependent.
+
+O handed the diagnosis to lane C (it had reached the same five by itself) rather than editing
+`screenshot/**` or `gui/**` under a live owner; only the `Ui.FAINT` byte was changed by O.
+
+### Lane state at 14:13Z (liveness judged from transcripts, not `runtimeState`)
+
+- **C** live (`ffa97168…`), fixing the five failures above.
+- **A** live, producing the M40 lyrics/music final report; it asks O for an alpha-blended sky pipeline
+  (`OverlayRenderTypes.SKY_SCREEN` ignores vertex alpha) and asks whether Music Visuals should default on.
+- **B** live, at the M41 isolated gate.
+- **E** live, implementing M48 (HUD widgets / radar / Nick Hider).
+- **G** idle → O sent M45-FOLLOWUP: `ReachModule` maxima 5.0→3.0 entity and 64.0→1.0 block so the sliders
+  stop advertising values `ReachMath` clamps away; O owns the `ModuleManagerTest` row that still pins
+  5.0/64.0 and must update it in the same integration pass.
+- **F** and **I** are not auth-failing any more — their transcripts end at 13:52/13:55 with "You've
+  reached your daily usage limit for Chat"; they cannot take turns today. M50 (cosmetics audit) and the
+  rest of M51 therefore stay with O.
+
+### 2026-10-31 20:32 local (14:32Z) — post-lock state, two dispatches, B's M41 verified from source
+
+**C's post-lock gate (accepted).** After the cross-lane build lock landed, C re-ran the same gate in one
+shell invocation: `[jilaton] build lock acquired`, BUILD SUCCESSFUL, **810 tests / 0 failures / 0 errors**,
+177 result files; jar `.isolated-build-c/root/libs/jilaton-client-0.1.0.jar` 9,745,050 bytes, SHA-256
+`2939ad481cd3570d3981228599e0d0d1a82cafa7cb6b6ebde1ef8a1cc1f052ac`, byte-identical to the pre-lock green
+run. The five 14:10Z failures are closed; the flapping was the shared Gradle/Loom cache, not a peer's
+build dir.
+
+**Dispatch 1 — I (`9c45b592`), M51-FOLLOWUP, sent at 14:27Z to an idle session** (`activeTurnId: null`,
+`queuedTurnCount: 0`, revision 52): (a) make `PharaohHelmetMixin` gate on the real player via
+`AvatarRenderState.id` + `level.getEntity(id)` and route both the gate and the emit path through one
+`PharaohHeaddressModule.shows(Player)` predicate, so the gate stops hiding helmets for players the emit
+path skips (64-block distance, friends/others filters); (b) fix the collar (y=-1.2, r≈0.34 vs torso
+feet+0.75..1.5, half-width ~0.25) and back lappet (z −6.2..−4.1 vs CapeLayer) intersections in geometry
+only, citing the mapped cape box; (c) truth-table + geometry tests, isolated build.
+
+**Dispatch 2 — C (`5f8290c6`), sent at 14:29Z to an idle session** (revision 79): the "1/6 ON" meaning,
+which is a real mixed-unit bug — `CardMetric.on()` counts only `BooleanSetting`
+(`gui/shell/CardMetric.java:20-26`) while `total()` counts every setting (`:15-17`), so sliders and
+choices inflate the denominator and "4/6 ON" can mean "4 of 4 switches on". C must unify the unit, make
+the card name it, delete the no-op `.replace(" on", " on")` at `JilatonClickGui.java:456`, update
+`ShellGeometryTest.java:186-191` (it currently pins the bug), and report navigation persistence as a
+field/save/restore table. On "last Appearance Studio section": there is no studio-section field in
+`ClientConfig` and `VisualStudioScreen` draws SKY THEME/COSMETICS/SHAPE/APPLY as one page, so C must say
+whether the concept exists at all before adding state — no invented section UI.
+
+**B's M41 verified from source while it finishes its gate (read-only, no message sent — B is running).**
+- Swing: `SwingAnimationsModule` (`module/impl/SwingAnimationsModule.java:1-200`) carries six Anubis
+  styles plus legacy-alias resolution (`styleIndex`), a per-swing combat latch (`latch`, `covers`), and
+  tempo scaling (`scaledTicks`). Wiring is real: `SwingAnimationMixin` modifies
+  `getCurrentSwingDuration()` in `updateSwingTime` and `swing(...)` only for the local player, and
+  `FirstPersonHandsAndItemsMixin` cancels `ItemInHandRenderer.swingArm` and applies the pose only when the
+  module covers that hand. Not a stub and not a second competing transform.
+- Ambience precedence: `render/fx/AmbiencePrecedence.java` encodes
+  `CustomSky > Cyberspace > Glass > Fullbright > client accent`, plus a night gate that Fullbright clears
+  and a "sky owner draws its own streaks" rule; `AmbienceModule.java:56-130` consumes all four methods, so
+  the order is enforced, not just documented.
+- Terrain wave: `HitEffectsModule` default `world_wave_radius` is **44** (min 16, max 64), samples capped
+  at **160**, per-frame budget **240** shared across waves, behind-camera samples culled before the column
+  lookup (`TerrainWave.java:9-47`, `HitEffectsModule.java:277-301`). Matches the "radius ~40–50, bounded
+  perf" requirement.
+- Jump circles: `JumpCirclesModule.java:88-93` gates every emit through `JumpCirclePolicy.emits`,
+  `withinCooldown` and `landingCovered`, so a jump and its landing are one effect.
+
+**Lane state 14:32Z:** B `4d91b750` running (`3fb0fdc0…`, gate retry, last tool a Bash); C and I opening
+on the two dispatches; A, E, F, G, H idle with no assigned work.
+
+**O decisions recorded, no agent woken for them.** (1) Music Visuals stays **default-off**: it is a
+capability, not a default, and turning it on would add a frame-time cost to every launch that the user did
+not ask for. (2) The Sky Lyrics alpha request is valid but **B-owned**: `OverlayRenderTypes.SKY_SCREEN`
+uses `BlendFunction(ONE, ONE_MINUS_SRC_COLOR, …)` (screen blend), so vertex alpha is ignored and A's fade
+rides on vertex colour. The fix is a second translucent pipeline id + `skyAlpha(Identifier)` texture map +
+an `FxFrame` list + a second draw call in `EntityOverlayRenderer.drawSky`, after which A switches the
+`SpatialLyricsModule:404` SkyQuad emission to it. It goes to B as a follow-up once B's current gate turn
+ends; O does not wake B mid-gate and does not hand B's files to A.
+
+**C · M42 follow-up record (ClickGUI), 20:33Z — gate 815 tests, 0 failures/errors, after the cross-lane build lock.**
+- **Card metric unit fixed.** `gui/shell/CardMetric.java` counts boolean switches for numerator *and*
+  denominator and names the unit: `4/6 SW ON`. Choice/slider-only modules read `0 SWITCHES` (never
+  `0/0 ON`, and `fullbright` owns sliders only); zero-setting modules read `NO SETTINGS`.
+  `JilatonClickGui` Visuals summary prints `<label> · <description>`; the no-op `.replace(" on"," on")` is
+  gone. Pinned by `CardMetricTest` (5) and `ShellGeometryTest.everyVisualCardReportsALiveMetric`.
+- **"Last Appearance Studio section" — does not exist in the design → satisfied by construction.** No
+  `ClientConfig` field, and `VisualStudioScreen` draws SKY THEME / COSMETICS / SHAPE / APPLY as one page
+  (`:178-221`) with no selectable section, so there is no section state to restore. No UI invented.
+- **Nav persistence** (shipping `JilatonClickGui` / legacy `ClickGuiScreen`): category `guiCategory`
+  (save `ClientConfig:406`, load `:263`; restore `JilatonClickGui:94`, `ClickGuiScreen:157`); selected
+  module `guiSelectedModule` (`:407/:264`; `ClickGuiScreen:158-159`; the shipping GUI treats selection as
+  the open drawer and restores it from `guiExpandedModule`, `JilatonClickGui:95-96`); drawer
+  `guiExpandedModule` (`:408/:265`; `JilatonClickGui:95-96/:151`, `ClickGuiScreen:160-161/:174`); list
+  scroll `guiScroll` (`:412/:269-273`; `ClickGuiScreen:164/:178`; the shipping GUI no longer writes it —
+  follow-up 2 reconciled scroll to per-category only); per-category scroll `ui.scroll.<cat>`
+  (`:413-418/:274-283`; `JilatonClickGui:99-100/:157`, `ClickGuiScreen:163/:179-181`); orders
+  `ui.visual_order`/`ui.module_order` (`:403-404/:258-261`; honored at `JilatonClickGui:202`,
+  `ClickGuiScreen:1159`; written by both GUIs since follow-up 2 — grip drop in `JilatonClickGui`,
+  `ClickGuiScreen:1785/:1794`).
+  Closing the studio saves config then opens `new VisualStudioScreen(this)` (`ClickGuiScreen:1625-1629`)
+  and returns to the Settings page with GUI state intact.
+- **Dead state removed:** `JilatonClickGui.dragChannel`, `JilatonLoadingScene.TEXTURE_WIDTH`/`BASE_TINT`,
+  `VisualStudioScreen.SURFACE`, `VisualPreview.SKY_STARS`. `JilatonClickGui.resumed` is live (`:102` read
+  at `:348`). `HudRenderer.BACKGROUND` is unused but E's to remove.
+
+**C · M42 follow-up 2 record (ClickGUI), 14:44Z — gate 835 tests / 180 suites, 0 failures, 0 errors, 0
+skipped, jar SHA-256 `a6f1170f2e1375d5b95d1feabd6acc7df1b56bf4fb35d2402d3012e357c76292`, under the
+cross-lane build lock.** The first gate run (~14:47Z) hit one failure in I's `PharaohHelmetMixinTest`
+(“both helpers must be inspected, saw [hidesHelmet]”) while I's mixin source was newer than their test;
+the unchanged re-run 90 s later was green, which is the shared-tree hazard, not a defect in this lane.
+- **Legend.** The Visuals page header now prints `SW = switches on` right-aligned under the live count
+  (`JilatonClickGui`, `TITLE_Y + 28`, 10px `Ui.TEXT_3`), only when `visualPage()`. The card metric slot and
+  its ratio are untouched; no tooltip system. The footer hint on the Modules page also names the new
+  affordance: "Drag the grip to reorder".
+- **Reorder in the shipping GUI** (`JilatonClickGui`), mirroring the legacy `ClickGuiScreen.releasedBoard`
+  split: grip = a three-dot gutter on the card's left edge (drawn in `moduleCard` and `visualCard`; hit test
+  `gripHit`, clear of the name and the switch). Press on the grip starts a drag; movement past 4 board units
+  sets `cardDragging`; `dropIndexAt` maps the pointer to a card cell; a 3px accent bar marks the insertion
+  slot while dragging. Release inside the list calls `applyReorder(...)` → `setModuleOrder` (and
+  `setVisualOrder` for a Visuals drop or a render module) → `config.save(modules)`; release outside, Esc and
+  a category switch cancel. Grip presses never toggle or open a card; body clicks behave exactly as before.
+  Hidden modules survive the drop, but the visible block is ordered first and the rest follow in their old
+  relative order — the legacy merge's semantics, kept deliberately.
+- **Scroll reconciled — `guiScroll` is no longer written by the shipping GUI.** Per-category scroll is the
+  real state: `remember()` writes only `setCategoryScroll` and the constructor restores only
+  `config.categoryScroll(category)`. `ClickGuiScreen` remains the legacy reader/writer of `guiScroll`.
+- **Tests:** `CardReorderPersistenceTest` (3) — drop rewrites `moduleOrder` and survives a
+  `ClientConfig` save/load, a Visuals drop keeps every render module in `visualOrder` and does not drop
+  filtered-out modules, and the grip area never overlaps the switch on either card shape. Existing order
+  round-trip in `ClientConfigTest.persistsClickGuiNavigationStateAndModuleOrderingAcrossRestarts` covers
+  the config half.
+- **`HudRenderer.BACKGROUND` (E's file):** `grep -rn "BACKGROUND" src/main/java src/test/java` returns only
+  its declaration, `HudRenderer.java:51`; no `HudRenderer.BACKGROUND` reference exists anywhere in the
+  source or test trees, so it is genuinely dead and E can delete it.
+
+### 2026-10-31 20:38 local (14:38Z) — C's metric fix accepted; ordering was the real gap
+
+**C's report, verified against the tree.** `CardMetric` now counts `BooleanSetting` on both sides of the
+ratio (`gui/shell/CardMetric.java:15-37`): `4/6 SW ON`, `0 SWITCHES` when a module has no switches, `NO
+SETTINGS` when it has no settings — never `0/0 ON`. The no-op `.replace(" on"," on")` is gone from
+`JilatonClickGui.java:455-456`. `CardMetricTest` exists; `ShellGeometryTest` asserts the new invariant
+instead of the mixed unit. C's gate: **815 tests, 0 failures**, jar SHA-256
+`1c271694be41b515aeb64ca56f5ec7021f8aad865722f4db61a5fa4a3077501b`. It also removed genuinely dead
+fields (`dragChannel` here, `JilatonLoadingScene.TEXTURE_WIDTH/BASE_TINT`, `VisualStudioScreen.SURFACE`,
+`VisualPreview.SKY_STARS`) and confirmed `resumed` is live.
+
+**Persistence table accepted** for category, selected module, drawer, list scroll, per-category scroll,
+ordering and legacy GUI equivalents. "Appearance Studio section" **does not exist in the design** —
+`VisualStudioScreen` draws SKY THEME/COSMETICS/SHAPE/APPLY as one static page (`:178-221`) — so the
+criterion is satisfied by construction and recorded as such; no section UI was invented.
+
+**Gap found through the table, now dispatched (C, 14:39Z).** Ordering persists but the shipping GUI has no
+way to SET it: `JilatonClickGui.java:202-207` only reads the stored order, and the only writer is
+`ClickGuiScreen.releasedBoard` (`:1770-1800`, `DragKind.REORDER`) in a screen the keybind never opens
+(`JilatonClient.java:73`). C is adding grip-drag reorder to the shipping GUI through the already-tested
+`ModuleOrder.move` + `setModuleOrder`/`setVisualOrder` + save path, an insertion indicator, and a
+config round-trip test; plus a one-line "SW = switches on" legend so the new unit is self-explanatory, and
+a reconciliation of `guiScroll` (written at `JilatonClickGui:156`, never read back for its own category).
+
+**Cross-lane note for E:** C reports `HudRenderer.BACKGROUND` unreferenced; E owns that file — O routes
+it as a cleanup, not a defect.
+
+**H dispatched at 14:35Z** for a real defect O found in review: `InventoryMoveModule.java:45-53` treats
+`ClickGuiScreen` (legacy) as editor input but not `JilatonClickGui`, so Inventory Move still synthesises
+WASD while the shipping GUI is open. H is fixing the predicate and re-checking every `ClickGuiScreen`
+reference site.
+
+### 2026-10-31 20:44 local (14:44Z) — H's InventoryMove fix verified; dead harness helpers removed
+
+**H's fix, checked against the tree.** `InventoryMoveModule.java:45-52` now asks
+`InventoryMovePolicy.isJilatonEditor(screen)`, and the policy pins the set by class
+(`InventoryMovePolicy.java:15-25`): `ClickGuiScreen`, `JilatonClickGui`, `HudEditorScreen`,
+`VisualStudioScreen`. Class equality rather than `instanceof` is justified — all four are `final` and
+constructing any of them headlessly loads `JilatonType.font()`, so `new Screen(...){}` NPEs in 1.21.11;
+the test uses `Screen.class` as the neutral anchor. H's XML:
+`.isolated-build-h/.../TEST-...InventoryMovePolicyTest.xml`, mtime 14:35:53Z, **tests=4, failures=0,
+errors=0, skipped=0**. H reports no other movement-lane module special-cases `ClickGuiScreen`; every other
+reference is C's GUI, `MenuChrome` (already covers both), O's harness, a GUI test, or docs.
+
+**Design note left open, not changed:** `InventoryMovePolicy.shouldMove` returns true for any
+non-container screen in every mode (`:32-34`), so `NORMAL` (and, because of the `!containerScreen` branch,
+`SAFE` too) still re-synthesises movement while `JilatonPauseScreen`, `MusicCenterScreen` or
+`AccountsScreen` is open. That predates today's work, is not in the user's acceptance list, and changing it
+would change mode semantics and existing tests; recorded here so it is a known, deliberate state rather
+than an unnoticed one.
+
+**O removed the dead legacy-GUI helpers in the harness.** `VisualVerifier` still carried
+`clickShell`, `shellLayout`, `click(ClickGuiScreen,...)`, `clickNav`, `clickGeneral` and
+`expandFirstCombatCard` — written for `ClickGuiScreen`, which the keybind no longer opens
+(`JilatonClient.java:73`), and **never called**: they would log "ClickGUI is not open" and return null.
+The live ClickGUI scenes drive the shipping screen through `openGui(...)`/`clickAt(...)`, so nothing was
+lost; the four now-unused imports were removed with them. H's report called these helpers "live"; the
+call-site grep says otherwise and this entry is the correction.
+
+### 2026-10-31 20:46 local (14:46Z) — the harness caught a mixin that all 45 unit tests could not
+
+**Runtime failure, not a test failure.** B's `runVisualVerify` boot at 14:41:46Z logged:
+
+```
+Mixin apply for mod jilaton failed jilaton.mixins.json:PharaohHelmetMixin ... -> HumanoidArmorLayer:
+InvalidMixinException: ... contains non-private static method
+  playerOf(Lnet/minecraft/client/renderer/entity/state/HumanoidRenderState;)Lnet/minecraft/world/entity/player/Player;
+Caused by: BootstrapMethodError: Mixin transformation of HumanoidArmorLayer failed
+```
+
+I shipped the predicate fix with two package-private static helpers (`playerOf`, `hidesHelmet`) and a
+source-reading test that proves the emit path and the gate call the same predicate — **45 tests green
+while the mixin could not load at all.** Mixin requires non-private non-handler methods to carry
+`@Unique`; source-level tests cannot see applicability. O scanned every mixin (`mixin/**`): only those
+two methods lack `@Unique`, so this is the complete set, not a broader pattern.
+
+**Dispatched to I at 14:46Z (idle):** annotate both with `@Unique` (keep package-private so the test can
+call them) and add an applicability-oriented regression test that asserts every non-handler method in
+`PharaohHelmetMixin` carries `@Unique`. O runs the runtime re-check after B's client exits.
+
+**Process lesson recorded for this lane:** a green unit suite is never evidence that a mixin applies.
+Every new mixin needs at least one live client boot in the log before it is called done.
+
+### 2026-10-31 20:58 local (14:58Z) — I's @Unique fix accepted; C follow-up 2 accepted; E cleanup; blur/opacity gap opened
+
+**I (M51-FOLLOWUP-2) accepted, source and bytecode.** `mixin/PharaohHelmetMixin.java:35` and `:51` now carry
+`@Unique` on the two package-private helpers (`playerOf`, `hidesHelmet`); the `@Inject` handler stays private.
+I's `javap -v` shows the `RuntimeInvisibleAnnotations` entry on both, its new
+`PharaohHelmetMixinTest.everyHelperMethodCarriesUnique` parses the mixin source and requires `@Unique` on every
+non-injector method (red-green: the first version of the parser missed wrapped `@Inject` signatures and
+misclassified `playerOf`; fixed by matching the signature start). Targeted XML (`.isolated-build-i`):
+`PharaohHelmetMixinTest 8`, `PharaohHeaddressTransformTest 5`, `PharaohHeaddressVisibilityTest 11`,
+`Character* 22` = **46 tests, 0 failures/errors/skips**. Runtime re-check still owed to lane O/B.
+
+**C (follow-up 2) accepted against the tree and its own gate.** `.isolated-build-c` XML: **180 suites /
+835 tests / 0 failures / 0 errors / 0 skipped**, newest XML 14:48:04Z; `devlibs/jilaton-client-0.1.0-dev.jar`
+SHA-256 `a6f1170f…c76292` (C quoted the dev jar; the release jar on disk is `477c085a…`). Code read directly:
+- legend `JilatonClickGui.java:408-410` prints `SW = switches on` only when `visualPage()` (`category == "Visuals"`),
+  which is exactly where `CardMetric.label` is rendered (`:471-472`); module cards never print the ratio.
+- grip `:477-488` draws three dots and `gripHit` sits in the left gutter; the press branch (`:876-885`) runs before
+  `toggleHit` and the body, so a grip press can neither toggle nor open the drawer.
+- drop `:1088-1142` writes `setModuleOrder` plus `setVisualOrder` for visual/render moves, remembers nav state before
+  saving, and cancels on release outside, Esc (`:1174`) and category switch.
+- `guiScroll` is no longer written by the shipping GUI; per-category `setCategoryScroll` is its only list state
+  (`:104`, `:160`). The legacy screen still writes/reads `guiScroll` (`ClickGuiScreen:164,178`), so the field is not
+  left write-only overall.
+- `HudRenderer.BACKGROUND` confirmed dead by grep before removal (see E below).
+
+**E removed the dead field.** `gui/HudRenderer.java:51` deleted only that `private static final int BACKGROUND`;
+post-delete grep has zero hits (`PreviewSpec.PANEL_BACKGROUND` is a different field). E's XML: 180 suites / 835 tests
+/ 0 fail / 0 err / 0 skip, newest 14:52:15Z. Test task only, no jar; no runtime claim.
+
+**Acceptance gap found and dispatched (C follow-up 3).** The user requires GUI backgrounds with "blur/opacity
+settings". `JilatonClickGui.renderBackground` (`:257-261`) only fills a fixed `ShellPalette.SCRIM` and never calls
+`Screen.renderBlurredBackground`, so the shipping GUI has no blur at all and no opacity control; the Theme page shows
+only Accent / Reduced motion / Animation intensity / Font. Verified 1.21.11 API before dispatching: `Options` has
+`OptionInstance<Integer> menuBackgroundBlurriness()`, `int getMenuBackgroundBlurriness()`, and `Screen` has
+`protected void renderBlurredBackground(GuiGraphics)`. C is implementing a persisted backdrop-opacity slider
+(scales both scrim branches) and a real blur control that must not rewrite `options.txt` (capture/restore around the
+open GUI). Fabricating a blurred look with a solid fill is explicitly forbidden.
+
+**B relaunch status.** B's active turn is a poll loop keyed to `private static Player playerOf` — it cannot see the
+`@Unique` fix, so it will time out; O's go-ahead is queued behind it and answers B's three open questions
+(JumpCirclePolicy is B's; terrain wave accepted as shipped; client free to launch). No other client or build is
+live; C runs tests only.

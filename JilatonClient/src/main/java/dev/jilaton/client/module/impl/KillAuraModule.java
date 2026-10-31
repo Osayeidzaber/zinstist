@@ -3,6 +3,7 @@ package dev.jilaton.client.module.impl;
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
+import dev.jilaton.client.render.TargetEspGeometry;
 import dev.jilaton.client.rotation.RotationPriorities;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
@@ -42,6 +43,12 @@ public final class KillAuraModule extends ClientModule {
     private final ChoiceSetting highlightColor;
     private final NumberSetting highlightOpacity;
     private final NumberSetting highlightWidth;
+    private final BooleanSetting customHalo;
+    private final BooleanSetting customOrbit;
+    private final BooleanSetting customHelix;
+    private final BooleanSetting customGround;
+    private final BooleanSetting customCyber;
+    private final BooleanSetting customReticle;
     private final ChoiceSetting priority;
     private final ClickSchedule clickSchedule = new ClickSchedule();
     private LivingEntity currentTarget;
@@ -70,10 +77,20 @@ public final class KillAuraModule extends ClientModule {
         raycastMode = addSetting(new ChoiceSetting("raycast_mode", "Raycast mode",
                 List.of("None", "Enemy", "All"), "None"));
         showTargetIndicator = addSetting(new BooleanSetting("show_target_indicator", "Target highlight", true));
-        highlightStyle = addSetting(new ChoiceSetting("highlight_style", "Highlight style", List.of("Halo", "Corners", "Halo + corners"), "Halo"));
+        highlightStyle = addSetting(new ChoiceSetting("highlight_style", "Highlight style", List.of(
+                "Halo", "Corners", "Halo + corners",
+                TargetEspGeometry.MINIMAL, TargetEspGeometry.ORBIT, TargetEspGeometry.HELIX,
+                TargetEspGeometry.GROUND_AURA, TargetEspGeometry.CYBER_TARGET,
+                TargetEspGeometry.CINEMATIC, TargetEspGeometry.CUSTOM), "Halo"));
         highlightColor = addSetting(new ChoiceSetting("highlight_color", "Highlight color", List.of("Monochrome", "Theme"), "Monochrome"));
         highlightOpacity = addSetting(new NumberSetting("highlight_opacity", "Highlight opacity", 0.1, 1, 0.05, 0.85));
         highlightWidth = addSetting(new NumberSetting("highlight_width", "Highlight line width", 1, 4, 0.5, 1.5));
+        customHalo = addSetting(new BooleanSetting("custom_halo", "Custom: halo rings", true));
+        customOrbit = addSetting(new BooleanSetting("custom_orbit", "Custom: orbital comets", true));
+        customHelix = addSetting(new BooleanSetting("custom_helix", "Custom: double helix", false));
+        customGround = addSetting(new BooleanSetting("custom_ground", "Custom: ground aura", false));
+        customCyber = addSetting(new BooleanSetting("custom_cyber", "Custom: cyber brackets", true));
+        customReticle = addSetting(new BooleanSetting("custom_reticle", "Custom: lock reticle", true));
     }
 
     @Override
@@ -166,8 +183,27 @@ public final class KillAuraModule extends ClientModule {
         return showTargetIndicator.value();
     }
 
+    /** TargetESP-style geometry chosen for the aura marker; the Halo variants use the legacy halo path. */
+    public String markerStyle() { return highlightStyle.value(); }
+
+    public boolean markerGeometry() {
+        String style = highlightStyle.value();
+        return !style.equals("Halo") && !style.equals("Corners") && !style.equals("Halo + corners");
+    }
+
+    public int markerMask() {
+        int mask = 0;
+        if (customHalo.value()) mask |= TargetEspGeometry.COMP_HALO;
+        if (customOrbit.value()) mask |= TargetEspGeometry.COMP_ORBIT;
+        if (customHelix.value()) mask |= TargetEspGeometry.COMP_HELIX;
+        if (customGround.value()) mask |= TargetEspGeometry.COMP_GROUND;
+        if (customCyber.value()) mask |= TargetEspGeometry.COMP_CYBER;
+        if (customReticle.value()) mask |= TargetEspGeometry.COMP_RETICLE;
+        return mask;
+    }
+
     public boolean highlightHalo() { return !highlightStyle.value().equals("Corners"); }
-    public boolean highlightCorners() { return !highlightStyle.value().equals("Halo"); }
+    public boolean highlightCorners() { return !highlightStyle.value().equals("Halo") && !markerGeometry(); }
     public int highlightColor(int theme) { return highlightColor.value().equals("Theme") ? theme : 0xFFE1E5EC; }
     public double highlightOpacity() { return highlightOpacity.value(); }
     public float highlightWidth() { return (float) highlightWidth.value(); }

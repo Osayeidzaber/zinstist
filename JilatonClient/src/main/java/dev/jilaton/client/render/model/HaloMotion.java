@@ -18,8 +18,9 @@ public final class HaloMotion {
 
     /** The emission pulse has its own clock so it keeps breathing when spin is set to zero. */
     public static double advancePulse(double previous, double dt, boolean reducedMotion) {
-        if (reducedMotion) return previous;
-        return previous + Math.max(0, dt) * PULSE_RATE;
+        if (!Double.isFinite(previous)) previous = 0;
+        if (reducedMotion || !(dt > 0)) return previous;
+        return previous + dt * PULSE_RATE;
     }
 
     /** Subtle 0..1 emission swing; reduced motion holds it at the midpoint so the ring still glows. */
@@ -29,8 +30,9 @@ public final class HaloMotion {
 
     /** Slow spin; decorative, so reduced motion freezes it. */
     public static double advancePhase(double previous, double dt, double speed, boolean reducedMotion) {
-        if (reducedMotion) return previous;
-        return previous + Math.max(0, dt) * Math.max(0, speed) * Math.PI * 2 * 0.35;
+        if (!Double.isFinite(previous)) previous = 0;
+        if (reducedMotion || !(dt > 0) || !(speed > 0)) return previous;
+        return previous + dt * speed * Math.PI * 2 * 0.35;
     }
 
     public static double bob(double phase, double amplitude, boolean reducedMotion) {

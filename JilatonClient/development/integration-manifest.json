@@ -2361,21 +2361,23 @@
       "state": "IMPLEMENTED",
       "source_path": "src/main/java/dev/jilaton/client/module/impl/FullbrightModule.java",
       "target_path": "src/main/java/dev/jilaton/client/module/impl/FullbrightModule.java",
-      "source_sha256": "4bb7e84626ea48f9a646983fdb67d29066e8ce09f09b83317c7c2bb4df63c8e6",
+      "source_sha256": "85b5dd8093000d1a6da6e8849b56fdac9ae6341bbc6e534beb4abefc8d491298",
       "provenance": "See ATTRIBUTION.md and IMPLEMENTATION_INVENTORY.md; implementations may be partial",
       "settings": [
         {
           "type": "Number",
-          "id": "brightness",
-          "label": "Brightness",
-          "declaration": "\"brightness\", \"Brightness\", 0.0, 1.0, 0.05, 1.0",
+          "id": "gamma",
+          "label": "Gamma",
+          "declaration": "\"gamma\", \"Gamma\", 1.0, 16.0, 0.5, 8.0",
           "modes": []
         }
       ],
       "dependencies": [
         "src/main/java/dev/jilaton/client/module/ClientModule.java",
         "src/main/java/dev/jilaton/client/module/ModuleCategory.java",
-        "src/main/java/dev/jilaton/client/setting/NumberSetting.java"
+        "src/main/java/dev/jilaton/client/setting/NumberSetting.java",
+        "src/main/java/dev/jilaton/client/mixin/LightTextureFullbrightMixin.java",
+        "src/main/resources/jilaton.mixins.json"
       ],
       "dependency_coverage": "Direct project imports only; dependency closure is not yet audited",
       "settings_coverage": "Declared constructor settings; GUI/config use the shared Setting framework",
@@ -2383,7 +2385,7 @@
       "tests": [
         "src/test/java/dev/jilaton/client/module/ModuleManagerTest.java"
       ],
-      "runtime_verification": "UNVERIFIED; see checkpoint for specific smoke checks",
+      "runtime_verification": "RUNTIME_VERIFIED 2026-10-31 via runVisualVerify (run-verify/screenshots/verify-26-fullbright-off.png vs verify-26b-fullbright-on.png, midnight, identical framing): mean luminance 15.5 (median 17) -> 69.0 (median 85), while the harness logged options.gamma() 0.5 before and after, so the saved option is untouched. Lightmap injection is @ModifyArg on LightTexture.updateLightTexture ordinal 6 (refmap class_765.method_3313).",
       "compatibility_issues": "Source-client parity and server compatibility are not established"
     },
     {

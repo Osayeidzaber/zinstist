@@ -14,7 +14,6 @@ public final class JilatonLoadingScene {
     /** Brand white from the Jilaton mark. */
     public static final int ACCENT = 0xFFF5F5F5;
 
-    private static final int TEXTURE_WIDTH = 2048;
     private static final int TEXTURE_HEIGHT = 512;
     /** Wordmark pixels that are not fully transparent, as fractions of the texture. */
     private static final float TEXT_TOP = 107.0F / TEXTURE_HEIGHT;
@@ -22,7 +21,6 @@ public final class JilatonLoadingScene {
     /** One shine band per this many texture columns keeps every slice an exact 64 px strip. */
     private static final int STRIPS = 32;
 
-    private static final int BASE_TINT = 0xFAF8FF;
     private static final double SHINE_CYCLE_SECONDS = 2.6;
     private static final double SHINE_HALF_WIDTH = 0.15;
     /** {half-width, peak alpha}: a soft halo, a mid sweep and a sharp glint on top of each other. */

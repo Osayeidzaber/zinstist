@@ -11,7 +11,11 @@ public final class HudDesign {
     public static final int COMPACT_TARGET_HEIGHT = 44;
     public static final int TARGET_MIN_WIDTH = 224;
     public static final int TARGET_MAX_WIDTH = 320;
+    /** Geometry the target card is laid out at; one factor scales the card and its text together. */
+    public static final int TARGET_BASE_WIDTH = TARGET_MAX_WIDTH;
     public static final int TARGET_HEIGHT = 74;
+    /** Room the held-item icon and its inset take inside the pill. */
+    public static final int PILL_TEXT_INSET = 17;
 
     public static final int KEYBIND_WIDTH = 152;
     public static final int KEYBIND_TITLE = 19;
@@ -52,6 +56,44 @@ public final class HudDesign {
         public int contentRight() { return width - padding; }
         public int chipWidth() { return (contentWidth() - 2 * CHIP_GAP) / 3; }
         public int chipX(int index) { return contentX + index * (chipWidth() + CHIP_GAP); }
+
+        /** Every rect of this card multiplied by one factor; text is drawn in the same scaled space. */
+        public TargetCard scaled(double factor) {
+            if (!Double.isFinite(factor) || factor <= 0) {
+                throw new IllegalArgumentException("Card scale must be positive");
+            }
+            int scaledPadding = mul(padding, factor);
+            int scaledRule = mul(ruleY, factor);
+            int scaledChips = chipsY < 0 ? -1 : mul(chipsY, factor);
+            int bottom = scaledChips >= 0 ? scaledChips + mul(chipHeight, factor) : scaledRule + 1;
+            return new TargetCard(mul(width, factor),
+                    Math.max(mul(height, factor), bottom + scaledPadding),
+                    scaledPadding, mul(headX, factor), mul(headY, factor),
+                    mul(headSize, factor), mul(contentX, factor), mul(nameY, factor),
+                    mul(pillY, factor), mul(pillHeight, factor), mul(healthY, factor),
+                    mul(barY, factor), mul(barHeight, factor), scaledRule,
+                    scaledChips, mul(chipHeight, factor), segments);
+        }
+    }
+
+    private static int mul(int value, double factor) {
+        return (int) Math.round(value * factor);
+    }
+
+    /** The compact card's fixed anchors, so scaling it is one multiplication rather than eight literals. */
+    public record CompactCard(int width, int height, int faceX, int faceY, int faceSize, int textX,
+                              int nameY, int heartsY, int barY, int barHeight, int statusY,
+                              int rightPadding) {
+        public CompactCard scaled(double factor) {
+            if (!Double.isFinite(factor) || factor <= 0) {
+                throw new IllegalArgumentException("Card scale must be positive");
+            }
+            return new CompactCard(mul(width, factor), Math.max(mul(statusY + 9, factor),
+                    mul(height, factor)), mul(faceX, factor), mul(faceY, factor),
+                    mul(faceSize, factor), mul(textX, factor), mul(nameY, factor),
+                    mul(heartsY, factor), mul(barY, factor), mul(barHeight, factor),
+                    mul(statusY, factor), mul(rightPadding, factor));
+        }
     }
 
     public record Bar(int x, int y, int width, int height, int segments, int gap) {
@@ -70,10 +112,54 @@ public final class HudDesign {
     }
 
     /** The detailed card is about a third of the viewport wide, within a readable range. */
+    public static int targetCardWidth(int viewportWidth) {
+        return Math.max(TARGET_MIN_WIDTH, Math.min(TARGET_MAX_WIDTH, Math.round(viewportWidth / 3.0F)));
+    }
+
     public static TargetCard targetCard(int viewportWidth) {
-        int width = Math.max(TARGET_MIN_WIDTH, Math.min(TARGET_MAX_WIDTH, Math.round(viewportWidth / 3.0F)));
-        return new TargetCard(width, TARGET_HEIGHT, 8, 8, 8, 44, 62, 8, 19, 12, 34,
-                45, 4, 51, 55, 11, SEGMENTS);
+        return targetCard(targetCardWidth(viewportWidth), true, true);
+    }
+
+    /** The renderer's layout card: fixed base width, rows packed around the visible elements. */
+    public static TargetCard baseTargetCard(boolean chips, boolean held) {
+        return targetCard(TARGET_BASE_WIDTH, chips, held);
+    }
+
+    public static TargetCard targetCard(int width, boolean chips, boolean held) {
+        int clamped = Math.max(TARGET_MIN_WIDTH, Math.min(TARGET_MAX_WIDTH, width));
+        int pillY = held ? 19 : 20;
+        int pillHeight = held ? 12 : 0;
+        int healthY = held ? 34 : 20;
+        int barY = healthY + 11;
+        int ruleY = barY + 6;
+        int chipsY = chips ? ruleY + 4 : -1;
+        int chipHeight = 11;
+        int height = chips ? chipsY + chipHeight + 8 : ruleY + 1 + 8;
+        return new TargetCard(clamped, height, 8, 8, 8, 44, 62, 8, pillY, pillHeight, healthY,
+                barY, 4, ruleY, chipsY, chipHeight, SEGMENTS);
+    }
+
+    /** The compact card's base geometry; the renderer scales it by one factor. */
+    public static CompactCard compactTarget() {
+        return new CompactCard(COMPACT_TARGET_WIDTH, COMPACT_TARGET_HEIGHT, 7, 7, 24, 38, 6, 17, 30, 3, 35, 7);
+    }
+
+    /**
+     * Width of the held-item pill for a measured label. A label that fits the content column gets its
+     * own width; only a label that genuinely exceeds it is given the full column and ellipsized.
+     */
+    public static int pillWidth(int textWidth, int contentWidth) {
+        if (contentWidth <= 0 || textWidth <= 0) {
+            return 0;
+        }
+        if (pillTextFits(textWidth, contentWidth)) {
+            return Math.max(1, Math.min(contentWidth, textWidth + 20));
+        }
+        return contentWidth;
+    }
+
+    public static boolean pillTextFits(int textWidth, int contentWidth) {
+        return textWidth <= contentWidth - PILL_TEXT_INSET;
     }
 
     public static Bar healthBar(TargetCard card) {

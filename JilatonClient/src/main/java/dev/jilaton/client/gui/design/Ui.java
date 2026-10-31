@@ -15,8 +15,9 @@ public final class Ui {
     public static final int BACKDROP = 0xFF0A0A0A, DEEP = 0xFF060606, PANEL = 0xFF0E0E0E, SIDEBAR = 0xFF0A0A0A,
             CARD = 0xFF131313, RAISED = 0xFF1B1B1B, DRAWER = 0xFF0F0F0F, STROKE = 0xFF262626;
     // Secondary text stays readable on #0A0A0A: TEXT_2 is about 9:1, TEXT_3 about 5:1 (above WCAG AA).
+    // FAINT is the lowest step and still clears 3:1 on the brightest shell surface (#131313) for hints.
     public static final int TEXT = 0xFFF5F5F5, TEXT_2 = 0xFFB8B8B8, TEXT_3 = 0xFF8C8C8C, SOFT = 0xFFD6D6D6,
-            FAINT = 0xFF4A4A4A;
+            FAINT = 0xFF6A6A6A;
     public static final int DANGER = 0xFFE5484D, ONLINE = 0xFF30A46C, WARN = 0xFFE5A13E;
 
     private Ui() { }
@@ -121,9 +122,14 @@ public final class Ui {
         return out.isEmpty() ? "" : out.stripTrailing() + "…";
     }
 
+    /** Size of the 40x22 switch drawn by {@link #toggle}. */
+    public static final float TOGGLE_W = 40, TOGGLE_H = 22;
+    /** Size of the 32x18 switch drawn by {@link #smallToggle}. */
+    public static final float SMALL_TOGGLE_W = 32, SMALL_TOGGLE_H = 18;
+
     /** 40x22 switch; {@code t} 0..1 slides the knob and fades the track to the accent. */
     public static void toggle(GuiGraphics g, float x, float y, double t, int accent) {
-        round(g, x, y, 40, 22, 11, mix(STROKE, accent, t));
+        round(g, x, y, TOGGLE_W, TOGGLE_H, 11, mix(STROKE, accent, t));
         float knob = x + 3 + (float) (18 * t);
         // The knob contrasts with the track: dark on a light accent (white by default), light on a dark one.
         round(g, knob, y + 3, 16, 16, 8, mix(TEXT_2, JilatonUi.onColor(accent), t));
@@ -131,7 +137,7 @@ public final class Ui {
 
     /** Small toggle for drawers: 32x18. */
     public static void smallToggle(GuiGraphics g, float x, float y, double t, int accent) {
-        round(g, x, y, 32, 18, 9, mix(STROKE, accent, t));
+        round(g, x, y, SMALL_TOGGLE_W, SMALL_TOGGLE_H, 9, mix(STROKE, accent, t));
         round(g, x + 2 + (float) (14 * t), y + 2, 14, 14, 7, mix(TEXT_2, JilatonUi.onColor(accent), t));
     }
 

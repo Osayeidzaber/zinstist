@@ -23,12 +23,13 @@ public abstract class FirstPersonHandsAndItemsMixin {
     @Inject(method = "swingArm", at = @At("HEAD"), cancellable = true)
     private void jilaton$applySwingAnimation(float progress, PoseStack poseStack, int invert, HumanoidArm arm, CallbackInfo ci) {
         Minecraft client = Minecraft.getInstance();
-        if (client.player == null || arm != client.player.getMainArm()) {
+        if (client.player == null) {
             return;
         }
 
         ClientModule module = JilatonClient.moduleManager().get("swing_animations");
-        if (module instanceof SwingAnimationsModule animations && animations.enabled()) {
+        if (module instanceof SwingAnimationsModule animations && animations.enabled()
+                && animations.covers(arm == client.player.getMainArm())) {
             animations.apply(poseStack, arm, progress);
             ci.cancel();
         }

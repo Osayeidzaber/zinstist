@@ -9,6 +9,7 @@ import dev.jilaton.client.render.character.kit.Detail;
 import dev.jilaton.client.render.character.kit.PartMesh;
 import dev.jilaton.client.render.character.kit.Surface;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.ThrowingSupplier;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -101,7 +102,9 @@ class CustomGlbImportTest {
     void corruptGlbIsRejectedWithoutBreakingTheScan() throws IOException {
         Files.write(folder.resolve("broken.glb"), new byte[]{0x67, 0x6C, 0x54, 0x46, 2, 0, 0, 0, 0, 0, 0, 0});
 
-        List<BakedDesign> designs = assertDoesNotThrow(() -> CustomCharacters.scan(folder), "scan() must survive a bad file");
+        List<BakedDesign> designs = assertDoesNotThrow(
+            (ThrowingSupplier<List<BakedDesign>>) () -> CustomCharacters.scan(folder), "scan() must survive a bad file"
+        );
         assertEquals(1, designs.size(), "the scan lists the file; the failure belongs to the bake");
 
         UncheckedIOException failure = assertThrows(
@@ -114,7 +117,7 @@ class CustomGlbImportTest {
 
     @Test
     void truncatedGlbIsRejectedByTheParser() {
-        byte[] good = assertDoesNotThrow(() -> boxGlb(1.0F, 2.0F, 3.0F));
+        byte[] good = assertDoesNotThrow((ThrowingSupplier<byte[]>) () -> boxGlb(1.0F, 2.0F, 3.0F));
         byte[] cut = Arrays.copyOf(good, good.length / 2);
 
         IOException failure = assertThrows(

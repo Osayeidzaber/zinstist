@@ -78,8 +78,13 @@ public final class JilatonClickGui extends Screen {
     /** Active slider drag: the setting and its track in board coordinates. */
     private NumberSetting dragging;
     private float dragX, dragW;
-    private int dragChannel = -1;
     private boolean dragMotion;
+    private boolean dragBackdrop;
+    /** Card reorder: the card held by its grip, the press point and the slot it would drop into. */
+    private String dragCard;
+    private double dragCardX, dragCardY;
+    private boolean cardDragging;
+    private int dropIndex = -1;
 
     public JilatonClickGui(ModuleManager modules, ClientConfig config, Screen parent) {
         super(Component.literal("Jilaton Client"));
@@ -97,8 +102,7 @@ public final class JilatonClickGui extends Screen {
         drawerId = !expanded.isEmpty() && modules.get(expanded) != null ? expanded : null;
         enabledOnly = config.guiEnabledOnly();
         restoredQuery = config.guiSearchQuery();
-        double catScroll = config.categoryScroll(category);
-        scroll = targetScroll = catScroll > 0 ? catScroll : 0;
+        scroll = targetScroll = config.categoryScroll(category);
         selectedProfile = config.guiSelectedProfile().isEmpty() ? null : config.guiSelectedProfile();
         resumed = page != Page.MODULES || !category.equals("All") || drawerId != null || !restoredQuery.isEmpty();
     }
@@ -154,7 +158,6 @@ public final class JilatonClickGui extends Screen {
         config.setGuiEnabledOnly(enabledOnly);
         config.setGuiSearchQuery(search == null ? restoredQuery : search.getValue());
         config.setGuiSelectedProfile(selectedProfile == null ? "" : selectedProfile);
-        config.setGuiScroll(targetScroll);
         config.setCategoryScroll(category, targetScroll);
     }
 
@@ -254,7 +257,10 @@ public final class JilatonClickGui extends Screen {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (minecraft.level == null) graphics.fill(0, 0, width, height, Ui.BACKDROP);
-        else graphics.fill(0, 0, width, height, 0xC7070707);
+        else {
+            if (config.backdropBlur()) renderBlurredBackground(graphics);
+            graphics.fill(0, 0, width, height, Ui.alpha(0xFF050505, config.backdropOpacity()));
+        }
     }
 
     @Override
@@ -306,7 +312,7 @@ public final class JilatonClickGui extends Screen {
                 if (module.enabled()) on++;
             }
             boolean active = page == Page.MODULES && c.equals(category);
-            sideRow(g, c, on + " / " + total, x, y, active, mx, my, accent);
+            sideRow(g, c, on + " of " + total, x, y, active, mx, my, accent);
             y += 44;
         }
         Ui.spaced(g, "GENERAL", x + 8, y + 12, 10, 1, JilatonType.Face.MEDIUM, Ui.TEXT_3);
@@ -402,6 +408,10 @@ public final class JilatonClickGui extends Screen {
                 on + " of " + total + " active", mx, my, accent);
 
         float right = mainRight();
+        if (visualPage()) {
+            // The cards print "<on>/<total> SW ON"; this line is the only place the unit is spelled out.
+            Ui.textRight(g, "SW = switches on", right, TITLE_Y + 28, 10, JilatonType.Face.REGULAR, Ui.TEXT_3);
+        }
         int cols = columns();
         float cw = (right - MAIN_X - GAP * (cols - 1)) / cols, ch = cardHeight();
         // Scissor rectangles go through the current pose, so they are given in board coordinates.
@@ -419,6 +429,11 @@ public final class JilatonClickGui extends Screen {
             if (visualPage()) visualCard(g, module, x, y, cw, ch, over, accent, now, reduced);
             else moduleCard(g, module, x, y, cw, ch, over, accent);
         }
+        if (cardDragging && dropIndex >= 0 && dropIndex < list.size()) {
+            float ix = MAIN_X + (dropIndex % cols) * (cw + GAP);
+            float iy = (float) (LIST_Y + (dropIndex / cols) * (ch + GAP) - scroll);
+            Ui.round(g, ix - 3, iy + 2, 3, ch - 4, 1.5F, accent);
+        }
         g.disableScissor();
         float max = maxScroll();
         if (max > 0) {
@@ -434,13 +449,15 @@ public final class JilatonClickGui extends Screen {
         Ui.round(g, x, y, w, h, 12, Ui.mix(Ui.CARD, Ui.RAISED, t * 0.7));
         if (open) Ui.glowRing(g, x, y, w, h, 12, accent, 1);
         else Ui.outline(g, x, y, w, h, 12, Ui.mix(Ui.STROKE, Ui.FAINT, t));
+        if (module.id().equals(dragCard)) Ui.outline(g, x, y, w, h, 12, accent);
+        drawGrip(g, module, x, y, h, accent);
         float textW = w - 32 - 40 - 12;
         Ui.text(g, Ui.fit(module.name(), textW, 13, JilatonType.Face.SEMIBOLD), x + 16, y + 15, 13, JilatonType.Face.SEMIBOLD, Ui.TEXT);
         String key = keyName(module);
         String sub = key + " · " + module.description();
         Ui.text(g, Ui.fit(sub, textW, 11, JilatonType.Face.REGULAR), x + 16, y + 35, 11,
                 module.id().equals(bindingId) ? accent : Ui.TEXT_2);
-        Ui.toggle(g, x + w - 16 - 40, y + 20, Ui.ease("cg:tog:" + module.id(), module.enabled()), accent);
+        Ui.toggle(g, x + w - 16 - Ui.TOGGLE_W, y + 20, Ui.ease("cg:tog:" + module.id(), module.enabled()), accent);
     }
 
     private void visualCard(GuiGraphics g, ClientModule module, float x, float y, float w, float h, boolean over, int accent,
@@ -450,14 +467,28 @@ public final class JilatonClickGui extends Screen {
         Ui.round(g, x, y, w, h, 12, Ui.mix(Ui.CARD, Ui.RAISED, t * 0.7));
         if (open) Ui.glowRing(g, x, y, w, h, 12, accent, 1);
         else Ui.outline(g, x, y, w, h, 12, Ui.mix(Ui.STROKE, Ui.FAINT, t));
+        if (module.id().equals(dragCard)) Ui.outline(g, x, y, w, h, 12, accent);
+        drawGrip(g, module, x, y, h, accent);
         float textW = w - 28 - 32 - 10;
         Ui.text(g, Ui.fit(module.name(), textW, 13, JilatonType.Face.SEMIBOLD), x + 14, y + 13, 13, JilatonType.Face.SEMIBOLD, Ui.TEXT);
-        Ui.smallToggle(g, x + w - 14 - 32, y + 12, Ui.ease("cg:tog:" + module.id(), module.enabled()), accent);
-        String summary = module.settings().isEmpty() ? module.description() : CardMetric.label(module).toLowerCase(Locale.ROOT)
-                .replace(" on", " on") + " · " + module.description();
+        Ui.smallToggle(g, x + w - 14 - Ui.SMALL_TOGGLE_W, y + 12, Ui.ease("cg:tog:" + module.id(), module.enabled()), accent);
+        String summary = module.settings().isEmpty() ? module.description()
+                : CardMetric.label(module) + " · " + module.description();
         Ui.text(g, Ui.fit(summary, w - 28, 11, JilatonType.Face.REGULAR), x + 14, y + 32, 11, Ui.TEXT_2);
         int px = Math.round(x + 14), py = Math.round(y + 52), pw = Math.round(w - 28), ph = Math.round(h - 52 - 12);
         preview.render(g, font, px, py, pw, ph, 8, module.id(), PreviewSpecs.of(module, accent), module.enabled(), t, reduced, now);
+    }
+
+    /** Three dots in the card's left gutter: press here to drag the card, never to toggle or open it. */
+    private void drawGrip(GuiGraphics g, ClientModule module, float x, float y, float h, int accent) {
+        int color = module.id().equals(dragCard) ? accent : Ui.FAINT;
+        float top = y + (h - 10) / 2;
+        for (int row = 0; row < 3; row++) Ui.rect(g, x + 7, top + row * 4, 2, 2, color);
+    }
+
+    /** The grip's grab area: the left gutter, clear of the name and summary text. */
+    static boolean gripHit(double mx, double my, float x, float y, float h) {
+        return Ui.inside(mx, my, x + 2, y + 6, 11, h - 12);
     }
 
     // ---------------------------------------------------------------- drawer
@@ -705,6 +736,16 @@ public final class JilatonClickGui extends Screen {
         Ui.circle(g, (float) (tx + tw * f), y + 12, 7, Ui.TEXT);
         Ui.textRight(g, Math.round(config.animationIntensity() * 100) + "%", x + w, y + 6, 12, JilatonType.Face.MONO, Ui.TEXT);
         y += 40;
+        Ui.text(g, "Backdrop blur", x, y + 8, 13, Ui.TEXT_2);
+        Ui.toggle(g, x + w - 40, y + 3, Ui.ease("cg:blur", config.backdropBlur()), accent);
+        y += 40;
+        Ui.text(g, "Backdrop opacity", x, y + 6, 13, Ui.TEXT_2);
+        double o = (config.backdropOpacity() - 0.2) / 0.75;
+        Ui.round(g, tx, y + 10, tw, 4, 2, Ui.STROKE);
+        Ui.round(g, tx, y + 10, (float) (tw * o), 4, 2, accent);
+        Ui.circle(g, (float) (tx + tw * o), y + 12, 7, Ui.TEXT);
+        Ui.textRight(g, Math.round(config.backdropOpacity() * 100) + "%", x + w, y + 6, 12, JilatonType.Face.MONO, Ui.TEXT);
+        y += 40;
         Ui.text(g, "Font", x, y + 8, 13, Ui.TEXT_2);
         String[] fonts = {"Inter", "Minecraft"};
         float segW = 6;
@@ -750,7 +791,7 @@ public final class JilatonClickGui extends Screen {
         float right = drawerModule() != null ? PX + PW - DRAWER : PX + PW;
         Ui.hline(g, PX + SIDE + 1, FOOTER_Y, right - PX - SIDE - 2, Ui.STROKE);
         String hint = bindingId != null ? "Press a key  ·  Backspace unbinds  ·  Esc cancels"
-                : page == Page.MODULES ? "Click to toggle  ·  Right-click for settings  ·  Esc to close"
+                : page == Page.MODULES ? "Click the switch to toggle  ·  Click a card for settings  ·  Drag the grip to reorder  ·  Esc to close"
                 : "Esc to close  ·  Ctrl F to search modules";
         Ui.textCentre(g, hint, (PX + SIDE + right) / 2, FOOTER_Y + 14, 11, JilatonType.Face.REGULAR,
                 bindingId != null ? Ui.accent() : Ui.TEXT_3);
@@ -799,6 +840,9 @@ public final class JilatonClickGui extends Screen {
     }
 
     private boolean clickSidebar(double mx, double my) {
+        dragCard = null;
+        cardDragging = false;
+        dropIndex = -1;
         float x = PX + 14, y = PY + 92;
         for (String c : CATEGORIES) {
             if (Ui.inside(mx, my, x, y, SIDE - 28, 40)) {
@@ -845,17 +889,55 @@ public final class JilatonClickGui extends Screen {
             float y = (float) (LIST_Y + (i / cols) * (ch + GAP) - scroll);
             if (!Ui.inside(mx, my, x, y, cw, ch)) continue;
             ClientModule module = list.get(i);
-            if (button == 1) {
-                drawerId = module.id().equals(drawerId) ? null : module.id();
-                drawerScroll = 0;
-            } else {
+            if (button == 0 && gripHit(mx, my, x, y, ch)) {
+                dragCard = module.id();
+                dragCardX = mx;
+                dragCardY = my;
+                cardDragging = false;
+                dropIndex = i;
+                return true;
+            }
+            if (button == 0 && toggleHit(mx, my, x, y, cw, visualPage())) {
                 module.toggle();
                 config.save(modules);
+            } else {
+                drawerId = module.id().equals(drawerId) ? null : module.id();
+                drawerScroll = 0;
             }
             remember();
             return true;
         }
         return true;
+    }
+
+    /** True only on the card's switch; the rest of the card opens the settings drawer. */
+    static boolean toggleHit(double mx, double my, float x, float y, float w, boolean visual) {
+        return visual
+                ? Ui.inside(mx, my, x + w - 14 - Ui.SMALL_TOGGLE_W, y + 12, Ui.SMALL_TOGGLE_W, Ui.SMALL_TOGGLE_H)
+                : Ui.inside(mx, my, x + w - 16 - Ui.TOGGLE_W, y + 20, Ui.TOGGLE_W, Ui.TOGGLE_H);
+    }
+
+    /**
+     * Persists a card drop: {@code moved} lands at {@code target} in the list the player sees. Modules hidden by
+     * the category, the "Enabled only" chip or a search keep their slots (the legacy board's merge), and a drop on
+     * Visuals also rewrites the render order the preview grid follows.
+     */
+    static void applyReorder(ClientConfig config, ModuleManager modules, List<ClientModule> all,
+                             List<ClientModule> visible, ClientModule moved, int target, boolean visual) {
+        List<String> current = new ArrayList<>();
+        for (ClientModule module : visible) current.add(module.id());
+        List<String> active = visual && !config.visualOrder().isEmpty() ? config.visualOrder() : config.moduleOrder();
+        List<String> base = active.isEmpty() ? current : ModuleOrder.apply(active, current);
+        List<String> next = ModuleOrder.move(base, moved.id(), target);
+        List<String> allIds = new ArrayList<>();
+        for (ClientModule module : all) allIds.add(module.id());
+        config.setModuleOrder(ModuleOrder.apply(next, ModuleOrder.apply(config.moduleOrder(), allIds)));
+        if (visual || moved.category() == ModuleCategory.RENDER) {
+            List<String> renderIds = new ArrayList<>();
+            for (ClientModule module : all) if (module.category() == ModuleCategory.RENDER) renderIds.add(module.id());
+            config.setVisualOrder(ModuleOrder.apply(next, ModuleOrder.apply(config.visualOrder(), renderIds)));
+        }
+        config.save(modules);
     }
 
     private boolean clickDrawer(ClientModule module, double mx, double my, int button) {
@@ -996,6 +1078,20 @@ public final class JilatonClickGui extends Screen {
             return true;
         }
         y += 40;
+        if (Ui.inside(mx, my, x, y, w, 34)) {
+            config.setBackdropBlur(!config.backdropBlur());
+            config.save(modules);
+            return true;
+        }
+        y += 40;
+        if (Ui.inside(mx, my, tx - 6, y, tw + 12, 24)) {
+            dragBackdrop = true;
+            dragX = tx;
+            dragW = tw;
+            applySlider(mx);
+            return true;
+        }
+        y += 40;
         String[] fonts = {"Inter", "Minecraft"};
         float segW = 6;
         for (String f : fonts) segW += Ui.width(f, 12, JilatonType.Face.MEDIUM) + 28;
@@ -1012,12 +1108,19 @@ public final class JilatonClickGui extends Screen {
     private void applySlider(double mx) {
         double f = Math.max(0, Math.min(1, (mx - dragX) / Math.max(1, dragW)));
         if (dragMotion) config.setAnimationIntensity(f * 1.5);
+        else if (dragBackdrop) config.setBackdropOpacity(0.2 + f * 0.75);
         else if (dragging != null) dragging.setValue(dragging.minimum() + f * (dragging.maximum() - dragging.minimum()));
     }
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragXAmount, double dragYAmount) {
-        if (dragging != null || dragMotion) {
+        if (dragCard != null) {
+            double mx = canvas.x(event.x()), my = canvas.y(event.y());
+            if (!cardDragging && Math.hypot(mx - dragCardX, my - dragCardY) >= 4) cardDragging = true;
+            if (cardDragging) dropIndex = dropIndexAt(mx, my);
+            return true;
+        }
+        if (dragging != null || dragMotion || dragBackdrop) {
             applySlider(canvas.x(event.x()));
             return true;
         }
@@ -1026,13 +1129,43 @@ public final class JilatonClickGui extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (dragging != null || dragMotion) {
+        if (dragCard != null) {
+            boolean dropped = cardDragging;
+            int index = dropIndex;
+            ClientModule module = modules.get(dragCard);
+            dragCard = null;
+            cardDragging = false;
+            dropIndex = -1;
+            double mx = canvas.x(event.x()), my = canvas.y(event.y());
+            if (dropped && module != null && index >= 0
+                    && Ui.inside(mx, my, MAIN_X, LIST_Y, mainRight() - MAIN_X, listBottom() - LIST_Y)) {
+                List<ClientModule> list = visible();
+                if (index < list.size()) {
+                    remember();
+                    applyReorder(config, modules, allModules, list, module, index, visualPage());
+                }
+            }
+            return true;
+        }
+        if (dragging != null || dragMotion || dragBackdrop) {
             dragging = null;
             dragMotion = false;
+            dragBackdrop = false;
             config.save(modules);
             return true;
         }
         return super.mouseReleased(event);
+    }
+
+    /** The card cell the pointer is over, clamped to the visible list; -1 when nothing is listed. */
+    private int dropIndexAt(double mx, double my) {
+        List<ClientModule> list = visible();
+        if (list.isEmpty()) return -1;
+        int cols = columns();
+        float cw = (mainRight() - MAIN_X - GAP * (cols - 1)) / cols, ch = cardHeight();
+        int row = Math.max(0, (int) ((my - LIST_Y + scroll) / (ch + GAP)));
+        int col = Math.max(0, Math.min(cols - 1, (int) ((mx - MAIN_X) / (cw + GAP))));
+        return Math.min(list.size() - 1, row * cols + col);
     }
 
     @Override
@@ -1069,6 +1202,12 @@ public final class JilatonClickGui extends Screen {
             return true;
         }
         if (key == GLFW.GLFW_KEY_ESCAPE) {
+            if (dragCard != null) {
+                dragCard = null;
+                cardDragging = false;
+                dropIndex = -1;
+                return true;
+            }
             if (search.isFocused() && !search.getValue().isEmpty()) {
                 search.setValue("");
                 return true;

@@ -378,16 +378,22 @@ class ModuleManagerTest {
     }
 
     @Test
-    void fullbrightGammaSettingStaysWithinMinecraftUnitRange() {
+    void fullbrightGammaSettingUsesLightmapRange() {
         FullbrightModule fullbright = new FullbrightModule();
-        NumberSetting brightness = fullbright.brightness();
+        NumberSetting gamma = fullbright.gamma();
 
-        assertEquals(0.0, brightness.minimum());
-        assertEquals(1.0, brightness.maximum());
-        assertEquals(1.0, brightness.value());
+        assertEquals(1.0, gamma.minimum());
+        assertEquals(16.0, gamma.maximum());
+        assertEquals(8.0, gamma.value());
+        assertEquals(8.0, (double) fullbright.lightmapGamma());
 
-        brightness.setValue(12.0);
-        assertEquals(1.0, brightness.value());
+        gamma.setValue(0.0);
+        assertEquals(1.0, gamma.value());
+        assertEquals(1.0, (double) fullbright.lightmapGamma());
+
+        gamma.setValue(20.0);
+        assertEquals(16.0, gamma.value());
+        assertEquals(16.0, (double) fullbright.lightmapGamma());
     }
 
     @Test
@@ -411,11 +417,17 @@ class ModuleManagerTest {
         ChoiceSetting mode = (ChoiceSetting) module.settings().stream()
                 .filter(setting -> setting.id().equals("mode"))
                 .findFirst().orElseThrow();
-        assertEquals("Smooth", mode.value());
+        assertEquals("Slash", mode.value());
         mode.cycle(1);
-        assertEquals("Power", mode.value());
-        mode.setValue("Feast");
-        assertEquals("Feast", mode.value());
+        assertEquals("Chop", mode.value());
+        mode.setValue("Spin");
+        assertEquals("Spin", mode.value());
+        NumberSetting scale = (NumberSetting) module.settings().stream()
+                .filter(setting -> setting.id().equals("scale")).findFirst().orElseThrow();
+        assertEquals(1.0, scale.value());
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("tempo")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("offhand")));
+        assertTrue(module.settings().stream().anyMatch(setting -> setting.id().equals("combat_only")));
         assertTrue(new ModuleManager().get("swing_animations") instanceof SwingAnimationsModule);
     }
 
@@ -608,8 +620,8 @@ class ModuleManagerTest {
         assertEquals(ModuleCategory.PLAYER, module.category());
         assertEquals(1.0, module.entityBonus().value());
         assertEquals(0.0, module.entityBonus().minimum());
-        assertEquals(5.0, module.entityBonus().maximum());
+        assertEquals(3.0, module.entityBonus().maximum());
         assertEquals(0.5, module.blockBonus().value());
-        assertEquals(64.0, module.blockBonus().maximum());
+        assertEquals(1.0, module.blockBonus().maximum());
     }
 }

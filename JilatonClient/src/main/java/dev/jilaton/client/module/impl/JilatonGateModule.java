@@ -33,7 +33,7 @@ public final class JilatonGateModule extends ClientModule implements FxEmitter {
     private final BooleanSetting vortex = addSetting(new BooleanSetting("vortex", "Animated portal interior", true));
     private final BooleanSetting particles = addSetting(new BooleanSetting("particles", "Sanctuary particles", true));
     private final ChoiceSetting colorMode = addSetting(EffectPalette.modeSetting("color_mode", "Color"));
-    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "8878FF"));
+    private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F2F2F2"));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.2, 1.0, 0.05, 0.92));
 
     private boolean anchored;
@@ -60,6 +60,11 @@ public final class JilatonGateModule extends ClientModule implements FxEmitter {
     protected void onDisable(Minecraft client) {
         anchored = false;
         boundLevel = null;
+    }
+
+    /** World anchor of the gate base, for the dev capture log. */
+    public String anchorDescription() {
+        return anchored ? String.format(java.util.Locale.ROOT, "%.2f %.2f %.2f yaw %.1f", anchorX, anchorY, anchorZ, Math.toDegrees(anchorYawRad)) : "unanchored";
     }
 
     private void captureAnchor(Minecraft client) {
@@ -283,10 +288,12 @@ public final class JilatonGateModule extends ClientModule implements FxEmitter {
     private static int membrane(int core, int accent, double t, double th, double seconds, double alpha) {
         double swirl = 0.5 + 0.5 * Math.sin(3 * th - 8.0 * t + seconds * 2.2);
         double fine = 0.5 + 0.5 * Math.sin(7 * th + 13.0 * t - seconds * 3.1);
-        double light = 0.08 + 0.55 * t * t + (0.3 * swirl + 0.1 * fine) * t;
+        // Light lives at the rim and in thin swirl bands; the centre stays a deep void.
+        double band = Math.pow(swirl, 6) * 0.35 + Math.pow(fine, 10) * 0.12;
+        double light = 0.02 + 0.75 * Math.pow(t, 3.5) + band * Math.pow(t, 1.3);
         int rgb = EffectBatch.mixRgb(core, accent, light);
-        if (t > 0.8) rgb = EffectBatch.mixRgb(rgb, 0xFFFFFF, (t - 0.8) * 1.6);
-        return EffectBatch.withAlpha(rgb, alpha * (0.82 + 0.15 * t));
+        if (t > 0.88) rgb = EffectBatch.mixRgb(rgb, 0xFFFFFF, (t - 0.88) * 3.0);
+        return EffectBatch.withAlpha(rgb, alpha * (0.94 + 0.06 * t));
     }
 
     /** Gate-local frame: {@code u} runs along the gate (right), {@code v} through it (forward), y is up. */

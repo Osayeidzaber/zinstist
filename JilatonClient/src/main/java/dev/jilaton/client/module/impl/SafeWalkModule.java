@@ -86,22 +86,19 @@ public final class SafeWalkModule extends ClientModule {
     }
 
     private boolean hasSupportAhead(Minecraft client, Player player, Input input, Vec2 override) {
-        float forward;
-        float sideways;
+        double forward;
+        double sideways;
         if (hasMovementVector(override)) {
             forward = override.y;
             sideways = override.x;
         } else {
-            forward = (input.forward() ? 1.0F : 0.0F) - (input.backward() ? 1.0F : 0.0F);
-            sideways = (input.right() ? 1.0F : 0.0F) - (input.left() ? 1.0F : 0.0F);
+            forward = (input.forward() ? 1.0 : 0.0) - (input.backward() ? 1.0 : 0.0);
+            sideways = (input.left() ? 1.0 : 0.0) - (input.right() ? 1.0 : 0.0);
         }
-        if (forward == 0.0F && sideways == 0.0F) {
+        Vec2 direction = SafeWalkPolicy.aheadDirection(player.getYRot(), forward, sideways);
+        if (direction.equals(Vec2.ZERO)) {
             return true;
         }
-
-        float yaw = (float) Math.toRadians(player.getYRot());
-        Vec2 direction = new Vec2(-((float) Math.sin(yaw) * forward) + ((float) Math.cos(yaw) * sideways),
-                ((float) Math.cos(yaw) * forward) + ((float) Math.sin(yaw) * sideways)).normalized();
 
         double speed = Math.hypot(player.getDeltaMovement().x, player.getDeltaMovement().z);
         double lead = Math.min(edgeDistance.value(), Math.max(0.08, speed));

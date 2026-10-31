@@ -14,7 +14,8 @@ import dev.jilaton.client.render.fx.FxFrame;
  * hair) out of a depth tie.
  */
 public final class ModelBatch {
-    private static final int MAX_PLACED = 512;
+    /** 16 players at ULTRA Feather wings is 16 x 60 = 960 parts, so 512 silently truncated a full server. */
+    private static final int MAX_PLACED = 1024;
     private static final double DEPTH_BIAS = 0.0015;
     private static final double LIGHT_X = 0.379;
     private static final double LIGHT_Y = 0.867;

@@ -20,7 +20,6 @@ public final class VisualPreview {
     private static final int INK = 0xFF000000;
 
     // SkyThemes.Feature ordinals, mirrored here so the renderer does not depend on the sky renderer.
-    private static final int SKY_STARS = 1;
     private static final int SKY_MILKY = 1 << 1;
     private static final int SKY_AURORA = 1 << 2;
     private static final int SKY_PLANET = 1 << 3;

@@ -59,6 +59,25 @@ class StaffClassifierTest {
         assertFalse(StaffClassifier.classify(team("alex", "", "", null, null), byHex).isPresent());
     }
 
+    @Test void blankNamesAndEmptyRuleListsNeverClassify() {
+        assertTrue(StaffClassifier.classify(player("   "), StaffClassifier.parseRules("ADMIN")).isEmpty());
+        assertTrue(StaffClassifier.classify(player("Admin"), List.of()).isEmpty());
+        assertTrue(StaffClassifier.classify(team("Admin", null, null, null, null), List.of()).isEmpty());
+    }
+
+    @Test void globsQuoteRegexCharactersAndFirstMatchWins() {
+        assertTrue(StaffClassifier.classify(player("a.b"), StaffClassifier.parseRules("glob:a.b")).isPresent());
+        assertFalse(StaffClassifier.classify(player("axb"), StaffClassifier.parseRules("glob:a.b")).isPresent());
+        assertEquals("OWNER", StaffClassifier.classify(player("OwnerBob"),
+                StaffClassifier.parseRules("OWNER, contains:own")).orElseThrow().label());
+    }
+
+    @Test void invalidColourRulesNeverMatchAndEmptyValuesAreSkipped() {
+        assertTrue(StaffClassifier.classify(team("alex", "", "", null, null),
+                StaffClassifier.parseRules("color:#GGGGGG")).isEmpty());
+        assertEquals(1, StaffClassifier.parseRules("color:, ADMIN").size());
+    }
+
     @Test void malformedTokensAreSkippedAndUnknownPrefixesStayPlain() {
         List<StaffClassifier.Rule> rules = StaffClassifier.parseRules(" , ADMIN, contains: , weird:Amy");
         assertEquals(2, rules.size());

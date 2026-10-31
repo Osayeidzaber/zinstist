@@ -184,11 +184,13 @@ class ShellGeometryTest {
             if (module.category() != ModuleCategory.RENDER) continue;
             renderIds.add(module.id());
             int total = CardMetric.total(module);
-            assertTrue(total > 0, module.id() + " has no settings, so its card cannot show live data");
             int on = CardMetric.on(module);
             assertTrue(on >= 0 && on <= total, module.id() + " reports " + on + "/" + total);
             String label = CardMetric.label(module);
-            assertEquals(on + "/" + total + " ON", label, module.id() + " label is not live");
+            // fullbright owns sliders only: with no switches its card must say so, never "0/0 ON" and
+            // never a placeholder. Every other Visuals card names the switch ratio it is showing.
+            assertEquals(total == 0 ? "0 SWITCHES" : on + "/" + total + " SW ON", label,
+                    module.id() + " card must show live switch state in switches, with the unit named");
             BooleanSetting flag = firstBoolean(module);
             if (flag != null) {
                 int before = CardMetric.on(module);

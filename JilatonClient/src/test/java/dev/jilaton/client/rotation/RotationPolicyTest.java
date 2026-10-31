@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -25,16 +26,27 @@ class RotationPolicyTest {
         RotationAngles result = RotationPolicy.stepToward(179.0F, 0.0F,
                 new RotationAngles(-179.0F, 0.0F), 5.0F);
 
-        assertEquals(-179.0F, result.yaw(), 0.0001F);
+        // Moves forward across +-180 (the 2 degree way), not backward through 0 (the 358 degree way).
+        assertEquals(2.0F, Math.abs(RotationPolicy.wrapDegrees(result.yaw() - 179.0F)) * 2, 0.0001F);
+        assertEquals(1.0F, RotationPolicy.angularError(result.yaw(), 0.0F, new RotationAngles(-179.0F, 0.0F)), 0.0001F);
     }
 
     @Test
-    void turnSpeedBoundsYawAndPitchIndependentlyAndPitchStaysValid() {
-        RotationAngles result = RotationPolicy.stepToward(0.0F, 88.0F,
-                new RotationAngles(90.0F, -90.0F), 3.0F);
+    void turnFollowsAStraightPathCappedByTurnSpeed() {
+        RotationAngles result = RotationPolicy.stepToward(0.0F, 0.0F, new RotationAngles(30.0F, 40.0F), 5.0F);
 
-        assertEquals(3.0F, result.yaw(), 0.0001F);
-        assertEquals(85.0F, result.pitch(), 0.0001F);
+        assertEquals(5.0F, Math.hypot(result.yaw(), result.pitch()), 0.001F);
+        assertEquals(30.0F / 40.0F, result.yaw() / result.pitch(), 0.001F);
+    }
+
+    @Test
+    void turnEasesOutNearTheTargetAndPitchStaysValid() {
+        RotationAngles near = RotationPolicy.stepToward(0.0F, 0.0F, new RotationAngles(4.0F, 0.0F), 30.0F);
+        assertEquals(2.0F, near.yaw(), 0.001F);
+        RotationAngles done = RotationPolicy.stepToward(0.0F, 0.0F, new RotationAngles(0.3F, 0.0F), 30.0F);
+        assertEquals(0.3F, done.yaw(), 0.0001F);
+        RotationAngles pitch = RotationPolicy.stepToward(0.0F, 88.0F, new RotationAngles(0.0F, 120.0F), 30.0F);
+        assertTrue(pitch.pitch() <= 90.0F);
     }
 
     @Test

@@ -55,6 +55,11 @@ public final class CyberspaceModule extends ClientModule implements FxEmitter {
                 ModuleCategory.RENDER);
     }
 
+    /** Resolved primary colour, read by the ambience precedence chain. */
+    public int primaryColor(int accent) {
+        return EffectPalette.resolve(colorMode.value(), accent, color.value());
+    }
+
     /**
      * Keeps the full-screen grade in vanilla's post-effect slot while enabled. Vanilla resets that slot when the
      * camera entity changes (respawn, spectating), so it is re-applied every tick rather than set once.

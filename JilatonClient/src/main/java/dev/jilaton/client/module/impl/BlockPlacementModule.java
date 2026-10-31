@@ -36,7 +36,7 @@ public final class BlockPlacementModule extends ClientModule implements FxEmitte
     private static final int MAX_PLACEMENTS = 48;
 
     private final ChoiceSetting style = addSetting(new ChoiceSetting("style", "Style", STYLES, "Pulse Box"));
-    private final NumberSetting duration = addSetting(new NumberSetting("duration", "Duration (seconds)", 0.2, 2.0, 0.05, 0.65));
+    private final NumberSetting duration = addSetting(new NumberSetting("duration", "Duration (seconds)", 0.2, 2.0, 0.05, 0.9));
     private final NumberSetting expand = addSetting(new NumberSetting("expand", "Expansion", 0.0, 0.5, 0.02, 0.16));
     private final NumberSetting lineWidth = addSetting(new NumberSetting("line_width", "Line width", 1.0, 4.5, 0.25, 2.2));
     private final BooleanSetting fill = addSetting(new BooleanSetting("fill", "Face glow fill", true));
@@ -164,7 +164,9 @@ public final class BlockPlacementModule extends ClientModule implements FxEmitte
     }
 
     /**
-     * Pure geometry emitter for a placed block at progress {@code [0..1]}, testable headlessly.
+     * Pure geometry emitter for a placed block at progress {@code [0..1]}, testable headlessly. Every style shares
+     * the same base: lit faces that flash then drain from the top down, a two-tone edge (dark under-stroke so it
+     * reads on bright terrain, bright core on top) and a ripple that spreads over the supporting surface.
      */
     public static void emitPlacementEffect(EffectBatch batch, String style,
                                            double wMinX, double wMinY, double wMinZ,
@@ -174,107 +176,142 @@ public final class BlockPlacementModule extends ClientModule implements FxEmitte
                                            int rgb, double baseAlpha, float lineWidth, boolean faceFill) {
         if (batch == null || progress < 0 || progress >= 1.0 || baseAlpha <= 0.005) return;
         double eased = Motion.SETTLE.apply(progress);
-        double fade = Math.pow(1.0 - progress, 1.45);
+        double fade = Math.pow(1.0 - progress, 1.3);
         double alpha = baseAlpha * fade;
         if (alpha <= 0.005) return;
 
         double minX = wMinX - camX, minY = wMinY - camY, minZ = wMinZ - camZ;
         double maxX = wMaxX - camX, maxY = wMaxY - camY, maxZ = wMaxZ - camZ;
-        int coreColor = EffectBatch.withAlpha(rgb, alpha);
+        double cx = (minX + maxX) * 0.5, cz = (minZ + maxZ) * 0.5;
+        double size = Math.max(maxX - minX, maxZ - minZ);
+        int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.35);
+        // The first 18% is a hard flash, then the glow settles.
+        double flash = progress < 0.18 ? 1.0 - progress / 0.18 : 0.0;
+
+        // Ground ripple around the base.
+        double rr = size * (0.55 + 0.9 * eased);
+        int rippleIn = EffectBatch.withAlpha(rgb, 0);
+        int rippleOut = EffectBatch.withAlpha(rgb, alpha * 0.4);
+        batch.band(cx, minY + 0.012, cz, rr * 0.78, rr, 40, rippleIn, rippleOut, false);
+        batch.glowRing(cx, minY + 0.014, cz, rr, 40, EffectBatch.withAlpha(bright, alpha * 0.8), lineWidth * 0.7F, false, 0, 0);
+
+        if (faceFill) {
+            // Faces drain from the top: the lit part shrinks downward as the effect ages.
+            double level = minY + (maxY - minY) * (1.0 - eased * 0.85);
+            litFaces(batch, minX, minY, minZ, maxX, level, maxZ, rgb, alpha * (0.22 + 0.45 * flash));
+        }
 
         switch (style == null ? "Pulse Box" : style) {
             case "Expanding Wire" -> {
-                drawBoxEdges(batch, minX, minY, minZ, maxX, maxY, maxZ,
-                        EffectBatch.withAlpha(rgb, alpha * 0.55), Math.max(1.0F, lineWidth * 0.75F));
-                double inf = eased * Math.max(0.04, maxExpand * 1.4);
-                drawBoxEdges(batch, minX - inf, minY - inf, minZ - inf,
-                        maxX + inf, maxY + inf, maxZ + inf, coreColor, lineWidth);
-                if (faceFill) {
-                    drawBoxFaces(batch, minX, minY, minZ, maxX, maxY, maxZ,
-                            EffectBatch.withAlpha(rgb, alpha * 0.14));
+                stroke(batch, minX, minY, minZ, maxX, maxY, maxZ, bright, alpha, lineWidth);
+                for (int shell = 0; shell < 2; shell++) {
+                    double local = Math.max(0, Math.min(1, (progress - shell * 0.18) / 0.82));
+                    double inf = Motion.SETTLE.apply(local) * Math.max(0.08, maxExpand * 1.8) * (shell + 1);
+                    double a = alpha * (1 - local) * (shell == 0 ? 0.9 : 0.5);
+                    edges(batch, minX - inf, minY - inf * 0.2, minZ - inf, maxX + inf, maxY + inf, maxZ + inf,
+                            EffectBatch.withAlpha(rgb, a), lineWidth * 0.8F);
                 }
             }
             case "Corner Lock" -> {
-                double inf = (1.0 - eased) * Math.max(0.05, maxExpand);
+                double inf = (1.0 - eased) * Math.max(0.12, maxExpand * 1.5);
                 double x0 = minX - inf, y0 = minY - inf, z0 = minZ - inf;
                 double x1 = maxX + inf, y1 = maxY + inf, z1 = maxZ + inf;
-                double arm = Math.min(0.32, (x1 - x0) * 0.34);
-                for (int cx = 0; cx < 2; cx++) {
-                    double px = cx == 0 ? x0 : x1;
-                    double sx = cx == 0 ? arm : -arm;
-                    for (int cy = 0; cy < 2; cy++) {
-                        double py = cy == 0 ? y0 : y1;
-                        double sy = cy == 0 ? arm : -arm;
-                        for (int cz = 0; cz < 2; cz++) {
-                            double pz = cz == 0 ? z0 : z1;
-                            double sz = cz == 0 ? arm : -arm;
-                            batch.glowLine(px, py, pz, px + sx, py, pz, coreColor, lineWidth, false);
-                            batch.glowLine(px, py, pz, px, py + sy, pz, coreColor, lineWidth, false);
-                            batch.glowLine(px, py, pz, px, py, pz + sz, coreColor, lineWidth, false);
-                        }
+                double arm = Math.min(0.3, (maxX - minX) * 0.3);
+                int core = EffectBatch.withAlpha(bright, alpha);
+                int under = EffectBatch.withAlpha(0x000000, alpha * 0.45);
+                for (int ix = 0; ix < 2; ix++) for (int iy = 0; iy < 2; iy++) for (int iz = 0; iz < 2; iz++) {
+                    double px = ix == 0 ? x0 : x1, py = iy == 0 ? y0 : y1, pz = iz == 0 ? z0 : z1;
+                    double sx = ix == 0 ? arm : -arm, sy = iy == 0 ? arm : -arm, sz = iz == 0 ? arm : -arm;
+                    double[][] ends = {{px + sx, py, pz}, {px, py + sy, pz}, {px, py, pz + sz}};
+                    for (double[] e : ends) {
+                        batch.line(px, py, pz, e[0], e[1], e[2], under, lineWidth * 2.4F, false);
+                        batch.glowLine(px, py, pz, e[0], e[1], e[2], core, lineWidth * 1.2F, false);
                     }
                 }
-                if (faceFill) {
-                    drawBoxFaces(batch, minX, minY, minZ, maxX, maxY, maxZ,
-                            EffectBatch.withAlpha(rgb, alpha * 0.16));
-                }
+                if (progress > 0.35) stroke(batch, minX, minY, minZ, maxX, maxY, maxZ, bright, alpha * 0.6, lineWidth * 0.7F);
             }
             case "Cyber Seal" -> {
-                drawBoxEdges(batch, minX, minY, minZ, maxX, maxY, maxZ, coreColor, lineWidth);
+                stroke(batch, minX, minY, minZ, maxX, maxY, maxZ, rgb, alpha * 0.8, lineWidth * 0.8F);
                 double scanY = minY + (maxY - minY) * eased;
-                int scanCol = EffectBatch.withAlpha(0xFFFFFF, alpha * 0.85);
-                batch.glowLine(minX - 0.02, scanY, minZ - 0.02, maxX + 0.02, scanY, minZ - 0.02, scanCol, lineWidth, false);
-                batch.glowLine(maxX + 0.02, scanY, minZ - 0.02, maxX + 0.02, scanY, maxZ + 0.02, scanCol, lineWidth, false);
-                batch.glowLine(maxX + 0.02, scanY, maxZ + 0.02, minX - 0.02, scanY, maxZ + 0.02, scanCol, lineWidth, false);
-                batch.glowLine(minX - 0.02, scanY, maxZ + 0.02, minX - 0.02, scanY, minZ - 0.02, scanCol, lineWidth, false);
-                if (faceFill) {
-                    int fillCol = EffectBatch.withAlpha(rgb, alpha * 0.22);
-                    batch.quad(minX, scanY, minZ, maxX, scanY, minZ, maxX, scanY, maxZ, minX, scanY, maxZ,
-                            fillCol, fillCol, fillCol, fillCol, false);
+                int scan = EffectBatch.withAlpha(0xFFFFFF, alpha);
+                double o = 0.02;
+                double[][] ring = {{minX - o, minZ - o}, {maxX + o, minZ - o}, {maxX + o, maxZ + o}, {minX - o, maxZ + o}};
+                for (int i = 0; i < 4; i++) {
+                    double[] p = ring[i], q = ring[(i + 1) % 4];
+                    batch.glowLine(p[0], scanY, p[1], q[0], scanY, q[1], scan, lineWidth * 1.2F, false);
                 }
+                // Grid etched on the faces below the scan line.
+                int grid = EffectBatch.withAlpha(rgb, alpha * 0.55);
+                for (int k = 1; k < 4; k++) {
+                    double y = minY + (maxY - minY) * k / 4.0;
+                    if (y > scanY) break;
+                    for (int i = 0; i < 4; i++) {
+                        double[] p = ring[i], q = ring[(i + 1) % 4];
+                        batch.line(p[0], y, p[1], q[0], y, q[1], grid, 1.0F, false);
+                    }
+                }
+                int fillTop = EffectBatch.withAlpha(rgb, alpha * 0.4);
+                batch.quad(minX - o, scanY, minZ - o, maxX + o, scanY, minZ - o, maxX + o, scanY, maxZ + o, minX - o, scanY, maxZ + o,
+                        fillTop, fillTop, fillTop, fillTop, false);
             }
             default -> {
-                double pulse = Math.sin(progress * Math.PI) * maxExpand;
-                double x0 = minX - pulse, y0 = minY - pulse, z0 = minZ - pulse;
-                double x1 = maxX + pulse, y1 = maxY + pulse, z1 = maxZ + pulse;
-                drawBoxEdges(batch, x0, y0, z0, x1, y1, z1, coreColor, lineWidth);
-                if (faceFill) {
-                    drawBoxFaces(batch, x0, y0, z0, x1, y1, z1, EffectBatch.withAlpha(rgb, alpha * 0.18));
+                double pulse = Math.sin(progress * Math.PI) * Math.max(0.04, maxExpand);
+                stroke(batch, minX - pulse, minY - pulse * 0.3, minZ - pulse, maxX + pulse, maxY + pulse, maxZ + pulse,
+                        bright, alpha, lineWidth);
+                // Light beam from the top face that shoots up and thins out.
+                double beamH = (maxY - minY) * (0.4 + 1.6 * eased);
+                int beam = EffectBatch.withAlpha(rgb, alpha * 0.5 * (1 - eased));
+                int beamTop = EffectBatch.withAlpha(rgb, 0);
+                double in = (maxX - minX) * 0.5 * eased;
+                double[][] top = {{minX + in, minZ + in}, {maxX - in, minZ + in}, {maxX - in, maxZ - in}, {minX + in, maxZ - in}};
+                for (int i = 0; i < 4; i++) {
+                    double[] p = top[i], q = top[(i + 1) % 4];
+                    batch.quad(p[0], maxY, p[1], q[0], maxY, q[1], q[0], maxY + beamH, q[1], p[0], maxY + beamH, p[1],
+                            beam, beam, beamTop, beamTop, false);
                 }
             }
         }
     }
 
-    private static void drawBoxEdges(EffectBatch batch,
-                                     double minX, double minY, double minZ,
-                                     double maxX, double maxY, double maxZ,
-                                     int color, float width) {
-        batch.glowLine(minX, minY, minZ, maxX, minY, minZ, color, width, false);
-        batch.glowLine(maxX, minY, minZ, maxX, minY, maxZ, color, width, false);
-        batch.glowLine(maxX, minY, maxZ, minX, minY, maxZ, color, width, false);
-        batch.glowLine(minX, minY, maxZ, minX, minY, minZ, color, width, false);
-
-        batch.glowLine(minX, maxY, minZ, maxX, maxY, minZ, color, width, false);
-        batch.glowLine(maxX, maxY, minZ, maxX, maxY, maxZ, color, width, false);
-        batch.glowLine(maxX, maxY, maxZ, minX, maxY, maxZ, color, width, false);
-        batch.glowLine(minX, maxY, maxZ, minX, maxY, minZ, color, width, false);
-
-        batch.glowLine(minX, minY, minZ, minX, maxY, minZ, color, width, false);
-        batch.glowLine(maxX, minY, minZ, maxX, maxY, minZ, color, width, false);
-        batch.glowLine(maxX, minY, maxZ, maxX, maxY, maxZ, color, width, false);
-        batch.glowLine(minX, minY, maxZ, minX, maxY, maxZ, color, width, false);
+    /** Edges as a dark under-stroke plus a bright glowing core, so they read on sky, grass and stone alike. */
+    private static void stroke(EffectBatch batch, double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+                               int rgb, double alpha, float width) {
+        edgesRaw(batch, minX, minY, minZ, maxX, maxY, maxZ, EffectBatch.withAlpha(0x000000, alpha * 0.4), width * 2.4F, false);
+        edgesRaw(batch, minX, minY, minZ, maxX, maxY, maxZ, EffectBatch.withAlpha(rgb, alpha), width, true);
     }
 
-    private static void drawBoxFaces(EffectBatch batch,
-                                     double minX, double minY, double minZ,
-                                     double maxX, double maxY, double maxZ,
-                                     int color) {
-        batch.quad(minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ, minX, minY, maxZ, color, color, color, color, false);
-        batch.quad(minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, color, color, color, color, false);
-        batch.quad(minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ, color, color, color, color, false);
-        batch.quad(minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ, color, color, color, color, false);
-        batch.quad(minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ, color, color, color, color, false);
-        batch.quad(maxX, minY, minZ, maxX, minY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ, color, color, color, color, false);
+    private static void edges(EffectBatch batch, double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+                              int color, float width) {
+        edgesRaw(batch, minX, minY, minZ, maxX, maxY, maxZ, color, width, true);
+    }
+
+    private static void edgesRaw(EffectBatch batch, double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+                                 int color, float width, boolean glow) {
+        double[][] e = {
+                {minX, minY, minZ, maxX, minY, minZ}, {maxX, minY, minZ, maxX, minY, maxZ}, {maxX, minY, maxZ, minX, minY, maxZ}, {minX, minY, maxZ, minX, minY, minZ},
+                {minX, maxY, minZ, maxX, maxY, minZ}, {maxX, maxY, minZ, maxX, maxY, maxZ}, {maxX, maxY, maxZ, minX, maxY, maxZ}, {minX, maxY, maxZ, minX, maxY, minZ},
+                {minX, minY, minZ, minX, maxY, minZ}, {maxX, minY, minZ, maxX, maxY, minZ}, {maxX, minY, maxZ, maxX, maxY, maxZ}, {minX, minY, maxZ, minX, maxY, maxZ}};
+        for (double[] s : e) {
+            if (glow) batch.glowLine(s[0], s[1], s[2], s[3], s[4], s[5], color, width, false);
+            else batch.line(s[0], s[1], s[2], s[3], s[4], s[5], color, width, false);
+        }
+    }
+
+    /** Lit faces with a bottom-up gradient: brighter at the base, fading toward the top edge. */
+    private static void litFaces(EffectBatch batch, double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+                                 int rgb, double alpha) {
+        if (maxY <= minY) return;
+        int[] sides = {EffectBatch.shade(rgb, 0, 0, -1), EffectBatch.shade(rgb, 0, 0, 1), EffectBatch.shade(rgb, -1, 0, 0), EffectBatch.shade(rgb, 1, 0, 0)};
+        double[][][] faces = {
+                {{minX, minZ}, {maxX, minZ}}, {{maxX, maxZ}, {minX, maxZ}}, {{minX, maxZ}, {minX, minZ}}, {{maxX, minZ}, {maxX, maxZ}}};
+        for (int i = 0; i < 4; i++) {
+            int lo = EffectBatch.withAlpha(EffectBatch.mixRgb(sides[i], 0xFFFFFF, 0.2), alpha);
+            int hi = EffectBatch.withAlpha(sides[i], alpha * 0.35);
+            double[] a = faces[i][0], b = faces[i][1];
+            batch.quad(a[0], minY, a[1], b[0], minY, b[1], b[0], maxY, b[1], a[0], maxY, a[1], lo, lo, hi, hi, false);
+        }
+        int top = EffectBatch.withAlpha(EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.4), alpha * 0.7);
+        batch.quad(minX, maxY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ, minX, maxY, maxZ, top, top, top, top, false);
     }
 
     private static final class PlacedBlock {

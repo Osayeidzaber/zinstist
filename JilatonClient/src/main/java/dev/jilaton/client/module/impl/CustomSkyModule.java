@@ -306,6 +306,12 @@ public final class CustomSkyModule extends ClientModule implements FxEmitter {
         if (t.features().contains(Feature.LIGHT_STREAKS)) lightStreaks(f, radius, t, intensity, time);
     }
 
+    /** The live theme accent, used by the ambience precedence chain; falls back until the first frame. */
+    public int sceneAccent(int fallback) {
+        SkyThemes.Theme theme = liveTheme;
+        return theme == null ? fallback : theme.accent();
+    }
+
     /** Smoothly blends palette changes so switching themes fades instead of snapping. */
     private SkyThemes.Theme smooth(SkyThemes.Theme target, double dt) {
         if (liveTheme == null) { liveTheme = target; return target; }

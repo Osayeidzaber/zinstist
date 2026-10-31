@@ -103,6 +103,16 @@ class HaloMotionTest {
     }
 
     @Test
+    void aBrokenFrameDeltaCannotPoisonTheSpinOrPulse() {
+        assertEquals(1.25, HaloMotion.advancePhase(1.25, Double.NaN, 2, false), 0);
+        assertEquals(1.4, HaloMotion.advancePulse(1.4, Double.NaN, false), 0);
+        assertEquals(HaloMotion.advancePhase(0, 0.016, 2, false),
+                HaloMotion.advancePhase(Double.NaN, 0.016, 2, false), 0);
+        assertEquals(HaloMotion.advancePulse(0, 0.016, false),
+                HaloMotion.advancePulse(Double.NaN, 0.016, false), 0);
+    }
+
+    @Test
     void qualityRaisesRingResolution() {
         assertTrue(HaloMotion.majorSegments(0) < HaloMotion.majorSegments(3));
         assertTrue(HaloMotion.minorSegments(0) < HaloMotion.minorSegments(3));

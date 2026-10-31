@@ -8,10 +8,17 @@ import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.render.EffectBatch;
 import dev.jilaton.client.render.EffectPalette;
+import dev.jilaton.client.render.fx.FxEmitter;
+import dev.jilaton.client.render.fx.FxFrame;
 import dev.jilaton.client.render.model.AssetMesh;
+import dev.jilaton.client.render.model.BodyAnchor;
 import dev.jilaton.client.render.model.HeldModelRenderer;
 import dev.jilaton.client.render.model.KnifeMotion;
+import dev.jilaton.client.render.model.KnifeThirdPerson;
 import dev.jilaton.client.render.model.Material;
+import dev.jilaton.client.render.model.Mesh;
+import dev.jilaton.client.render.model.ModelBatch;
+import dev.jilaton.client.render.model.Transform;
 import dev.jilaton.client.render.model.asset.ModelAssets;
 import dev.jilaton.client.render.knife.CsKnifeEngine;
 import dev.jilaton.client.setting.BooleanSetting;
@@ -24,6 +31,7 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.LinkedHashMap;
@@ -40,7 +48,7 @@ import java.util.Map;
  * <p>The knife meshes come from {@link ModelAssets}; every asset part carries a material tag and is drawn with its
  * own recipe — steel face, bright edge bevel, dark grip, accent-lit fittings.
  */
-public final class CosmeticKnifeModule extends ClientModule {
+public final class CosmeticKnifeModule extends ClientModule implements FxEmitter {
     /** Jilaton's own knives: each is a registered {@link ModelAssets} knife id, title-cased. */
     public static final List<String> JILATON_STYLES = List.of("Bayonet", "Karambit", "Butterfly", "Tanto");
     /** Skins drawn by the ported Anubis engine ({@link CsKnifeEngine}): its own clips, two-handed katana, trails. */
@@ -70,7 +78,7 @@ public final class CosmeticKnifeModule extends ClientModule {
 
     private final ChoiceSetting style = addSetting(new ChoiceSetting("style", "Blade", STYLES, "Bayonet"));
     private final ChoiceSetting holdOn = addSetting(new ChoiceSetting("hold_on", "Replace",
-            List.of("Swords", "Swords & axes", "Empty hand", "Any item"), "Swords"));
+            List.of("Swords", "Swords & axes", "Any item"), "Swords"));
     private final NumberSetting side = addSetting(new NumberSetting("side", "Side offset", 0.18, 0.34, 0.01, REST_SIDE));
     private final NumberSetting height = addSetting(new NumberSetting("height", "Height", -0.34, 0.10, 0.01, REST_HEIGHT));
     private final NumberSetting scale = addSetting(new NumberSetting("scale", "Scale", 0.70, 1.30, 0.05, 1.0));
@@ -86,10 +94,16 @@ public final class CosmeticKnifeModule extends ClientModule {
     private final NumberSetting inspectSpeed = addSetting(new NumberSetting("inspect_speed", "CS skins: animation speed", 0.5, 2, 0.05, 1));
     private final NumberSetting trailLength = addSetting(new NumberSetting("trail_length", "CS skins: slash trail length", 0.05, 0.35, 0.01, 0.14));
     private final BooleanSetting sparkles = addSetting(new BooleanSetting("sparkles", "CS skins: blade sparkle", true));
+    private final BooleanSetting thirdPerson = addSetting(new BooleanSetting("third_person", "Show in third person", true));
+    private final BooleanSetting others = addSetting(new BooleanSetting("others", "Show on other players", true));
     /** Built on first use so constructing the module never touches the engine's meshes. */
     private CsKnifeEngine engine;
 
     private final KnifeMotion motion = new KnifeMotion();
+    private final ModelBatch batch = new ModelBatch();
+    /** One motion per visible player: the first-person hand pass only covers the local player. */
+    private final Map<Integer, KnifeMotion> worldMotions = new LinkedHashMap<>();
+    private final Map<Integer, Boolean> worldSwings = new LinkedHashMap<>();
     private final Map<String, Material> materials = new LinkedHashMap<>();
     private AssetMesh.Fitted fitted;
     private String fittedKey = "";
@@ -108,6 +122,8 @@ public final class CosmeticKnifeModule extends ClientModule {
     @Override
     protected void onEnable(Minecraft client) {
         heldSlot = -1;
+        worldMotions.clear();
+        worldSwings.clear();
         motion.startDraw(System.nanoTime());
     }
 
@@ -116,7 +132,68 @@ public final class CosmeticKnifeModule extends ClientModule {
         motion.startUnequip(System.nanoTime());
         heldSlot = -1;
         lastFrame = 0;
+        worldMotions.clear();
+        worldSwings.clear();
+        batch.reset();
         if (engine != null) engine.deactivate();
+    }
+
+    /**
+     * Third-person pass: the same {@link KnifeMotion} state machine drives the blade at each player's wrist, so a draw,
+     * slash or inspect reads identically from outside. The CS skins keep their own ported clips and hand pass.
+     */
+    @Override
+    public void emit(FxFrame f) {
+        Minecraft client = f.client;
+        if (client.level == null || csSkin()) return;
+        if (!thirdPerson.value() && !others.value()) return;
+        worldMotions.keySet().removeIf(id -> client.level.getEntity(id) == null);
+        worldSwings.keySet().removeIf(id -> client.level.getEntity(id) == null);
+
+        AssetMesh.Fitted model = fitted(style.value());
+        double drawScale = model.scaleFor(scale.value());
+        int accent = EffectPalette.resolve(palette.value(),
+                dev.jilaton.client.gui.ClientTheme.resolveAccent(JilatonClient.clientConfig().themeId(),
+                        JilatonClient.clientConfig().customAccent()), custom.value());
+        batch.reset();
+        boolean drew = false;
+        for (Player player : client.level.players()) {
+            boolean self = player == client.player;
+            if (self ? f.firstPerson || !thirdPerson.value() : !others.value()) continue;
+            if (!player.isAlive() || player.isSpectator() || player.isInvisible()) continue;
+            // Only the bare hand: with an item held, vanilla already draws that item in third person and this pass
+            // must not put a second blade on top of it.
+            if (!player.getMainHandItem().isEmpty()) continue;
+            KnifeMotion state = worldState(player, f);
+            KnifeMotion.Pose pose = state.pose(f.now, equipSeconds.value(), sway.value(), bob.value(),
+                    player.walkAnimation.position(f.partial) * 0.6662 / Math.PI,
+                    Mth.clamp(player.walkAnimation.speed(f.partial), 0, 1),
+                    player.isSprinting(), player.isCrouching(), player.onGround(),
+                    player.getDeltaMovement().y, f.reducedMotion);
+            BodyAnchor.Part wristPart = player.getMainArm() == HumanoidArm.RIGHT
+                    ? BodyAnchor.Part.RIGHT_HAND : BodyAnchor.Part.LEFT_HAND;
+            Transform knife = KnifeThirdPerson.hand(BodyAnchor.forPart(player, wristPart, f.partial), pose);
+            for (Map.Entry<String, Mesh> part : model.parts().entrySet()) {
+                batch.add(f, part.getValue(), material(part.getKey(), accent), knife, drawScale,
+                        opacity.value(), false);
+            }
+            drew = true;
+        }
+        if (drew) batch.flush(f);
+    }
+
+    private KnifeMotion worldState(Player player, FxFrame f) {
+        KnifeMotion state = worldMotions.get(player.getId());
+        if (state == null) {
+            state = new KnifeMotion();
+            state.startDraw(f.now);
+            worldMotions.put(player.getId(), state);
+        }
+        boolean swing = player.swinging;
+        if (swing && !worldSwings.getOrDefault(player.getId(), false) && slashes.value()) state.startSlash(f.now);
+        worldSwings.put(player.getId(), swing);
+        state.look(player.getViewYRot(f.partial), player.getViewXRot(f.partial), f.dt, sway.value());
+        return state;
     }
 
     /** Whether the selected blade is one of the ported CS skins rather than a Jilaton knife. */
@@ -133,6 +210,7 @@ public final class CosmeticKnifeModule extends ClientModule {
                 (float) inspectSpeed.value(), (float) scale.value(), showArm.value(), deploy.value(), slashes.value(),
                 (float) trailLength.value(), sparkles.value()), JilatonClient::inspectHeld);
         if (CsKnifeEngine.active != engine) engine.activate();
+        engine.setBare(client.player != null && client.player.getMainHandItem().isEmpty());
         engine.tick();
     }
 
@@ -144,14 +222,23 @@ public final class CosmeticKnifeModule extends ClientModule {
         };
     }
 
-    /** Whether Jilaton's own viewmodel replaces this main-hand item; CS skins draw through {@link CsKnifeEngine}. */
+    /**
+     * Whether the knife occupies this main-hand pass. An empty hand always gets the blade — that is the module's
+     * home pose; the Replace setting only decides which held items it also takes over.
+     */
     public boolean replaces(ItemStack item) {
-        if (csSkin()) return false;
-        return switch (holdOn.value()) {
-            case "Swords & axes" -> item.is(ItemTags.SWORDS) || item.is(ItemTags.AXES);
-            case "Empty hand" -> item.isEmpty();
+        return occupies(item.isEmpty(), item.is(ItemTags.SWORDS), item.is(ItemTags.AXES),
+                holdOn.value(), csSkin());
+    }
+
+    /** The replace decision without an {@link ItemStack}, so it can be tested headless. */
+    static boolean occupies(boolean heldEmpty, boolean sword, boolean axe, String mode, boolean csSkin) {
+        if (heldEmpty) return true;
+        if (csSkin) return false;
+        return switch (mode) {
+            case "Swords & axes" -> sword || axe;
             case "Any item" -> true;
-            default -> item.is(ItemTags.SWORDS);
+            default -> sword;
         };
     }
 
@@ -160,7 +247,15 @@ public final class CosmeticKnifeModule extends ClientModule {
         if (!enabled()) return;
         if (csSkin()) {
             if (engine != null) engine.inspect();
-        } else motion.startInspect(System.nanoTime(), equipSeconds.value());
+            return;
+        }
+        long now = System.nanoTime();
+        motion.startInspect(now, equipSeconds.value());
+        Minecraft client = Minecraft.getInstance();
+        if (client.player != null) {
+            KnifeMotion world = worldMotions.get(client.player.getId());
+            if (world != null) world.startInspect(now, equipSeconds.value());
+        }
     }
 
     /** Harness hook: selects a blade without going through the GUI. */
@@ -176,6 +271,14 @@ public final class CosmeticKnifeModule extends ClientModule {
     public void renderInHand(ItemInHandRendererInvoker hands, AbstractClientPlayer player, float partial, float swing,
                              PoseStack pose, SubmitNodeCollector collector, int light) {
         framesDrawn++;
+        if (csSkin()) {
+            // The ported engine draws the skin and its arm(s) in an empty hand; fall back to the vanilla arm if it
+            // has no mesh for this skin so cancelling the pass never leaves the hand invisible.
+            if (engine == null || !engine.renderBare(pose, collector, light)) {
+                hands.jilaton$renderPlayerArm(pose, collector, light, 0, swing, player.getMainArm());
+            }
+            return;
+        }
         long now = System.nanoTime();
         double dt = lastFrame == 0 ? 0 : Math.min(0.1, (now - lastFrame) / 1e9);
         lastFrame = now;

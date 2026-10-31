@@ -11,6 +11,7 @@ import dev.jilaton.client.gui.hud.NumericCrossfade;
 import dev.jilaton.client.gui.hud.RadarMath;
 import dev.jilaton.client.gui.hud.Speedometer;
 import dev.jilaton.client.gui.hud.StaffClassifier;
+import dev.jilaton.client.gui.hud.HudText;
 import dev.jilaton.client.gui.hud.VanishRetention;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleManager;
@@ -47,7 +48,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class HudRenderer {
-    private static final int BACKGROUND = 0xB0111111;
     private static final int TEXT_PRIMARY = 0xFFF2F0F5;
     private static final int TEXT_SECONDARY = 0xFF8E8A9A;
     private static final int HAIRLINE = 0xFF262231;
@@ -557,7 +557,19 @@ public final class HudRenderer {
 
     private void beginWidget(GuiGraphics graphics, String id, int x, int y, int width, int height,
                              boolean preview) {
-        activeStyle = config.hudStyle(id);
+        beginWidgetAtScale(graphics, id, x, y, width, height, preview, config.hudStyle(id).scale());
+    }
+
+    /**
+     * One scale multiplies the whole widget: geometry is laid out at its base size and the pose is
+     * scaled here, so text, rows and the panel shrink together and nothing drifts out of bounds.
+     */
+    private void beginWidgetAtScale(GuiGraphics graphics, String id, int x, int y, int width, int height,
+                                    boolean preview, double widgetScale) {
+        HudStyle stored = config.hudStyle(id);
+        float scale = (float) Math.max(0.5, Math.min(2.0, widgetScale));
+        activeStyle = new HudStyle(scale, stored.panelOpacity(), stored.accent(),
+                stored.alignment(), stored.visible());
         HudLayout layout = HudLayout.resolve(width, height, graphics.guiWidth(), graphics.guiHeight(),
                 x, y, config.hudPosition(id), activeStyle);
         activeLayout = layout;
@@ -576,27 +588,39 @@ public final class HudRenderer {
         HudModule hud = (HudModule) modules.get("hud");
         long now = System.nanoTime();
         boolean compact = hud.compactTarget();
-        HudDesign.TargetCard card = compact ? null : HudDesign.targetCard(guiWidth);
-        int width = compact ? HudDesign.COMPACT_TARGET_WIDTH : card.width();
-        int height = compact ? HudDesign.COMPACT_TARGET_HEIGHT : card.height();
-        int x = widgetX("target", (guiWidth - width) / 2, width, guiWidth);
-        int y = widgetY("target", guiHeight - 76, height, guiHeight);
+        boolean chips = hud.targetChips();
+        boolean heldVisible = hud.targetHeld();
+        boolean distanceVisible = hud.targetDistance();
+        HudDesign.TargetCard card = HudDesign.baseTargetCard(chips, heldVisible);
+        HudDesign.CompactCard compactCard = HudDesign.compactTarget();
+        int width = compact ? compactCard.width() : card.width();
+        int height = compact ? compactCard.height() : card.height();
+        int requestedWidth = hud.targetWidth();
+        int screenWidth = requestedWidth > 0 ? requestedWidth : HudDesign.targetCardWidth(guiWidth);
+        double widgetScale = Math.max(0.5, Math.min(2.0,
+                config.hudStyle("target").scale() * hud.targetScale() * (screenWidth / (double) width)));
+        int scaledWidth = (int) Math.ceil(width * widgetScale);
+        int scaledHeight = (int) Math.ceil(height * widgetScale);
+        int x = widgetX("target", (guiWidth - scaledWidth) / 2, scaledWidth, guiWidth);
+        int y = widgetY("target", guiHeight - 76, scaledHeight, guiHeight);
         if (!editorPreview && hud.followTarget()) {
             Vec3 anchor = target.getPosition(partialTick).add(0, target.getBbHeight() * 0.75, 0);
             if (projection == null || !projection.isCurrent(client) || !projection.project(anchor, guiWidth, guiHeight)) {
                 targetPlacement.reset();
                 return;
             }
-            activeStyle = config.hudStyle("target");
+            HudStyle stored = config.hudStyle("target");
+            activeStyle = new HudStyle((float) widgetScale, stored.panelOpacity(), stored.accent(),
+                    HudStyle.Alignment.FREE, stored.visible());
             activeLayout = targetPlacement.place(target.getUUID(), projection.x(guiWidth), projection.y(guiHeight),
                     width, height, guiWidth, guiHeight, activeStyle, System.nanoTime(), config.reducedMotion());
             graphics.pose().pushMatrix();
             graphics.pose().translate(activeLayout.x(), activeLayout.y());
             graphics.pose().scale(activeLayout.scale(), activeLayout.scale());
             x = y = 0;
-        } else beginWidget(graphics, "target", x, y, width, height, editorPreview);
+        } else beginWidgetAtScale(graphics, "target", x, y, width, height, editorPreview, widgetScale);
         if (compact) {
-            renderCompactTarget(graphics, font, client, target, x, y, width, height, accent, recentlyAttacked);
+            renderCompactTarget(graphics, font, client, target, x, y, compactCard, accent, recentlyAttacked);
             graphics.pose().popMatrix();
             return;
         }
@@ -614,32 +638,42 @@ public final class HudRenderer {
         int contentX = x + card.contentX();
         HudNumberPainter painter = numbers(font);
         HudNumbers metrics = painter.numbers();
-        int distanceColumn = metrics.columnWidth(3) + metrics.advanceOf('.')
-                + HudNumberPainter.SUFFIX_GAP + font.width(" m");
+        int distanceColumn = distanceVisible
+                ? metrics.columnWidth(3) + metrics.advanceOf('.')
+                    + HudNumberPainter.SUFFIX_GAP + font.width(" m")
+                : 0;
         double distance = Math.sqrt(client.player.distanceToSqr(target));
         int nameWidth = Math.max(0, card.contentWidth() - distanceColumn - 6);
-        String name = font.plainSubstrByWidth(target.getName().getString(), nameWidth);
+        String name = HudText.ellipsize(target.getName().getString(),
+                character -> font.width(String.valueOf(character)), nameWidth);
         graphics.drawString(font, name, contentX, y + card.nameY(), 0xFFF2F2F2);
-        targetDistanceValue.update((int) Math.round(distance * 10));
-        targetDistanceFade.update(targetDistanceValue.text(), now, config.reducedMotion());
-        painter.drawSuffixedFade(graphics, targetDistanceFade, now, " m",
-                x + card.contentRight(), y + card.nameY(), 0xFF9A94A6, 0xFF9A94A6);
-
-        ItemStack held = target.getMainHandItem();
-        String heldName = held.isEmpty() ? "EMPTY" : held.getHoverName().getString().toUpperCase(Locale.ROOT);
-        int pillY = y + card.pillY();
-        int pillWidth = Math.min(card.contentWidth(), font.width(heldName) + 20);
-        graphics.fill(contentX, pillY, contentX + pillWidth, pillY + card.pillHeight(), 0xFF241A38);
-        graphics.fill(contentX, pillY + 1, contentX + 2, pillY + card.pillHeight() - 1, 0xFF8B5CF6);
-        if (!held.isEmpty()) {
-            graphics.pose().pushMatrix();
-            graphics.pose().translate(contentX + 3, pillY - 1);
-            graphics.pose().scale(0.75F, 0.75F);
-            graphics.renderItem(held, 0, 0);
-            graphics.pose().popMatrix();
+        if (distanceVisible) {
+            targetDistanceValue.update((int) Math.round(distance * 10));
+            targetDistanceFade.update(targetDistanceValue.text(), now, config.reducedMotion());
+            painter.drawSuffixedFade(graphics, targetDistanceFade, now, " m",
+                    x + card.contentRight(), y + card.nameY(), 0xFF9A94A6, 0xFF9A94A6);
         }
-        graphics.drawString(font, font.plainSubstrByWidth(heldName, pillWidth - 17), contentX + 15,
-                pillY + 2, 0xFFD9CFFF);
+
+        if (heldVisible) {
+            ItemStack held = target.getMainHandItem();
+            String heldName = held.isEmpty() ? "EMPTY" : held.getHoverName().getString().toUpperCase(Locale.ROOT);
+            int pillY = y + card.pillY();
+            int pillWidth = HudDesign.pillWidth(font.width(heldName), card.contentWidth());
+            graphics.fill(contentX, pillY, contentX + pillWidth, pillY + card.pillHeight(), 0xFF241A38);
+            graphics.fill(contentX, pillY + 1, contentX + 2, pillY + card.pillHeight() - 1, 0xFF8B5CF6);
+            if (!held.isEmpty()) {
+                graphics.pose().pushMatrix();
+                graphics.pose().translate(contentX + 3, pillY - 1);
+                graphics.pose().scale(0.75F, 0.75F);
+                graphics.renderItem(held, 0, 0);
+                graphics.pose().popMatrix();
+            }
+            String pillLabel = HudDesign.pillTextFits(font.width(heldName), card.contentWidth())
+                    ? heldName
+                    : HudText.ellipsize(heldName, character -> font.width(String.valueOf(character)),
+                        Math.max(0, pillWidth - HudDesign.PILL_TEXT_INSET));
+            graphics.drawString(font, pillLabel, contentX + 15, pillY + 2, 0xFFD9CFFF);
+        }
 
         float health = Math.max(0.0F, target.getHealth());
         float maxHealth = Math.max(1.0F, target.getMaxHealth());
@@ -669,7 +703,7 @@ public final class HudRenderer {
         graphics.fill(contentX, y + card.ruleY(), x + card.contentRight(),
                 y + card.ruleY() + 1, 0x26FFFFFF);
 
-        for (int index = 0; index < CHIP_LABELS.length; index++) {
+        for (int index = 0; chips && index < CHIP_LABELS.length; index++) {
             int left = x + card.chipX(index);
             int top = y + card.chipsY();
             int chipWidth = card.chipWidth();
@@ -693,36 +727,52 @@ public final class HudRenderer {
     }
 
     private void renderCompactTarget(GuiGraphics graphics, Font font, Minecraft client, LivingEntity target,
-                                     int x, int y, int width, int height, int accent, boolean recentlyAttacked) {
+                                     int x, int y, HudDesign.CompactCard card, int accent,
+                                     boolean recentlyAttacked) {
         int color = activeStyle.accentColor(accent);
-        glass(graphics, x, y, width, height, activeStyle.panelColor());
-        JilatonUi.fillRounded(graphics, x + 7, y + 7, 24, 24, 5, 0xFF1B1B1B);
+        glass(graphics, x, y, card.width(), card.height(), activeStyle.panelColor());
+        JilatonUi.fillRounded(graphics, x + card.faceX(), y + card.faceY(), card.faceSize(), card.faceSize(),
+                5, 0xFF1B1B1B);
         if (target instanceof net.minecraft.client.player.AbstractClientPlayer player)
-            net.minecraft.client.gui.components.PlayerFaceRenderer.draw(graphics, player.getSkin(), x + 7, y + 7, 24);
-        else graphics.drawString(font, font.plainSubstrByWidth(target.getName().getString(), 12), x + 11, y + 14, color);
+            net.minecraft.client.gui.components.PlayerFaceRenderer.draw(graphics, player.getSkin(),
+                    x + card.faceX(), y + card.faceY(), card.faceSize());
+        else graphics.drawString(font, HudText.ellipsize(target.getName().getString(),
+                        character -> font.width(String.valueOf(character)), card.faceSize() - 4),
+                x + card.faceX() + 4, y + card.heartsY() - 3, color);
+        int weaponRoom = Math.max(0, card.width() - card.textX() - card.rightPadding() - 40);
         String weapon = target.getMainHandItem().isEmpty() ? ""
-                : font.plainSubstrByWidth(target.getMainHandItem().getHoverName().getString(), 58);
-        String name = font.plainSubstrByWidth(target.getName().getString(), width - 45 - (weapon.isEmpty() ? 0 : font.width(weapon) + 7));
-        graphics.drawString(font, name, x + 38, y + 6, 0xFFEFEFEF);
+                : HudText.ellipsize(target.getMainHandItem().getHoverName().getString(),
+                    character -> font.width(String.valueOf(character)), Math.min(58, weaponRoom));
+        int nameRoom = Math.max(0, card.width() - card.textX() - card.rightPadding()
+                - (weapon.isEmpty() ? 0 : font.width(weapon) + 7));
+        String name = HudText.ellipsize(target.getName().getString(),
+                character -> font.width(String.valueOf(character)), nameRoom);
+        graphics.drawString(font, name, x + card.textX(), y + card.nameY(), 0xFFEFEFEF);
         float health = Math.max(0, target.getHealth() + target.getAbsorptionAmount());
         HudNumberPainter painter = numbers(font);
         long now = System.nanoTime();
         String hearts = dev.jilaton.client.render.NametagLayout.healthText(health, true);
-        int heartsX = painter.drawLeft(graphics, HEART_MARK, x + 38, y + 17, 0xFFF17EBB);
-        painter.drawLeft(graphics, hearts, heartsX, y + 17, 0xFFF17EBB);
-        if (!target.getMainHandItem().isEmpty()) graphics.drawString(font, weapon, x + width - font.width(weapon) - 7, y + 6, 0xFFA9A9A9);
+        int heartsX = painter.drawLeft(graphics, HEART_MARK, x + card.textX(), y + card.heartsY(), 0xFFF17EBB);
+        painter.drawLeft(graphics, hearts, heartsX, y + card.heartsY(), 0xFFF17EBB);
+        if (!weapon.isEmpty()) {
+            graphics.drawString(font, weapon, x + card.width() - font.width(weapon) - card.rightPadding(),
+                    y + card.nameY(), 0xFFA9A9A9);
+        }
         compactDistanceValue.update((int) Math.round(Math.sqrt(client.player.distanceToSqr(target)) * 10));
         compactDistanceFade.update(compactDistanceValue.text(), now, config.reducedMotion());
         painter.drawSuffixedFade(graphics, compactDistanceFade, now, "m",
-                x + width - 7, y + 17, 0xFFA9A9A9, 0xFFA9A9A9);
+                x + card.width() - card.rightPadding(), y + card.heartsY(), 0xFFA9A9A9, 0xFFA9A9A9);
         if (!target.getUUID().equals(lastTargetId)) { targetHealth.reset(); lastTargetId = target.getUUID(); }
         double ratio = Math.max(0, Math.min(1, target.getHealth() / Math.max(1F, target.getMaxHealth())));
         float displayed = (float) targetHealth.update(ratio, System.nanoTime(), config.reducedMotion());
-        int barWidth = width - 45;
-        graphics.fill(x + 38, y + 30, x + 38 + barWidth, y + 33, 0xFF2B2B2B);
-        graphics.fill(x + 38, y + 30, x + 38 + Math.round(barWidth * displayed), y + 33, color);
+        int barWidth = card.width() - card.textX() - card.rightPadding();
+        graphics.fill(x + card.textX(), y + card.barY(), x + card.textX() + barWidth,
+                y + card.barY() + card.barHeight(), 0xFF2B2B2B);
+        graphics.fill(x + card.textX(), y + card.barY(),
+                x + card.textX() + Math.round(barWidth * displayed), y + card.barY() + card.barHeight(), color);
         // No fabricated combo or hit count: this is local attack-attempt feedback.
-        graphics.drawString(font, recentlyAttacked ? "ATTACKING" : "TRACKING", x + 38, y + 35, 0xFF858585);
+        graphics.drawString(font, recentlyAttacked ? "ATTACKING" : "TRACKING",
+                x + card.textX(), y + card.statusY(), 0xFF858585);
     }
 
     private LivingEntity resolveCombatTarget(Minecraft client, boolean editorPreview) {

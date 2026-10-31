@@ -4,6 +4,7 @@ import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.music.MusicCenter;
+import dev.jilaton.client.music.MusicDisplay;
 import dev.jilaton.client.music.NowPlaying;
 import dev.jilaton.client.render.EffectPalette;
 import dev.jilaton.client.render.fx.FxEmitter;
@@ -36,7 +37,9 @@ public final class MusicVisualsModule extends ClientModule implements FxEmitter 
     private final ChoiceSetting notes = addSetting(new ChoiceSetting("notes", "Floating symbols", List.of("Off", "Stars", "Orbs"), "Stars"));
     private final BooleanSetting visualizer = addSetting(new BooleanSetting("visualizer", "Ground visualizer (local files only)", true));
     private final BooleanSetting notify = addSetting(new BooleanSetting("notify", "Now Playing notifications", true));
-    private final BooleanSetting thirdPersonOnly = addSetting(new BooleanSetting("third_person_only", "Only in third person", true));
+    private final ChoiceSetting display = addSetting(new ChoiceSetting("display", "First-person display",
+            MusicDisplay.MODES, MusicDisplay.WORLD_SPACE));
+    private final BooleanSetting thirdPersonOnly = addSetting(new BooleanSetting("third_person_only", "Only in third person (Custom)", true));
     private final ChoiceSetting colorMode = addSetting(EffectPalette.modeSetting("color_mode", "Color"));
     private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F2F2F2"));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.1, 1, 0.05, 0.85));
@@ -76,7 +79,9 @@ public final class MusicVisualsModule extends ClientModule implements FxEmitter 
         if (player == null || f.client.options.hideGui) return;
         NowPlaying playing = MusicCenter.get().nowPlaying();
         if (!playing.hasTrack()) return;
-        boolean hideAttached = thirdPersonOnly.value() && f.firstPerson;
+        // Explicit modes keep the card on screen in first person; only Custom keeps the legacy third-person gate.
+        boolean cameraCard = MusicDisplay.cameraAnchored(display.value(), f.firstPerson);
+        boolean hideAttached = !cameraCard && thirdPersonOnly.value() && f.firstPerson;
         int rgb = EffectPalette.resolve(colorMode.value(), f.accent, color.value());
         double a = opacity.value() * f.intensity;
         double amplitude = playing.visualSyncAllowed() ? MusicCenter.get().amplitude() : 0;
@@ -87,31 +92,8 @@ public final class MusicVisualsModule extends ClientModule implements FxEmitter 
 
         if (playing.artwork() != currentArt) { previousArt = currentArt; currentArt = playing.artwork(); artChangedAt = f.now; }
         if (!hideAttached && (albumPanel.value() || trackLabel.value())) {
-            double angle = viewYaw + Math.toRadians(panelAngle.value());
-            double px = pos.x - Math.sin(angle) * 1.9, pz = pos.z + Math.cos(angle) * 1.9;
-            double py = pos.y + player.getEyeHeight() * 0.85 + Math.sin(t * 0.9) * 0.05;
-            if (albumPanel.value()) {
-                double fade = Math.min(1, (f.now - artChangedAt) / 4e8);
-                float size = (float) panelSize.value();
-                if (previousArt != null && fade < 1) f.image(new FxFrame.WorldImage(px, py, pz, previousArt, size, (float) (a * (1 - fade)), true, 0));
-                if (currentArt != null) f.image(new FxFrame.WorldImage(px, py, pz, currentArt, size, (float) (a * fade), true, 0));
-                else FxShapes.softDot(f, px, py, pz, size * 0.45, rgb, a * 0.25, true);
-            }
-            if (trackLabel.value()) {
-                double below = albumPanel.value() ? panelSize.value() * 0.62 : 0;
-                f.text(new FxFrame.WorldText(px, py - below, pz, List.of(new FxFrame.Run(playing.title(), FxShapes.argb(0xFFFFFF, a))),
-                        0.012F, 0, 0, true, 0, false));
-                if (!playing.artist().isEmpty())
-                    f.text(new FxFrame.WorldText(px, py - below - 0.14, pz, List.of(new FxFrame.Run(playing.artist(), FxShapes.argb(0xA6A6A6, a))),
-                            0.009F, 0, 0, true, 0, false));
-                double progress = playing.progress(f.now);
-                double w = 0.5;
-                double bx = px - f.camX, by = py - below - 0.24 - f.camY, bz = pz - f.camZ;
-                f.batch.line(bx - f.rightX * w / 2, by, bz - f.rightZ * w / 2, bx + f.rightX * w / 2, by, bz + f.rightZ * w / 2,
-                        FxShapes.argb(0x3A3A3A, a), 2F, true);
-                f.batch.line(bx - f.rightX * w / 2, by, bz - f.rightZ * w / 2, bx + f.rightX * (w * progress - w / 2), by,
-                        bz + f.rightZ * (w * progress - w / 2), FxShapes.argb(rgb, a), 2F, true);
-            }
+            if (cameraCard) emitCard(f, playing, display.value(), rgb, a, t);
+            else emitWorldPanel(f, player, playing, rgb, a, t, viewYaw);
         }
         if (playing.playing() && !notes.value().equals("Off")) {
             double rate = (0.8 + level * 6) * f.quality.density();
@@ -138,5 +120,80 @@ public final class MusicVisualsModule extends ClientModule implements FxEmitter 
                         gx + Math.cos(angle) * (r0 + len), gy, gz + Math.sin(angle) * (r0 + len), FxShapes.argb(rgb, a * (0.35 + level)), 2F, false);
             }
         }
+    }
+
+    /**
+     * Camera-pinned card for the explicit first-person modes: artwork and track text sit at fixed offsets along the
+     * view basis, so looking around or walking never loses the track. Sizes come from {@link MusicDisplay}.
+     */
+    private void emitCard(FxFrame f, NowPlaying playing, String mode, int rgb, double a, double t) {
+        MusicDisplay.Placement p = MusicDisplay.placement(mode, panelSize.value());
+        double bob = Math.sin(t * 0.9) * 0.02;
+        double cx = f.camX + f.forwardX * p.forward() + f.rightX * p.right() + f.upX * (p.up() + bob);
+        double cy = f.camY + f.forwardY * p.forward() + f.rightY * p.right() + f.upY * (p.up() + bob);
+        double cz = f.camZ + f.forwardZ * p.forward() + f.rightZ * p.right() + f.upZ * (p.up() + bob);
+        double fade = Math.min(1, (f.now - artChangedAt) / 4e8);
+        if (albumPanel.value() && p.showArt()) {
+            float size = (float) p.artSize();
+            if (previousArt != null && fade < 1)
+                f.image(new FxFrame.WorldImage(cx, cy, cz, previousArt, size, (float) (a * (1 - fade)), true, 0));
+            if (currentArt != null) f.image(new FxFrame.WorldImage(cx, cy, cz, currentArt, size, (float) (a * fade), true, 0));
+            else FxShapes.softDot(f, cx, cy, cz, size * 0.45, rgb, a * 0.25, true);
+        }
+        if (!trackLabel.value()) return;
+        double titleDy = MusicDisplay.titleOffset(p);
+        double artistDy = titleDy - p.artistSize() * 16;
+        f.text(new FxFrame.WorldText(cx + f.upX * titleDy, cy + f.upY * titleDy, cz + f.upZ * titleDy,
+                List.of(new FxFrame.Run(playing.title(), FxShapes.argb(0xFFFFFF, a))), p.titleSize(), 0, 0, true, 0, false));
+        if (!playing.artist().isEmpty())
+            f.text(new FxFrame.WorldText(cx + f.upX * artistDy, cy + f.upY * artistDy, cz + f.upZ * artistDy,
+                    List.of(new FxFrame.Run(playing.artist(), FxShapes.argb(0xA6A6A6, a))), p.artistSize(), 0, 0, true, 0, false));
+        if (p.progressWidth() <= 0) return;
+        double barDy = artistDy - p.artistSize() * 16;
+        double w = p.progressWidth();
+        double bx = f.forwardX * p.forward() + f.rightX * p.right() + f.upX * (p.up() + bob + barDy);
+        double by = f.forwardY * p.forward() + f.rightY * p.right() + f.upY * (p.up() + bob + barDy);
+        double bz = f.forwardZ * p.forward() + f.rightZ * p.right() + f.upZ * (p.up() + bob + barDy);
+        double progress = playing.progress(f.now);
+        f.batch.line(bx - f.rightX * w / 2, by - f.rightY * w / 2, bz - f.rightZ * w / 2,
+                bx + f.rightX * w / 2, by + f.rightY * w / 2, bz + f.rightZ * w / 2, FxShapes.argb(0x3A3A3A, a), 2F, true);
+        f.batch.line(bx - f.rightX * w / 2, by - f.rightY * w / 2, bz - f.rightZ * w / 2,
+                bx + f.rightX * (w * progress - w / 2), by + f.rightY * (w * progress - w / 2),
+                bz + f.rightZ * (w * progress - w / 2), FxShapes.argb(rgb, a), 2F, true);
+    }
+
+    /** The original world-anchored album panel, used in third person and by the Custom mode. */
+    private void emitWorldPanel(FxFrame f, Player player, NowPlaying playing, int rgb, double a, double t, double viewYaw) {
+        double angle = viewYaw + Math.toRadians(panelAngle.value());
+        double px = player.getX() - Math.sin(angle) * 1.9, pz = player.getZ() + Math.cos(angle) * 1.9;
+        double py = player.getY() + player.getEyeHeight() * 0.85 + Math.sin(t * 0.9) * 0.05;
+        if (albumPanel.value()) {
+            double fade = Math.min(1, (f.now - artChangedAt) / 4e8);
+            float size = (float) panelSize.value();
+            if (previousArt != null && fade < 1) f.image(new FxFrame.WorldImage(px, py, pz, previousArt, size, (float) (a * (1 - fade)), true, 0));
+            if (currentArt != null) f.image(new FxFrame.WorldImage(px, py, pz, currentArt, size, (float) (a * fade), true, 0));
+            else FxShapes.softDot(f, px, py, pz, size * 0.45, rgb, a * 0.25, true);
+        }
+        if (trackLabel.value()) {
+            double below = albumPanel.value() ? panelSize.value() * 0.62 : 0;
+            f.text(new FxFrame.WorldText(px, py - below, pz, List.of(new FxFrame.Run(playing.title(), FxShapes.argb(0xFFFFFF, a))),
+                    0.012F, 0, 0, true, 0, false));
+            if (!playing.artist().isEmpty())
+                f.text(new FxFrame.WorldText(px, py - below - 0.14, pz, List.of(new FxFrame.Run(playing.artist(), FxShapes.argb(0xA6A6A6, a))),
+                        0.009F, 0, 0, true, 0, false));
+            double progress = playing.progress(f.now);
+            double w = 0.5;
+            double bx = px - f.camX, by = py - below - 0.24 - f.camY, bz = pz - f.camZ;
+            f.batch.line(bx - f.rightX * w / 2, by, bz - f.rightZ * w / 2, bx + f.rightX * w / 2, by, bz + f.rightZ * w / 2,
+                    FxShapes.argb(0x3A3A3A, a), 2F, true);
+            f.batch.line(bx - f.rightX * w / 2, by, bz - f.rightZ * w / 2, bx + f.rightX * (w * progress - w / 2), by,
+                    bz + f.rightZ * (w * progress - w / 2), FxShapes.argb(rgb, a), 2F, true);
+        }
+    }
+
+    /** Whether this module draws the track title in the given view, so lyrics do not draw a second copy. */
+    public boolean showsWorldTrackLabel(boolean firstPerson) {
+        return enabled() && trackLabel.value()
+                && MusicDisplay.showsTrackTitle(display.value(), firstPerson, thirdPersonOnly.value());
     }
 }

@@ -26,6 +26,7 @@
     "PlayerReachMixin",
     "LivingEntityReachMixin",
     "LivingEntityTravelMixin",
+    "SwingAnimationMixin",
     "KeepSprintMixin",
     "HighJumpMixin",
     "TitleScreenMixin",
@@ -70,6 +71,7 @@
     "ServerListRedirectMixin",
     "WorldListRedirectMixin",
     "LowFireMixin",
+    "LightTextureFullbrightMixin",
     "MixinCharacterAvatarRenderState",
     "MixinCharacterAvatarRenderer",
     "MixinCharacterPlayerModel",
@@ -87,7 +89,10 @@
     "HotbarStyleMixin",
     "JilatonTextMixin",
     "JilatonFontWidthMixin",
-    "MinecraftSessionAccessor"
+    "MinecraftSessionAccessor",
+    "screenshot.ScreenshotGrabMixin",
+    "screenshot.ScreenshotClickMixin",
+    "PharaohHelmetMixin"
   ],
   "injectors": {
     "defaultRequire": 1

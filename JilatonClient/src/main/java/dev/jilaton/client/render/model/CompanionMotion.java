@@ -14,8 +14,9 @@ public final class CompanionMotion {
     private CompanionMotion() { }
 
     public static double advanceOrbit(double previous, double dt, double speed, boolean reducedMotion) {
-        if (reducedMotion) return previous;
-        return previous + Math.max(0, dt) * Math.max(0, speed) * Math.PI * 2 * 0.22;
+        if (!Double.isFinite(previous)) previous = 0;
+        if (reducedMotion || !(dt > 0) || !(speed > 0)) return previous;
+        return previous + dt * speed * Math.PI * 2 * 0.22;
     }
 
     /**
@@ -25,9 +26,9 @@ public final class CompanionMotion {
      */
     public static double[] springStep(double px, double py, double pz, double vx, double vy, double vz,
                                       double tx, double ty, double tz, double stiffness, double damping, double dt) {
-        double k = Math.max(0.5, Math.min(40, stiffness));
-        double c = Math.max(0, damping);
-        double step = Math.max(0, Math.min(MAX_STEP, dt));
+        double k = Double.isFinite(stiffness) ? Math.max(0.5, Math.min(40, stiffness)) : 11;
+        double c = Double.isFinite(damping) ? Math.max(0, damping) : 0;
+        double step = Double.isFinite(dt) ? Math.max(0, Math.min(MAX_STEP, dt)) : 0;
         double nvx = vx + ((tx - px) * k - vx * c) * step;
         double nvy = vy + ((ty - py) * k - vy * c) * step;
         double nvz = vz + ((tz - pz) * k - vz * c) * step;
@@ -49,9 +50,9 @@ public final class CompanionMotion {
      * and zero when it is barely moving, so a parked companion never sits at a fixed angle.
      */
     public static double bankDegrees(double lateralSpeed, double speed, double maxDegrees) {
-        if (speed < 1e-4) return 0;
+        if (!Double.isFinite(lateralSpeed) || !Double.isFinite(speed) || speed < 1e-4) return 0;
         double ratio = Math.max(-1, Math.min(1, lateralSpeed / speed));
-        return Math.max(0, maxDegrees) * ratio;
+        return Double.isFinite(maxDegrees) ? Math.max(0, maxDegrees) * ratio : 0;
     }
 
     public static int shards(String shape) {

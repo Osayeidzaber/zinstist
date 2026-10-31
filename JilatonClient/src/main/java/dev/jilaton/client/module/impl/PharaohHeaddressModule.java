@@ -11,6 +11,7 @@ import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.TextSetting;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
@@ -24,10 +25,26 @@ import java.util.List;
  * interpolated head yaw and pitch through the shared world-effect pipeline.
  */
 public final class PharaohHeaddressModule extends ClientModule implements FxEmitter {
+    private static volatile PharaohHeaddressModule active;
     private static final int MAX_PLAYERS = 16;
     private static final double MAX_DISTANCE_SQR = 64 * 64;
     private static final float UNIT = 0.0625F;
     private static final List<String> STYLES = List.of("Nemes", "Khepresh", "Sun Disc");
+
+    /*
+     * Head-space clearance geometry (1/16 block, origin at the eye-height anchor). Vanilla is drawn at
+     * 0.9375 scale: the torso top sits at the neck (eyes 1.62 - head 0.46875/2 = 1.40625 world) and the
+     * chestplate adds one unit of deformation (1.4648 world = -0.5625 head units; HumanoidModel.java:122).
+     * The cape pivots on the neck (PlayerCapeModel.java:33) and its top edge can only rise by the
+     * 10-degree roll lift, 0.293 * sin(10) = 0.0509 world (PlayerCapeModel.java:44, AvatarRenderer.java:139-141),
+     * i.e. -0.68 head units. Everything below stays under those two lines.
+     */
+    static final double COLLAR_Y = 1.0;          // 1.5625 world: 0.098 above the chestplate top
+    static final double COLLAR_RADIUS = 6.0;     // 0.375 world: clears the 0.3315 head corner by 0.0435
+    static final double BACK_LAPPET_Y0 = -0.4;   // 1.475 world: above the lifted cape corner (-0.68)
+    static final double BACK_LAPPET_Y1 = 7.2;
+    static final double BACK_LAPPET_Z0 = -6.2;
+    static final double BACK_LAPPET_Z1 = -4.1;
 
     /** Corner order matches {@link #FACES}: x low/high, y low/high, z low/high. */
     private static final int[] FACES = {1, 3, 7, 5, 0, 4, 6, 2, 2, 6, 7, 3, 0, 1, 5, 4, 4, 5, 7, 6, 0, 2, 3, 1};
@@ -38,7 +55,7 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
     private final BooleanSetting collar = addSetting(new BooleanSetting("collar", "Broad collar", true));
     private final NumberSetting size = addSetting(new NumberSetting("size", "Size", 0.8, 1.3, 0.05, 1.0));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.2, 1, 0.05, 0.85));
-    private final ChoiceSetting colorMode = addSetting(new ChoiceSetting("color_mode", "Color", List.of("Theme", "Manual"), "Theme"));
+    private final ChoiceSetting colorMode = addSetting(new ChoiceSetting("color_mode", "Color", List.of("Theme", "Manual"), "Manual"));
     private final TextSetting goldColor = addSetting(EffectPalette.hexSetting("gold", "Gold", "C8A24A"));
     private final TextSetting inlayColor = addSetting(EffectPalette.hexSetting("inlay", "Inlay", "243B6B"));
     private final TextSetting gemColor = addSetting(EffectPalette.hexSetting("gem", "Gem", "5AA6E8"));
@@ -57,6 +74,42 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
 
     public PharaohHeaddressModule() {
         super("pharaoh_headdress", "Pharaoh Headdress", "A striped nemes, khepresh or sun-disc crown over players' heads.", ModuleCategory.RENDER);
+        active = this;
+    }
+
+    /** The enabled headdress, or null; read by the helmet-hiding mixin during the armor pass. */
+    public static PharaohHeaddressModule active() {
+        PharaohHeaddressModule module = active;
+        return module != null && module.enabled() ? module : null;
+    }
+
+    /** The per-avatar facts the visibility rule needs, resolved from a live player by {@link #shows(Player)}. */
+    public record Viewer(boolean self, boolean firstPerson, boolean alive, boolean invisible, boolean friend,
+                         double distanceSqr) {
+    }
+
+    /**
+     * The single visibility rule shared by the emit path and the helmet gate, so the two cannot drift:
+     * a player is shown when the module is on, they are alive and visible, the own/others/friends filters
+     * admit them, they are within 64 blocks of the camera and the camera is not in first person for them.
+     */
+    public static boolean shows(Player player) {
+        PharaohHeaddressModule module = active;
+        if (module == null || player == null) return false;
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.gameRenderer == null) return false;
+        Camera camera = client.gameRenderer.getMainCamera();
+        return module.shows(new Viewer(player == client.player, !camera.isDetached(), player.isAlive(),
+                player.isInvisible(), FriendManager.contains(player), player.position().distanceToSqr(camera.position())));
+    }
+
+    public boolean shows(Viewer viewer) {
+        if (viewer == null || !enabled()) return false;
+        if (!viewer.alive() || viewer.invisible()) return false;
+        if (viewer.self() && (viewer.firstPerson() || !own.value())) return false;
+        if (!viewer.self() && !others.value()) return false;
+        if (!viewer.self() && friends.value() && !viewer.friend()) return false;
+        return viewer.distanceSqr() <= MAX_DISTANCE_SQR;
     }
 
     @Override
@@ -71,15 +124,9 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
         double time = f.seconds() * (f.reducedMotion ? 0.3 : 1);
         int drawn = 0;
         for (Player player : client.level.players()) {
-            if (!player.isAlive() || player.isInvisible()) continue;
-            boolean self = player == client.player;
-            if (self && (f.firstPerson || !own.value())) continue;
-            if (!self && !others.value()) continue;
-            if (!self && friends.value() && !FriendManager.contains(player)) continue;
-            Vec3 pos = player.getPosition(f.partial);
-            if (pos.distanceToSqr(f.camX, f.camY, f.camZ) > MAX_DISTANCE_SQR) continue;
+            if (!shows(player)) continue;
             if (++drawn > MAX_PLAYERS) break;
-            draw(f, player, pos, index, palette, a, time);
+            draw(f, player, player.getPosition(f.partial), index, palette, a, time);
         }
     }
 
@@ -127,7 +174,8 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
         striped(f, -5.4, 6.3, 4.1, 5.4, 7.3, 5.6, 1, gold, gold, a * 0.4, light, a * 0.95, width);
         striped(f, -6.3, -2.6, 2.0, -4.3, 7.0, 4.8, bands, gold, inlay, a * 0.28, light, a * 0.7, width);
         striped(f, 4.3, -2.6, 2.0, 6.3, 7.0, 4.8, bands, gold, inlay, a * 0.28, light, a * 0.7, width);
-        striped(f, -5.8, -3.6, -6.2, 5.8, 7.2, -4.1, bands, gold, inlay, a * 0.28, light, a * 0.7, width);
+        striped(f, -5.8, BACK_LAPPET_Y0, BACK_LAPPET_Z0, 5.8, BACK_LAPPET_Y1, BACK_LAPPET_Z1,
+                bands, gold, inlay, a * 0.28, light, a * 0.7, width);
 
         double[] brow = point(0, 7.7, 5.7);
         FxShapes.crystal(f, brow[0], brow[1], brow[2], 0.055 * size.value(), 0.07 * size.value(), time, gem, a * 0.9, walls);
@@ -172,8 +220,8 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
     }
 
     private void collar(FxFrame f, int gold, int inlay, int gem, double a, double time) {
-        double[] base = point(0, -1.2, 0);
-        double radius = 5.4 * unit;
+        double[] base = point(0, COLLAR_Y, 0);
+        double radius = COLLAR_RADIUS * unit;
         int segments = f.quality.circleSegments();
         f.batch.ring(base[0] - f.camX, base[1] - f.camY, base[2] - f.camZ, radius, segments,
                 FxShapes.argb(gold, a * 0.75), 1.4F, walls, 0, 0);
@@ -221,17 +269,21 @@ public final class PharaohHeaddressModule extends ClientModule implements FxEmit
             double lx = (c & 1) == 0 ? x0 : x1;
             double ly = (c & 2) == 0 ? y0 : y1;
             double lz = (c & 4) == 0 ? z0 : z1;
-            double ay = ly * cp + lz * sp;
-            double az = lz * cp - ly * sp;
-            double bx = lx * cy - az * sy;
-            double bz = lx * sy + az * cy;
-            corners[c * 3] = ox + bx * unit;
-            corners[c * 3 + 1] = oy + ay * unit;
-            corners[c * 3 + 2] = oz + bz * unit;
+            double[] p = point(lx, ly, lz);
+            corners[c * 3] = p[0];
+            corners[c * 3 + 1] = p[1];
+            corners[c * 3 + 2] = p[2];
         }
     }
 
     private double[] point(double lx, double ly, double lz) {
+        return transform(lx, ly, lz, ox, oy, oz, cy, sy, cp, sp, unit);
+    }
+
+    /** Head-space to world-space: pitch about X, then yaw about Y, then the head anchor and scale. */
+    static double[] transform(double lx, double ly, double lz,
+                              double ox, double oy, double oz,
+                              double cy, double sy, double cp, double sp, double unit) {
         double ay = ly * cp + lz * sp;
         double az = lz * cp - ly * sp;
         double bx = lx * cy - az * sy;

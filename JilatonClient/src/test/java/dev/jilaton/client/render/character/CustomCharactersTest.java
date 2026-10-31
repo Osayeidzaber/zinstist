@@ -2,6 +2,7 @@ package dev.jilaton.client.render.character;
 
 import dev.jilaton.client.render.character.kit.BakedDesign;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.ThrowingSupplier;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -16,7 +17,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class CustomCharactersTest {
     @Test
     void folderLookupIsSafeWithoutAClient() {
-        Path folder = assertDoesNotThrow(CustomCharacters::folder, "folder() must not throw outside a running client");
+        Path folder = assertDoesNotThrow(
+            (ThrowingSupplier<Path>) CustomCharacters::folder, "folder() must not throw outside a running client"
+        );
         if (folder != null) {
             assertTrue(folder.endsWith("characters"), "unexpected drop folder: " + folder);
         }
@@ -33,7 +36,9 @@ class CustomCharactersTest {
     @Test
     void ensureFolderIsANoOpWithoutAConfigDirectory() {
         assumeTrue(CustomCharacters.folder() == null, "a config directory exists, so the null branch cannot be reached");
-        Path created = assertDoesNotThrow(() -> CustomCharacters.ensureFolder(), "there is nowhere to create the folder");
+        Path created = assertDoesNotThrow(
+            (ThrowingSupplier<Path>) CustomCharacters::ensureFolder, "there is nowhere to create the folder"
+        );
         assertNull(created, "there is nowhere to create the folder");
     }
 
