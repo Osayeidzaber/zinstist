@@ -21,6 +21,20 @@ public final class HudDesign {
     public static final int KEYBIND_TITLE = 19;
     public static final int KEYBIND_ROW = 14;
     public static final int KEYBIND_MAX_ROWS = 6;
+    /** One enabled-module row in the right-column list. */
+    public static final int MODULE_ROW = 12;
+    public static final int EFFECTS_WIDTH = 148;
+    public static final int EFFECTS_TITLE = 21;
+    public static final int EFFECTS_ROW = 14;
+    public static final int CPS_HEIGHT = 22;
+    public static final int ARMOR_WIDTH = 130;
+    public static final int ARMOR_HEIGHT = 50;
+    public static final int KEYSTROKES_WIDTH = 70;
+    public static final int KEYSTROKES_HEIGHT = 58;
+    /** Clearance between two panels that share a column. */
+    public static final int STACK_GAP = 6;
+    /** Margin a bottom-anchored column keeps from the screen edge. */
+    public static final int HUD_MARGIN = 8;
     public static final int SERVER_WIDTH = 148;
     public static final int SERVER_HEIGHT = 66;
     public static final int SERVER_ROW = 12;
@@ -190,6 +204,49 @@ public final class HudDesign {
 
     public static int keybindHeight(int rows) {
         return KEYBIND_TITLE + Math.max(0, Math.min(KEYBIND_MAX_ROWS, rows)) * KEYBIND_ROW + 2;
+    }
+
+    /** Height of the enabled-module list for a count of rows. */
+    public static int moduleListHeight(int rows) {
+        return Math.max(0, rows) * MODULE_ROW;
+    }
+
+    /** Height of the potion panel: one title row plus one row per effect. */
+    public static int effectsHeight(int rows) {
+        return EFFECTS_TITLE + Math.max(0, rows) * EFFECTS_ROW;
+    }
+
+    /**
+     * Tops of panels stacked downward from {@code top}, ordered top to bottom. Each panel consumes its
+     * own height plus one gap, so two neighbours can never share a row.
+     */
+    public static int[] stackDown(int top, int gap, int... heights) {
+        int[] tops = new int[heights.length];
+        int cursor = top;
+        for (int index = 0; index < heights.length; index++) {
+            tops[index] = cursor;
+            cursor += Math.max(0, heights[index]) + Math.max(0, gap);
+        }
+        return tops;
+    }
+
+    /**
+     * Tops of panels stacked upward against {@code bottom}, ordered top to bottom. The last entry sits
+     * at the bottom edge, so growing a panel (a larger radar) travels upward instead of over its
+     * neighbour.
+     */
+    public static int[] stackUp(int bottom, int gap, int... heights) {
+        int total = Math.max(0, gap) * Math.max(0, heights.length - 1);
+        for (int height : heights) {
+            total += Math.max(0, height);
+        }
+        int cursor = bottom - total;
+        int[] tops = new int[heights.length];
+        for (int index = 0; index < heights.length; index++) {
+            tops[index] = cursor;
+            cursor += Math.max(0, heights[index]) + Math.max(0, gap);
+        }
+        return tops;
     }
 
     public static int chipTextWidth(TargetCard card) {

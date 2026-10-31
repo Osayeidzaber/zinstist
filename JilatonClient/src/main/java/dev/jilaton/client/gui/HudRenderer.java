@@ -228,9 +228,13 @@ public final class HudRenderer {
                 NowPlayingWidget.render(graphics, font, state, style, x, y, activeStyle.accentColor(accent) & 0xFFFFFF,
                         nowPlaying.artwork(), nowPlaying.device(), System.nanoTime());
                 graphics.pose().popMatrix();
-                if (config.hudPosition("music") == null) rightColumnTop = y + height + 6;
+                // A dragged music card owns its slot and must not move the list below it.
+                if (config.hudPosition("music") == null) {
+                    rightColumnTop = activeLayout.y() + activeLayout.height() + HudDesign.STACK_GAP;
+                }
             }
         }
+        int rightColumnNext = rightColumnTop;
 
         if (!(module instanceof HudModule hud) || (!editorPreview && !hud.enabled())
                 || (!editorPreview && client.screen instanceof HudEditorScreen)) {
@@ -239,6 +243,10 @@ public final class HudRenderer {
         if (hud.staff() || hud.radar() || editorPreview) {
             refreshRetention(client, hud);
         }
+
+        // Bottom-right slots, top to bottom: radar, held item, server, armor, keystrokes. The chain is
+        // anchored to the screen edge so no panel can be pushed off-screen from below.
+        int[] bottomColumn = bottomColumnTops(guiHeight, hud);
 
         int moduleListTop = 8;
         if (hud.watermark() && visible("watermark", editorPreview)) {
@@ -266,7 +274,7 @@ public final class HudRenderer {
                 listWidth = Math.max(listWidth, font.width(active.name()) + 4);
             }
             if (!activeModuleScratch.isEmpty()) {
-                int listHeight = activeModuleScratch.size() * 12;
+                int listHeight = HudDesign.moduleListHeight(activeModuleScratch.size());
                 int x = widgetX("modules", guiWidth - listWidth - 8, listWidth, guiWidth);
                 int y = widgetY("modules", rightColumnTop, listHeight, guiHeight);
                 beginWidget(graphics, "modules", x, y, listWidth, listHeight, editorPreview);
@@ -274,9 +282,11 @@ public final class HudRenderer {
                 for (ClientModule active : activeModuleScratch) {
                     String label = active.name();
                     graphics.drawString(font, label, x + listWidth - font.width(label), y + 2, 0xFFF5F5F5, true);
-                    y += 12;
+                    y += HudDesign.MODULE_ROW;
                 }
-                moduleListTop = activeLayout.y() + activeLayout.height() + 6;
+                moduleListTop = activeLayout.y() + activeLayout.height() + HudDesign.STACK_GAP;
+                // The list reserves the next slot only while it is auto-placed; a dragged list is free.
+                if (config.hudPosition("modules") == null) rightColumnNext = moduleListTop;
                 graphics.pose().popMatrix();
             }
         }
@@ -370,31 +380,38 @@ public final class HudRenderer {
         }
 
         if (hud.keystrokes() && visible("keystrokes", editorPreview)) {
-            int x = widgetX("keystrokes", guiWidth - 78, 70, guiWidth);
-            int y = widgetY("keystrokes", guiHeight - 160, 58, guiHeight);
-            beginWidget(graphics, "keystrokes", x, y, 70, 58, editorPreview);
+            int width = HudDesign.KEYSTROKES_WIDTH;
+            int height = HudDesign.KEYSTROKES_HEIGHT;
+            int x = widgetX("keystrokes", guiWidth - width - 8, width, guiWidth);
+            int y = widgetY("keystrokes", bottomColumn[4], height, guiHeight);
+            beginWidget(graphics, "keystrokes", x, y, width, height, editorPreview);
             accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
             renderKeystrokes(graphics, client, accent, x, y);
             graphics.pose().popMatrix();
         }
 
         if (hud.armor() && visible("armor", editorPreview)) {
-            renderArmor(graphics, client, editorPreview);
+            renderArmor(graphics, client, editorPreview, bottomColumn[3]);
         }
         if (hud.effects() && visible("effects", editorPreview)) {
-            renderEffects(graphics, client, editorPreview);
+            // The potion panel may grow until the next panel in the column, CPS or the bottom-right chain.
+            int effectsLimit = bottomColumn[0] - HudDesign.STACK_GAP;
+            if (hud.cps() && visible("cps", editorPreview)) {
+                effectsLimit -= HudDesign.CPS_HEIGHT + HudDesign.STACK_GAP;
+            }
+            rightColumnNext = renderEffects(graphics, client, editorPreview, rightColumnNext, effectsLimit);
         }
         if ((hud.serverPanel() || editorPreview) && visible("server", editorPreview)) {
-            renderServerPanel(graphics, font, client, editorPreview);
+            renderServerPanel(graphics, font, client, editorPreview, bottomColumn[2]);
         }
         if ((hud.heldItem() || editorPreview) && visible("held_item", editorPreview)) {
-            renderHeldItem(graphics, font, client, editorPreview);
+            renderHeldItem(graphics, font, client, editorPreview, bottomColumn[1]);
         }
         if ((hud.staff() || editorPreview) && visible("staff", editorPreview)) {
             renderStaff(graphics, font, client, editorPreview);
         }
         if ((hud.radar() || editorPreview) && visible("radar", editorPreview)) {
-            renderRadar(graphics, client, editorPreview);
+            renderRadar(graphics, client, editorPreview, bottomColumn[0]);
         }
         if (hud.cps() && visible("cps", editorPreview)) {
             HudNumberPainter painter = numbers(font);
@@ -404,9 +421,9 @@ public final class HudRenderer {
             int suffixWidth = font.width(" R");
             int width = 9 + labelWidth + 4 + column + betweenWidth + column + suffixWidth + 9;
             int x = widgetX("cps", guiWidth - width - 8, width, guiWidth);
-            int y = widgetY("cps", 36, 22, guiHeight);
-            beginWidget(graphics, "cps", x, y, width, 22, editorPreview);
-            drawPanel(graphics, x, y, width, 22);
+            int y = widgetY("cps", rightColumnNext, HudDesign.CPS_HEIGHT, guiHeight);
+            beginWidget(graphics, "cps", x, y, width, HudDesign.CPS_HEIGHT, editorPreview);
+            drawPanel(graphics, x, y, width, HudDesign.CPS_HEIGHT);
             int textY = y + 7;
             int cursor = x + 9;
             int color = activeStyle.accentColor(accent);
@@ -455,11 +472,11 @@ public final class HudRenderer {
         graphics.pose().popMatrix();
     }
 
-    private void renderArmor(GuiGraphics graphics, Minecraft client, boolean preview) {
-        int width = 130;
-        int height = 50;
+    private void renderArmor(GuiGraphics graphics, Minecraft client, boolean preview, int defaultY) {
+        int width = HudDesign.ARMOR_WIDTH;
+        int height = HudDesign.ARMOR_HEIGHT;
         int x = widgetX("armor", graphics.guiWidth() - width - 8, width, graphics.guiWidth());
-        int y = widgetY("armor", graphics.guiHeight() - 100, height, graphics.guiHeight());
+        int y = widgetY("armor", defaultY, height, graphics.guiHeight());
         beginWidget(graphics, "armor", x, y, width, height, preview);
         drawPanel(graphics, x, y, width, height);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
@@ -495,7 +512,12 @@ public final class HudRenderer {
         graphics.pose().popMatrix();
     }
 
-    private void renderEffects(GuiGraphics graphics, Minecraft client, boolean preview) {
+    /**
+     * Draws the potion panel in the next right-column slot and returns the slot below it. A dragged
+     * panel keeps its saved spot and does not move the panels that follow.
+     */
+    private int renderEffects(GuiGraphics graphics, Minecraft client, boolean preview, int defaultY,
+                              int bottomLimit) {
         long now = System.nanoTime();
         long tick = client.level.getGameTime();
         if (tick != lastEffectTick || lastLevel != client.level) {
@@ -525,13 +547,18 @@ public final class HudRenderer {
                 }
             }
         }
-        if (effectRows.isEmpty() && !preview) return;
-        int width = 148;
-        int maxRows = Math.max(1, (graphics.guiHeight() - 24) / 14);
+        if (effectRows.isEmpty() && !preview) return defaultY;
+        int width = HudDesign.EFFECTS_WIDTH;
+        int maxRows = Math.max(1, (graphics.guiHeight() - 24) / HudDesign.EFFECTS_ROW);
+        // An auto-placed panel also has to stop above the bottom-right column instead of growing into it.
+        if (config.hudPosition("effects") == null) {
+            int room = (bottomLimit - defaultY - HudDesign.EFFECTS_TITLE) / HudDesign.EFFECTS_ROW;
+            maxRows = Math.max(1, Math.min(maxRows, room));
+        }
         int rowCount = Math.max(1, Math.min(maxRows, effectRows.size()));
-        int height = 21 + rowCount * 14;
+        int height = HudDesign.effectsHeight(rowCount);
         int x = widgetX("effects", graphics.guiWidth() - width - 8, width, graphics.guiWidth());
-        int y = widgetY("effects", 64, height, graphics.guiHeight());
+        int y = widgetY("effects", defaultY, height, graphics.guiHeight());
         beginWidget(graphics, "effects", x, y, width, height, preview);
         drawPanel(graphics, x, y, width, height);
         graphics.drawString(JilatonType.font(), "POTION EFFECTS", x + 6, y + 6,
@@ -546,7 +573,10 @@ public final class HudRenderer {
             fade.update(row.duration(), now, config.reducedMotion());
             painter.drawFadeRight(graphics, fade, now, x + width - 6, y + 21 + index * 14, TEXT_SECONDARY);
         }
+        int next = config.hudPosition("effects") == null
+                ? activeLayout.y() + activeLayout.height() + HudDesign.STACK_GAP : defaultY;
         graphics.pose().popMatrix();
+        return next;
     }
 
     private record EffectRow(String key, String name, String duration) { }
@@ -912,11 +942,12 @@ public final class HudRenderer {
         graphics.pose().popMatrix();
     }
 
-    private void renderServerPanel(GuiGraphics graphics, Font font, Minecraft client, boolean preview) {
+    private void renderServerPanel(GuiGraphics graphics, Font font, Minecraft client, boolean preview,
+                                   int defaultY) {
         int width = HudDesign.SERVER_WIDTH;
         int height = HudDesign.SERVER_HEIGHT;
         int x = widgetX("server", graphics.guiWidth() - width - 8, width, graphics.guiWidth());
-        int y = widgetY("server", graphics.guiHeight() - 174, height, graphics.guiHeight());
+        int y = widgetY("server", defaultY, height, graphics.guiHeight());
         beginWidget(graphics, "server", x, y, width, height, preview);
         drawPanel(graphics, x, y, width, height);
         graphics.drawString(font, "SERVER", x + 7, y + 6,
@@ -954,7 +985,8 @@ public final class HudRenderer {
         graphics.pose().popMatrix();
     }
 
-    private void renderHeldItem(GuiGraphics graphics, Font font, Minecraft client, boolean preview) {
+    private void renderHeldItem(GuiGraphics graphics, Font font, Minecraft client, boolean preview,
+                                int defaultY) {
         ItemStack stack = client.player.getMainHandItem();
         double presence = heldItemPresence.update(!stack.isEmpty() || preview ? 1 : 0, System.nanoTime(),
                 config.reducedMotion());
@@ -964,7 +996,7 @@ public final class HudRenderer {
         int width = HudDesign.HELD_ITEM_WIDTH;
         int height = HudDesign.HELD_ITEM_HEIGHT;
         int x = widgetX("held_item", graphics.guiWidth() - width - 8, width, graphics.guiWidth());
-        int y = widgetY("held_item", graphics.guiHeight() - 240, height, graphics.guiHeight());
+        int y = widgetY("held_item", defaultY, height, graphics.guiHeight());
         beginWidget(graphics, "held_item", x, y, width, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
         glass(graphics, x, y, width, height, HudDesign.withAlpha(activeStyle.panelColor(), presence));
@@ -1110,7 +1142,7 @@ public final class HudRenderer {
         graphics.pose().popMatrix();
     }
 
-    private void renderRadar(GuiGraphics graphics, Minecraft client, boolean preview) {
+    private void renderRadar(GuiGraphics graphics, Minecraft client, boolean preview, int defaultY) {
         HudModule hud = (HudModule) modules.get("hud");
         int size = hud.radarSize();
         int height = HudDesign.radarPanelHeight(size);
@@ -1119,7 +1151,7 @@ public final class HudRenderer {
         long nowNanos = System.nanoTime();
         long nowMillis = System.currentTimeMillis();
         int x = widgetX("radar", graphics.guiWidth() - size - 8, size, graphics.guiWidth());
-        int y = widgetY("radar", graphics.guiHeight() - 290, height, graphics.guiHeight());
+        int y = widgetY("radar", defaultY, height, graphics.guiHeight());
         beginWidget(graphics, "radar", x, y, size, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
         glass(graphics, x, y, size, height, hudSurface());
@@ -1233,6 +1265,17 @@ public final class HudRenderer {
     private int widgetY(String widgetId, int defaultY, int widgetHeight, int guiHeight) {
         HudPosition position = config.hudPosition(widgetId);
         return position == null ? defaultY : (int) Math.round(Math.max(0, guiHeight - widgetHeight) * position.y());
+    }
+
+    /**
+     * Default tops of the bottom-right column, ordered radar, held item, server, armor, keystrokes.
+     * Every slot is reserved from the settings, so toggling one widget never shifts its neighbours;
+     * a taller radar grows upward.
+     */
+    private static int[] bottomColumnTops(int guiHeight, HudModule hud) {
+        return HudDesign.stackUp(guiHeight - HudDesign.HUD_MARGIN, HudDesign.STACK_GAP,
+                HudDesign.radarPanelHeight(hud.radarSize()), HudDesign.HELD_ITEM_HEIGHT,
+                HudDesign.SERVER_HEIGHT, HudDesign.ARMOR_HEIGHT, HudDesign.KEYSTROKES_HEIGHT);
     }
 
     private static int latency(Minecraft client) {

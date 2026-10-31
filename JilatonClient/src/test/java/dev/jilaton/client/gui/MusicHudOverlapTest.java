@@ -51,15 +51,22 @@ class MusicHudOverlapTest {
         return new Rect("keybinds", 8, 8, HudDesign.KEYBIND_WIDTH, height);
     }
 
-    /** HudRenderer.java:649-653 — right column bottom, above the vanilla hotbar area. */
+    /** Bottom-right column tops, ordered radar, held item, server, armor, keystrokes. */
+    private static int[] bottomColumn(int h) {
+        return HudDesign.stackUp(h - HudDesign.HUD_MARGIN, HudDesign.STACK_GAP,
+                HudDesign.radarPanelHeight(HudDesign.RADAR_DEFAULT_SIZE), HudDesign.HELD_ITEM_HEIGHT,
+                HudDesign.SERVER_HEIGHT, HudDesign.ARMOR_HEIGHT, HudDesign.KEYSTROKES_HEIGHT);
+    }
+
+    /** HudRenderer — right column bottom, above the armor panel. */
     private static Rect server(int w, int h) {
-        return new Rect("server", w - HudDesign.SERVER_WIDTH - 8, h - 174,
+        return new Rect("server", w - HudDesign.SERVER_WIDTH - 8, bottomColumn(h)[2],
                 HudDesign.SERVER_WIDTH, HudDesign.SERVER_HEIGHT);
     }
 
-    /** HudRenderer.java:678-688 — right column, above the server panel. */
+    /** HudRenderer — right column, above the server panel. */
     private static Rect heldItem(int w, int h) {
-        return new Rect("held_item", w - HudDesign.HELD_ITEM_WIDTH - 8, h - 240,
+        return new Rect("held_item", w - HudDesign.HELD_ITEM_WIDTH - 8, bottomColumn(h)[1],
                 HudDesign.HELD_ITEM_WIDTH, HudDesign.HELD_ITEM_HEIGHT);
     }
 
@@ -74,9 +81,17 @@ class MusicHudOverlapTest {
         return new Rect("performance", w - 148, 8, 140, 22);
     }
 
-    /** HudRenderer.java:345-346 — potion effects, top right below CPS. */
+    /** Music-enabled right column: the potion panel sits under the now-playing card and module list. */
     private static Rect effects(int w, int rows) {
-        return new Rect("effects", w - 148 - 8, 64, 148, 21 + Math.max(1, rows) * 14);
+        int top = music(w).bottom() + HudDesign.STACK_GAP + HudDesign.moduleListHeight(5) + HudDesign.STACK_GAP;
+        return new Rect("effects", w - HudDesign.EFFECTS_WIDTH - 8, top,
+                HudDesign.EFFECTS_WIDTH, HudDesign.effectsHeight(Math.max(1, rows)));
+    }
+
+    /** HudRenderer — enabled-module list, under the now-playing card. */
+    private static Rect modules(int w) {
+        int top = music(w).bottom() + HudDesign.STACK_GAP;
+        return new Rect("modules", w - 8 - 96, top, 96, HudDesign.moduleListHeight(5));
     }
 
     /** HudRenderer.java:222-226 — bottom left. */
@@ -84,14 +99,16 @@ class MusicHudOverlapTest {
         return new Rect("coordinates", 8, h - 29, 150, 21);
     }
 
-    /** HudRenderer.java:234-236 — bottom left above coordinates. */
-    private static Rect keystrokes(int h) {
-        return new Rect("keystrokes", 8, h - 104, 70, 58);
+    /** HudRenderer — bottom-right column, below the armour panel. */
+    private static Rect keystrokes(int w, int h) {
+        return new Rect("keystrokes", w - HudDesign.KEYSTROKES_WIDTH - 8, bottomColumn(h)[4],
+                HudDesign.KEYSTROKES_WIDTH, HudDesign.KEYSTROKES_HEIGHT);
     }
 
-    /** HudRenderer.java:297-301 — right column above the hotbar. */
+    /** HudRenderer — right column above the keystrokes. */
     private static Rect armor(int w, int h) {
-        return new Rect("armor", w - 130 - 8, h - 100, 130, 50);
+        return new Rect("armor", w - HudDesign.ARMOR_WIDTH - 8, bottomColumn(h)[3],
+                HudDesign.ARMOR_WIDTH, HudDesign.ARMOR_HEIGHT);
     }
 
     /** HudRenderer.java:390-391 — centred above the hotbar. */
@@ -132,8 +149,8 @@ class MusicHudOverlapTest {
     }
 
     private static List<Rect> hudDefaults(int w, int h) {
-        return List.of(music(w), keybinds(), server(w, h), heldItem(w, h), aboveHeadEditor(w, h),
-                performance(w), effects(w, 3), coordinates(h), keystrokes(h), armor(w, h), targetCard(w, h),
+        return List.of(music(w), modules(w), keybinds(), server(w, h), heldItem(w, h), aboveHeadEditor(w, h),
+                performance(w), effects(w, 3), coordinates(h), keystrokes(w, h), armor(w, h), targetCard(w, h),
                 notifications(w, h), watermark());
     }
 
@@ -161,7 +178,7 @@ class MusicHudOverlapTest {
         for (int w : WIDTHS) {
             int h = heightForWidth(w);
             Rect music = music(w);
-            for (Rect other : List.of(performance(w), coordinates(h), keystrokes(h), armor(w, h),
+            for (Rect other : List.of(performance(w), coordinates(h), keystrokes(w, h), armor(w, h),
                     targetCard(w, h), notifications(w, h), watermark())) {
                 assertFalse(music.intersects(other), "music/" + other.id() + " " + w);
             }
@@ -181,26 +198,25 @@ class MusicHudOverlapTest {
     }
 
     /**
-     * Known HUD-side collision, reported rather than worked around: the potion panel starts at y 64 while the
-     * Now Playing slot starts at y 40, so both sit in the right-hand column. The fix belongs in
-     * HudRenderer's effects default (HudRenderer.java:346); when that moves, delete this test.
+     * JA-009: the potion panel used to be pinned at y 64 while the now-playing card and module list grew
+     * down the same column (148x16 overlap under the card, 148x32 under the list). It now takes the
+     * next slot in the stack, so music, the module list and the panel cannot overlap.
      */
     @Test
-    void effectsPanelSharesTheMusicColumn() {
+    void potionPanelStacksBelowTheMusicCardAndModuleList() {
         for (int w : WIDTHS) {
             Rect music = music(w);
+            Rect modules = modules(w);
             Rect effects = effects(w, 3);
-            assertTrue(music.intersects(effects), "expected the reported overlap at " + w);
-            Rect overlap = music.intersection(effects);
-            assertEquals(w - 156, overlap.x());
-            assertEquals(64, overlap.y());
-            assertEquals(148, overlap.width());
-            assertEquals(16, overlap.height());
+            assertFalse(music.intersects(modules), "music/modules " + w);
+            assertFalse(music.intersects(effects), "music/effects " + w);
+            assertFalse(modules.intersects(effects), "modules/effects " + w);
+            assertEquals(music.bottom() + HudDesign.STACK_GAP, modules.y(), "modules follow music " + w);
+            assertEquals(modules.bottom() + HudDesign.STACK_GAP, effects.y(), "effects follow modules " + w);
         }
         int expandedHeight = NowPlayingWidget.height(NowPlayingWidget.Style.EXPANDED);
-        assertEquals(70, expandedHeight);
         Rect expanded = new Rect("music_expanded", 1280 - 220 - 8, 40, 220, expandedHeight);
-        assertEquals(46, expanded.intersection(effects(1280, 3)).height());
+        assertFalse(expanded.intersects(effects(1280, 3)), "expanded music/effects");
     }
 
     @Test
