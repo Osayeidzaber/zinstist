@@ -82,8 +82,8 @@ class TerrainWaveTest {
         assertFalse(TerrainWave.selectsCell(0, 16.9, 16.9, 20, 3, 0, 1), "the afterglow has a hard inner edge");
         assertFalse(TerrainWave.selectsCell(10, -18, 20.59, 20, 3, 0, 1), "deep behind the camera is culled");
         assertTrue(TerrainWave.selectsCell(19, -1.5, 19.06, 20, 3, 0, 1), "a shallow-behind cell stays in the margin");
-        assertTrue(TerrainWave.selectsCell(0.4, 0, 0.4, 20, 3, 0, 1), "the impact core is never culled");
-        assertTrue(TerrainWave.selectsCell(0.4, 0, 0.4, 20, 3, 0, -1), "the impact core ignores the view direction");
+        assertTrue(TerrainWave.selectsCell(0.4, 0, 0.4, 1, 3, 0, -1), "the impact core ignores the view direction");
+        assertFalse(TerrainWave.selectsCell(0.4, 0, 0.4, 20, 3, 0, 1), "the core is still outside a wide wave's band");
         assertFalse(TerrainWave.selectsCell(0, 22, 22, 0.3, 3, 0, 1), "an early wave has no band yet");
     }
 }
