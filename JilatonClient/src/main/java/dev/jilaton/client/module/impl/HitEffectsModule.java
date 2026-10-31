@@ -94,6 +94,8 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     private Object boundLevel;
     /** Block samples the world wave may spend this frame, shared by every live wave. */
     private int waveBudget;
+    /** Scratch corners reused for every block top of the wave, so the hot scan never allocates. */
+    private final double[] waveTop = new double[12];
 
     public HitEffectsModule() {
         super("hit_effects", "HitEffects", "World-space impact effects: sparks, ripples, shockwaves, ink splashes, rings and combos.", ModuleCategory.RENDER);
@@ -212,13 +214,19 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
         int rgb = primary(f.accent), rgb2 = secondaryRgb();
         double life = lifetime.value(), alphaScale = opacity.value() * f.intensity, s = size.value();
         waveBudget = TerrainWave.MAX_BLOCKS_PER_FRAME;
+        int liveWaves = 0;
+        for (Impact impact : impacts) if (impact.styles.contains(Style.WORLD_WAVE)) liveWaves++;
+        int waveShare = TerrainWave.blockBudget(liveWaves);
         Iterator<Impact> iterator = impacts.iterator();
         while (iterator.hasNext()) {
             Impact impact = iterator.next();
             if (!impact.spawned) { burstParticles(f, impact, rgb, rgb2); impact.spawned = true; }
             double age = (f.now - impact.born) / 1e9;
-            double t = age / (life * 1.2);
-            if (t >= 1) { iterator.remove(); continue; }
+            double t = Math.min(1, age / (life * 1.2));
+            // Every style but the terrain wave has finished by life*1.2; the wave keeps expanding to its own
+            // MAX_LIFE_SECONDS, so a 44-block front is never cut off just before it arrives.
+            double impactLife = impact.styles.contains(Style.WORLD_WAVE) ? TerrainWave.impactLife(life) : life * 1.2;
+            if (age >= impactLife) { iterator.remove(); continue; }
             double power = impact.crit ? 1.35 : 1;
             if (impact.styles.contains(Style.RIPPLE)) {
                 double flash = Math.max(0, 1 - t * 5.5);
@@ -246,7 +254,9 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
                 f.batch.ring(impact.x - f.camX, impact.floorY + 0.04 - f.camY, impact.z - f.camZ, r,
                         f.quality.circleSegments(), FxShapes.argb(rgb2, a), 2.2F, false, 0, 0);
             }
-            if (impact.styles.contains(Style.WORLD_WAVE)) worldWave(f, impact, age, rgb, alphaScale);
+            if (impact.styles.contains(Style.WORLD_WAVE)) {
+                waveBudget -= worldWave(f, impact, age, rgb, alphaScale, Math.min(waveShare, waveBudget));
+            }
             if (impact.styles.contains(Style.RINGS)) {
                 double eased = 1 - Math.pow(1 - Math.min(1, t * 1.3), 3);
                 double a = alphaScale * (1 - t);
@@ -272,54 +282,52 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
 
     /**
      * One large terrain-following wavefront: every sampled block under the front gets a glowing top face
-     * and outline, joined by a faint ring. Sampling is capped per frame and blocks behind the camera are
-     * culled before the column lookup, so a 64-block wave stays a handful of hundred reads.
+     * and outline, joined by a faint ring. Sampling is capped per frame and per wave, and blocks behind the
+     * camera are culled before the column lookup, so a 64-block wave stays a handful of hundred reads.
+     * Returns the number of block tops emitted so the caller can keep the frame-wide budget exact.
      */
-    /**
-     * The wavefront as a band of real block tops: every column whose centre lies inside the band glows by its
-     * distance to the front, sitting on that column's own surface so the wave climbs and drops with terrain.
-     */
-    private void worldWave(FxFrame f, Impact impact, double age, int rgb, double alphaScale) {
-        if (f.client.level == null || waveBudget <= 0) return;
+    private int worldWave(FxFrame f, Impact impact, double age, int rgb, double alphaScale, int budget) {
+        if (f.client.level == null || budget <= 0) return 0;
         double progress = TerrainWave.progress(age, TerrainWave.MAX_LIFE_SECONDS);
-        if (progress >= 1) return;
+        if (progress >= 1) return 0;
         double radius = TerrainWave.radius(progress, worldWaveRadius.value());
         double alpha = alphaScale * TerrainWave.alpha(progress);
-        if (radius < 0.5 || alpha < 0.01) return;
+        if (radius < 0.5 || alpha < 0.01) return 0;
         double thickness = worldWaveThickness.value();
         int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
-        double outer = radius + 1.2, inner = Math.max(0, radius - thickness);
-        int cx = (int) Math.floor(impact.x), cz = (int) Math.floor(impact.z), span = (int) Math.ceil(outer) + 1;
+        int cx = (int) Math.floor(impact.x), cz = (int) Math.floor(impact.z);
+        int span = (int) Math.ceil(radius + TerrainWave.LEADING_EDGE) + 1;
         net.minecraft.world.level.Level level = f.client.level;
-        for (int dx = -span; dx <= span && waveBudget > 0; dx++) {
-            for (int dz = -span; dz <= span && waveBudget > 0; dz++) {
+        int used = 0;
+        for (int dx = -span; dx <= span && used < budget; dx++) {
+            for (int dz = -span; dz <= span && used < budget; dz++) {
                 int bx = cx + dx, bz = cz + dz;
                 double ox = bx + 0.5 - impact.x, oz = bz + 0.5 - impact.z;
                 double distance = Math.sqrt(ox * ox + oz * oz);
-                if (distance > outer || distance < inner) continue;
-                if (distance > 1 && !TerrainWave.inFront(ox / distance, oz / distance, f.forwardX, f.forwardZ, 0.35)) continue;
+                if (!TerrainWave.selectsCell(ox, oz, distance, radius, thickness, f.forwardX, f.forwardZ)) continue;
                 double glow = TerrainWave.frontGlow(distance, radius, thickness) * alpha;
                 if (glow < 0.02) continue;
                 double ground = surface(level, bx + 0.5, impact.floorY, bz + 0.5);
                 if (!Double.isFinite(ground)) continue;
-                waveBudget--;
-                double[] top = TerrainWave.blockTop(bx + 0.5, bz + 0.5, ground);
+                used++;
+                TerrainWave.blockTop(bx + 0.5, bz + 0.5, ground, waveTop);
                 int fill = FxShapes.argb(EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.25 * glow), Math.min(1, 0.85 * glow));
                 // blockTop winds clockwise seen from above; reversed so the face points up and survives culling.
-                f.batch.quad(top[0] - f.camX, top[1] - f.camY, top[2] - f.camZ,
-                        top[9] - f.camX, top[10] - f.camY, top[11] - f.camZ,
-                        top[6] - f.camX, top[7] - f.camY, top[8] - f.camZ,
-                        top[3] - f.camX, top[4] - f.camY, top[5] - f.camZ, fill, fill, fill, fill, false);
+                f.batch.quad(waveTop[0] - f.camX, waveTop[1] - f.camY, waveTop[2] - f.camZ,
+                        waveTop[9] - f.camX, waveTop[10] - f.camY, waveTop[11] - f.camZ,
+                        waveTop[6] - f.camX, waveTop[7] - f.camY, waveTop[8] - f.camZ,
+                        waveTop[3] - f.camX, waveTop[4] - f.camY, waveTop[5] - f.camZ, fill, fill, fill, fill, false);
                 if (glow / alpha > 0.35) {
                     int edge = FxShapes.argb(bright, glow);
                     for (int e = 0; e < 4; e++) {
                         int p = e * 3, q = ((e + 1) % 4) * 3;
-                        f.batch.glowLine(top[p] - f.camX, top[p + 1] - f.camY, top[p + 2] - f.camZ,
-                                top[q] - f.camX, top[q + 1] - f.camY, top[q + 2] - f.camZ, edge, 1.2F, false);
+                        f.batch.glowLine(waveTop[p] - f.camX, waveTop[p + 1] - f.camY, waveTop[p + 2] - f.camZ,
+                                waveTop[q] - f.camX, waveTop[q + 1] - f.camY, waveTop[q + 2] - f.camZ, edge, 1.2F, false);
                     }
                 }
             }
         }
+        return used;
     }
 
     /** Walkable surface of a column near {@code nearY}; falls back to the heightmap for cliffs and platforms. */

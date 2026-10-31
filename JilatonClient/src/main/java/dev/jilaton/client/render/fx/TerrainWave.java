@@ -12,8 +12,36 @@ public final class TerrainWave {
     public static final double MAX_LIFE_SECONDS = 1.6;
     /** Hard cap on glowing block tops drawn per frame across every live wave. */
     public static final int MAX_BLOCKS_PER_FRAME = 1400;
+    /** Length of the sharp falloff ahead of the front, in blocks. */
+    public static final double LEADING_EDGE = 1.2;
+    /** Cells this close to the impact are always sampled, whatever the view direction. */
+    public static final double CORE_RADIUS = 1.0;
+    /** Angular cull margin in blocks: cells slightly behind the camera plane still count as visible. */
+    public static final double FRONT_MARGIN = 0.35;
 
     private TerrainWave() { }
+
+    /**
+     * Seconds a hit must stay alive so every enabled style can finish. The terrain wave expands for its full
+     * {@link #MAX_LIFE_SECONDS} regardless of the configured particle lifetime, so it sets the floor.
+     */
+    public static double impactLife(double configuredLifeSeconds) {
+        return Math.max(Math.max(0, configuredLifeSeconds) * 1.2, MAX_LIFE_SECONDS);
+    }
+
+    /** Per-wave share of the frame-wide block budget, so one wave cannot starve every wave behind it. */
+    public static int blockBudget(int liveWaves) {
+        return Math.max(1, MAX_BLOCKS_PER_FRAME / Math.max(1, liveWaves));
+    }
+
+    /** Whether a cell at {@code distance} from the impact lies inside the visible wave band. */
+    public static boolean selectsCell(double ox, double oz, double distance, double radius, double thickness,
+                                      double forwardX, double forwardZ) {
+        if (distance > radius + LEADING_EDGE) return false;
+        if (distance < Math.max(0, radius - Math.max(0.5, thickness))) return false;
+        if (distance <= CORE_RADIUS) return true;
+        return inFront(ox / distance, oz / distance, forwardX, forwardZ, FRONT_MARGIN);
+    }
 
     /** Fraction of the wave's life that has elapsed, clamped to [0, 1]. */
     public static double progress(double ageSeconds, double lifeSeconds) {
