@@ -13,6 +13,8 @@ public final class WingMotion {
     public static final double LAG_STEP = 0.085;
     private static final double TOP_FAN = 78;
     private static final double FAN_SPREAD = 86;
+    /** Forward component of every feather, so the fan sits slightly behind the shoulder plane. */
+    private static final double FEATHER_SWEEP_BACK = -0.16;
 
     private WingMotion() { }
 
@@ -109,5 +111,20 @@ public final class WingMotion {
 
     public static double bend(String style) {
         return style.equals("Blade") ? -0.02 : style.equals("Energy") ? -0.14 : -0.06;
+    }
+
+    /**
+     * Pose frame of one feather on one side. The fan angle is measured in the wing's left-handed body frame
+     * (local +X is the entity's right), and the flap sweeps that fan up and down, so the leading feather
+     * rises before the tip does. The fan direction is authored directly, then the trailing X mirror restores
+     * the submit path's winding handedness without touching the direction or the up axis (the strip is
+     * symmetric in X). Public so the headless tests can pin the fan direction.
+     */
+    public static Transform featherFrame(Transform pivot, int side, double fanDegrees, double flapDegrees) {
+        double angle = Math.toRadians(fanDegrees + flapDegrees);
+        double dirX = side * Math.cos(angle);
+        double dirY = Math.sin(angle);
+        return pivot.compose(Transform.lookAlong(dirX, dirY, FEATHER_SWEEP_BACK, 0, 1, 0))
+                .compose(Transform.mirrorX());
     }
 }

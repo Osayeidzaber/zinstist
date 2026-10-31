@@ -75,4 +75,29 @@ public final class CompanionMotion {
     public static double shardOrbit(String shape) {
         return shape.equals("Sentinel") ? 1.55 : 1.25;
     }
+
+    /**
+     * Body frame of the companion: it faces its own motion and leans into a turn. {@code bankDegrees} is
+     * positive when the companion slides toward its own right, so a positive bank must lift the right side
+     * (the up axis gains +X); a proper local roll tips the up axis toward -X, hence the negated angle.
+     * Public so the headless tests can pin the handedness.
+     */
+    public static Transform bankedFrame(double x, double y, double z,
+                                        double vx, double vy, double vz, double bankDegrees) {
+        return Transform.translation(x, y, z)
+                .compose(Transform.lookAlong(vx, vy, vz, 0, 1, 0))
+                .spin(0, 0, -bankDegrees);
+    }
+
+    /** Ring frame: a 72 degree tilt plus the orbit's own spin, both relative to the banked body. */
+    public static Transform ringFrame(Transform base, double orbitPhase) {
+        return base.spin(0, 72, 0)
+                .spin(Math.toDegrees(orbitPhase * 1.4), 0, 0);
+    }
+
+    /** One shard on its orbit around the core; {@code bob} is the small vertical wobble. */
+    public static Transform shardFrame(Transform base, double angle, double orbit, double bob) {
+        return base.translate(Math.cos(angle) * orbit, bob, Math.sin(angle) * orbit)
+                .spin(0, Math.toDegrees(angle), 0);
+    }
 }

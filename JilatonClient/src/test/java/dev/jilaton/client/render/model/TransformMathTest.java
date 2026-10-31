@@ -136,6 +136,25 @@ class TransformMathTest {
         assertEquals(-1.0, determinant(posed), EPS, "the knife must not be mirrored by its pose");
     }
 
+    @Test
+    void mirrorXFlipsHandednessWithoutTouchingTheFacingOrUpAxes() {
+        Transform oriented = Transform.translation(1, 2, 3)
+                .compose(Transform.lookAlong(0.3, 0.2, 1, 0, 1, 0));
+        Transform mirrored = oriented.compose(Transform.mirrorX());
+
+        assertEquals(-determinant(oriented), determinant(mirrored), EPS, "one mirror flips the handedness");
+        assertVector(oriented.originX(), oriented.originY(), oriented.originZ(),
+                new double[]{mirrored.originX(), mirrored.originY(), mirrored.originZ()}, EPS, "origin");
+        assertVector(oriented.upX(), oriented.upY(), oriented.upZ(),
+                new double[]{mirrored.upX(), mirrored.upY(), mirrored.upZ()}, EPS, "up");
+        assertVector(oriented.forwardX(), oriented.forwardY(), oriented.forwardZ(),
+                new double[]{mirrored.forwardX(), mirrored.forwardY(), mirrored.forwardZ()}, EPS, "forward");
+        assertVector(-oriented.rightX(), -oriented.rightY(), -oriented.rightZ(),
+                new double[]{mirrored.rightX(), mirrored.rightY(), mirrored.rightZ()}, EPS, "right");
+        assertBasis(oriented, oriented.compose(Transform.mirrorX()).compose(Transform.mirrorX()), EPS,
+                "two mirrors cancel");
+    }
+
     private static void assertBasis(Transform expected, Transform actual, double eps) {
         assertBasis(expected, actual, eps, "basis");
     }
