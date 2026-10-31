@@ -212,10 +212,14 @@ public final class FxParticles {
         dLife[i] = dLife[last]; dAlpha[i] = dAlpha[last]; dSeed[i] = dSeed[last]; dColor[i] = dColor[last]; dOwner[i] = dOwner[last];
     }
 
+    /** Per-thread scratch cursor for surface probes; world effects call {@link #groundY} thousands of times a frame. */
+    private static final ThreadLocal<BlockPos.MutableBlockPos> GROUND_CURSOR =
+            ThreadLocal.withInitial(BlockPos.MutableBlockPos::new);
+
     /** Top of the first solid surface at or below {@code y}, searching {@code depth} blocks; NaN if none. */
     public static double groundY(Level level, double x, double y, double z, int depth) {
         if (level == null) return Double.NaN;
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos pos = GROUND_CURSOR.get();
         int bx = (int) Math.floor(x), bz = (int) Math.floor(z), top = (int) Math.floor(y);
         for (int by = top; by >= top - depth; by--) {
             pos.set(bx, by, bz);

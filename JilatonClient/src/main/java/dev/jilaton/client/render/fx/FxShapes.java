@@ -63,16 +63,15 @@ public final class FxShapes {
             double a0 = rotation + (i - 0.5) * Math.PI * 2 / points;
             double a1 = rotation + i * Math.PI * 2 / points;
             double a2 = rotation + (i + 0.5) * Math.PI * 2 / points;
-            double[] p0 = basis(f, Math.cos(a0) * inner, Math.sin(a0) * inner);
-            double[] p1 = basis(f, Math.cos(a1) * radius, Math.sin(a1) * radius);
-            double[] p2 = basis(f, Math.cos(a2) * inner, Math.sin(a2) * inner);
-            f.batch.quad(cx, cy, cz, cx + p0[0], cy + p0[1], cz + p0[2], cx + p1[0], cy + p1[1], cz + p1[2],
-                    cx + p2[0], cy + p2[1], cz + p2[2], core, core, tip, core, walls);
+            double i0x = Math.cos(a0) * inner, i0y = Math.sin(a0) * inner;
+            double r1x = Math.cos(a1) * radius, r1y = Math.sin(a1) * radius;
+            double i2x = Math.cos(a2) * inner, i2y = Math.sin(a2) * inner;
+            f.batch.quad(cx, cy, cz,
+                    cx + f.rightX * i0x + f.upX * i0y, cy + f.rightY * i0x + f.upY * i0y, cz + f.rightZ * i0x + f.upZ * i0y,
+                    cx + f.rightX * r1x + f.upX * r1y, cy + f.rightY * r1x + f.upY * r1y, cz + f.rightZ * r1x + f.upZ * r1y,
+                    cx + f.rightX * i2x + f.upX * i2y, cy + f.rightY * i2x + f.upY * i2y, cz + f.rightZ * i2x + f.upZ * i2y,
+                    core, core, tip, core, walls);
         }
-    }
-
-    private static double[] basis(FxFrame f, double a, double b) {
-        return new double[]{f.rightX * a + f.upX * b, f.rightY * a + f.upY * b, f.rightZ * a + f.upZ * b};
     }
 
     /** Camera-facing ring band with a feathered outer edge. */
@@ -86,13 +85,21 @@ public final class FxShapes {
         for (int i = 0; i < segments; i++) {
             double a = i * Math.PI * 2 / segments, b = (i + 1) * Math.PI * 2 / segments;
             double ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-            double[] ai = basis(f, ca * inner, sa * inner), bi = basis(f, cb * inner, sb * inner);
-            double[] am = basis(f, ca * radius, sa * radius), bm = basis(f, cb * radius, sb * radius);
-            double[] ao = basis(f, ca * outer, sa * outer), bo = basis(f, cb * outer, sb * outer);
-            f.batch.quad(cx + ai[0], cy + ai[1], cz + ai[2], cx + bi[0], cy + bi[1], cz + bi[2],
-                    cx + bm[0], cy + bm[1], cz + bm[2], cx + am[0], cy + am[1], cz + am[2], edge, edge, mid, mid, walls);
-            f.batch.quad(cx + am[0], cy + am[1], cz + am[2], cx + bm[0], cy + bm[1], cz + bm[2],
-                    cx + bo[0], cy + bo[1], cz + bo[2], cx + ao[0], cy + ao[1], cz + ao[2], mid, mid, edge, edge, walls);
+            double aiX = ca * inner, aiY = sa * inner, biX = cb * inner, biY = sb * inner;
+            double amX = ca * radius, amY = sa * radius, bmX = cb * radius, bmY = sb * radius;
+            double aoX = ca * outer, aoY = sa * outer, boX = cb * outer, boY = sb * outer;
+            f.batch.quad(
+                    cx + f.rightX * aiX + f.upX * aiY, cy + f.rightY * aiX + f.upY * aiY, cz + f.rightZ * aiX + f.upZ * aiY,
+                    cx + f.rightX * biX + f.upX * biY, cy + f.rightY * biX + f.upY * biY, cz + f.rightZ * biX + f.upZ * biY,
+                    cx + f.rightX * bmX + f.upX * bmY, cy + f.rightY * bmX + f.upY * bmY, cz + f.rightZ * bmX + f.upZ * bmY,
+                    cx + f.rightX * amX + f.upX * amY, cy + f.rightY * amX + f.upY * amY, cz + f.rightZ * amX + f.upZ * amY,
+                    edge, edge, mid, mid, walls);
+            f.batch.quad(
+                    cx + f.rightX * amX + f.upX * amY, cy + f.rightY * amX + f.upY * amY, cz + f.rightZ * amX + f.upZ * amY,
+                    cx + f.rightX * bmX + f.upX * bmY, cy + f.rightY * bmX + f.upY * bmY, cz + f.rightZ * bmX + f.upZ * bmY,
+                    cx + f.rightX * boX + f.upX * boY, cy + f.rightY * boX + f.upY * boY, cz + f.rightZ * boX + f.upZ * boY,
+                    cx + f.rightX * aoX + f.upX * aoY, cy + f.rightY * aoX + f.upY * aoY, cz + f.rightZ * aoX + f.upZ * aoY,
+                    mid, mid, edge, edge, walls);
         }
     }
 
@@ -131,21 +138,18 @@ public final class FxShapes {
                                int rgb, double alpha, boolean walls) {
         if (alpha <= 0.004) return;
         double cx = x - f.camX, cy = y - f.camY, cz = z - f.camZ;
-        double[][] ring = new double[4][];
-        for (int i = 0; i < 4; i++) {
-            double a = yaw + i * Math.PI / 2;
-            ring[i] = new double[]{cx + Math.cos(a) * radius, cy, cz + Math.sin(a) * radius};
-        }
         double topY = cy + height, bottomY = cy - height;
         int face = argb(rgb, alpha * 0.35), faceDark = argb(EffectBatch.mixRgb(rgb, 0, 0.45), alpha * 0.35);
         int edge = argb(rgb, alpha);
         for (int i = 0; i < 4; i++) {
-            double[] a = ring[i], b = ring[(i + 1) % 4];
-            f.batch.quad(a[0], a[1], a[2], b[0], b[1], b[2], cx, topY, cz, cx, topY, cz, face, face, face, face, walls);
-            f.batch.quad(a[0], a[1], a[2], b[0], b[1], b[2], cx, bottomY, cz, cx, bottomY, cz, faceDark, faceDark, faceDark, faceDark, walls);
-            f.batch.line(a[0], a[1], a[2], b[0], b[1], b[2], edge, 1.5F, walls);
-            f.batch.line(a[0], a[1], a[2], cx, topY, cz, edge, 1.5F, walls);
-            f.batch.line(a[0], a[1], a[2], cx, bottomY, cz, edge, 1.5F, walls);
+            double a0 = yaw + i * Math.PI / 2, a1 = yaw + (i + 1) * Math.PI / 2;
+            double ax = cx + Math.cos(a0) * radius, az = cz + Math.sin(a0) * radius;
+            double bx = cx + Math.cos(a1) * radius, bz = cz + Math.sin(a1) * radius;
+            f.batch.quad(ax, cy, az, bx, cy, bz, cx, topY, cz, cx, topY, cz, face, face, face, face, walls);
+            f.batch.quad(ax, cy, az, bx, cy, bz, cx, bottomY, cz, cx, bottomY, cz, faceDark, faceDark, faceDark, faceDark, walls);
+            f.batch.line(ax, cy, az, bx, cy, bz, edge, 1.5F, walls);
+            f.batch.line(ax, cy, az, cx, topY, cz, edge, 1.5F, walls);
+            f.batch.line(ax, cy, az, cx, bottomY, cz, edge, 1.5F, walls);
         }
     }
 

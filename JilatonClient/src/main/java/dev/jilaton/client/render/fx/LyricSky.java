@@ -26,6 +26,8 @@ public final class LyricSky {
     public static final double CROWD_ANGLE_DEGREES = 14;
     /** Elevation distance under which a new line sits on top of an existing one. */
     public static final double CROWD_ELEVATION_DEGREES = 4;
+    /** Hard bound on live sky lines, independent of any caller-supplied setting. */
+    public static final int MAX_LINES = 8;
 
     /** One placed line. Its direction is fixed at birth; only visibility animates. */
     public static final class Entry {
@@ -54,8 +56,9 @@ public final class LyricSky {
     }
 
     private final List<Entry> entries = new ArrayList<>();
+    private final List<Entry> entriesView = Collections.unmodifiableList(entries);
 
-    public List<Entry> entries() { return Collections.unmodifiableList(entries); }
+    public List<Entry> entries() { return entriesView; }
 
     public void clear() { entries.clear(); }
 
@@ -86,11 +89,12 @@ public final class LyricSky {
         }
         Entry entry = new Entry(text, lineIndex, azimuth, elevation, now);
         entries.add(entry);
+        int cap = Math.max(1, Math.min(MAX_LINES, maxLines));
         int live = 0;
         for (int i = entries.size() - 1; i >= 0; i--) {
             Entry e = entries.get(i);
             if (e.evicted()) continue;
-            if (++live > Math.max(1, maxLines)) e.evictedNanos = now;
+            if (++live > cap) e.evictedNanos = now;
         }
         return entry;
     }
@@ -107,7 +111,11 @@ public final class LyricSky {
     /** Drops lines that have fully expired; the sung line never times out. */
     public void step(long now, double lingerSeconds, int activeLineIndex) {
         Entry active = active(activeLineIndex);
-        entries.removeIf(e -> e.state(now, lingerSeconds, e == active) == LyricStates.State.EXPIRED);
+        // Reverse index removal keeps the per-frame path allocation-free (removeIf would capture a lambda).
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            Entry e = entries.get(i);
+            if (e.state(now, lingerSeconds, e == active) == LyricStates.State.EXPIRED) entries.remove(i);
+        }
     }
 
     public static double alpha(Entry e, long now, double lingerSeconds, boolean active) {
@@ -129,12 +137,12 @@ public final class LyricSky {
      * bottom-left, bottom-right, top-right, top-left (matching the {@code (0,1) (1,1) (1,0) (0,0)} UVs).
      */
     public static float[] corners(double azimuth, double elevation, double radius, double width, double height) {
-        double[] dir = direction(azimuth, elevation);
-        double dx = dir[0], dy = dir[1], dz = dir[2];
-        double horizontal = Math.hypot(dx, dz);
+        double horizontal = Math.cos(elevation);
+        double dx = -Math.sin(azimuth) * horizontal, dy = Math.sin(elevation), dz = Math.cos(azimuth) * horizontal;
+        double horiz = Math.hypot(dx, dz);
         // Screen right for a viewer looking along dir with world up: dir x up, normalized.
-        double rx = horizontal > 1e-9 ? -dz / horizontal : 1;
-        double rz = horizontal > 1e-9 ? dx / horizontal : 0;
+        double rx = horiz > 1e-9 ? -dz / horiz : 1;
+        double rz = horiz > 1e-9 ? dx / horiz : 0;
         // Quad up: right x dir, so the text stays upright in the sky.
         double ux = -rz * dy;
         double uy = rz * dx - rx * dz;

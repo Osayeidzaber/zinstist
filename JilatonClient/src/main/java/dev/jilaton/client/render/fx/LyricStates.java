@@ -49,7 +49,7 @@ public final class LyricStates {
             case ACTIVE, TRANSITIONING -> 1;
             case FADING -> evictedAge >= 0
                     ? Math.max(0, 1 - evictedAge / EVICT_SECONDS)
-                    : Math.max(0, (lingerSeconds + FADE_SECONDS - age) / FADE_SECONDS);
+                    : Math.max(0, Math.min(1, (lingerSeconds + FADE_SECONDS - age) / FADE_SECONDS));
             case EXPIRED -> 0;
         };
     }
