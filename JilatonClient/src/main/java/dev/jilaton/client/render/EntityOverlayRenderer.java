@@ -258,15 +258,20 @@ public final class EntityOverlayRenderer implements AutoCloseable {
             Font.DisplayMode mode = text.seeThrough() ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL;
             int width = font.width(text.plain());
             float x = text.align() < 0 ? 0 : text.align() > 0 ? -width : -width / 2F;
-            if ((text.glow() >>> 24) != 0) {
-                String plain = text.plain();
-                for (int i = 0; i < 4; i++) {
-                    float ox = (i & 1) == 0 ? -0.7F : 0.7F, oy = (i & 2) == 0 ? -0.7F : 0.7F;
-                    font.drawInBatch(plain, x + ox, oy, text.glow(), false, matrix, buffers, mode, 0, LightTexture.FULL_BRIGHT);
-                }
+            // Lit text (the "glow" lines, i.e. the active lyric) gets the glowing-sign 8-way dark outline, which keeps
+            // the pixel font readable on bright sky, snow or sand; soft offset copies only smeared the letters.
+            boolean outlined = (text.glow() >>> 24) != 0 && !text.seeThrough();
+            if (outlined && (text.background() >>> 24) != 0) {
+                font.drawInBatch(text.plain(), x, 0, 0, false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
             }
             for (FxFrame.Run run : text.runs()) {
-                font.drawInBatch(run.text(), x, 0, run.color(), false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
+                if (outlined) {
+                    int outline = (int) Math.round(((run.color() >>> 24) & 0xFF) * 0.9) << 24 | 0x060606;
+                    font.drawInBatch8xOutline(net.minecraft.network.chat.Component.literal(run.text()).getVisualOrderText(),
+                            x, 0, run.color(), outline, matrix, buffers, LightTexture.FULL_BRIGHT);
+                } else {
+                    font.drawInBatch(run.text(), x, 0, run.color(), false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
+                }
                 x += font.width(run.text());
             }
             matrices.popPose();

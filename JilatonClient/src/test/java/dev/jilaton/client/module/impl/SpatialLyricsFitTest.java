@@ -19,10 +19,10 @@ class SpatialLyricsFitTest {
     void overlongLineEllipsisesOnAWordBoundaryWithinTheSlot() {
         Lyrics lyrics = Lyrics.parse("[00:00.00]alpha beta gamma delta epsilon zeta eta theta");
         String fitted = SpatialLyricsModule.fittedLine(lyrics, 0, 0, SIX_PX);
-        assertEquals("alpha beta gamma\u2026", fitted);
+        assertEquals("alpha beta gamma delta epsilon\u2026", fitted);
         assertTrue(HudText.width(fitted, SIX_PX) <= SpatialLyricsModule.MAX_LINE_PIXELS);
-        // 0.020 world units per font pixel: the slot is 2.5 units wide per font-size unit, as before.
-        assertEquals(2.5, SpatialLyricsModule.MAX_LINE_PIXELS * 0.020, 1e-9);
+        // 0.020 world units per font pixel: the slot is 4 units wide per font-size unit.
+        assertEquals(4.0, SpatialLyricsModule.MAX_LINE_PIXELS * 0.020, 1e-9);
         String kept = fitted.substring(0, fitted.length() - 1);
         assertTrue(lyrics.lines().get(0).text().startsWith(kept));
         assertTrue(Character.isWhitespace(lyrics.lines().get(0).text().charAt(kept.length())));

@@ -66,7 +66,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private final BooleanSetting titleFallback = addSetting(new BooleanSetting("title_fallback", "Show track title when no lyrics", true));
     private final NumberSetting trailLines = addSetting(new NumberSetting("trail_lines", "World Trail: lines kept", 1, 8, 1, 5));
     private final NumberSetting linger = addSetting(new NumberSetting("linger", "World Trail: linger (s)", 3, 40, 1, 14));
-    private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 4));
+    private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 2));
     private final LyricTrail trail = new LyricTrail();
     private long lastTrailNanos;
 
@@ -237,7 +237,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             // The text is already fitted to MAX_LINE_PIXELS, so glyphs keep one size: an overlong line loses
             // whole words to an ellipsis instead of shrinking below the readable size.
             float size = (float) (0.020 * fontSize.value() * scale);
-            int glowColor = glow.value() > 0 && slot == 0 ? FxShapes.argb(rgb, alpha * glow.value() * 0.35) : 0;
+            int glowColor = FxShapes.argb(rgb, Math.max(0.05, alpha * Math.max(glow.value(), 0.2) * 0.35));
             int background = panel.value() ? FxShapes.argb(0x000000, alpha * 0.45) : 0;
             boolean billboard = facing.value().equals("Face camera");
             f.text(new FxFrame.WorldText(x, y, z, runs, size, background, glowColor, billboard,
@@ -304,8 +304,9 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             double appear = f.reducedMotion ? 1 : LyricTrail.appear(e, f.now);
             y -= 0.12 * (1 - appear);
             float size = (float) (0.020 * fontSize.value() * (0.86 + 0.14 * appear));
-            // Depth layers first, back to front, so see-through mode still paints the face last.
-            for (int layer = layers; layer >= 1; layer--) {
+            // Depth layers first, back to front, so see-through mode still paints the face last. Only the lit line
+            // is extruded: on dimmed lines the layers smeared the letters into the terrain.
+            for (int layer = isActive ? layers : 0; layer >= 1; layer--) {
                 double back = layer * 0.012 * fontSize.value();
                 int shade = shaded(isActive ? rgb : 0x6A6A70, 0x0B0B10, 0.45 + 0.5 * layer / Math.max(1, layers));
                 f.text(new FxFrame.WorldText(e.x + e.dirX * back, y + e.dirY * back, e.z + e.dirZ * back,
@@ -318,7 +319,8 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
                 shine(e.text, timed ? active : null, timed ? Lyrics.wordsSung(active, position) : 0, rgb, alpha,
                         f.seconds(), runs);
             } else runs.add(new FxFrame.Run(e.text, FxShapes.argb(0xDCDCDC, alpha)));
-            int glowColor = glow.value() > 0 && isActive ? FxShapes.argb(rgb, alpha * glow.value() * 0.35) : 0;
+            // Every line is outlined (a non-zero glow marks it for the renderer's 8-way outline) so it stays legible.
+            int glowColor = FxShapes.argb(rgb, Math.max(0.05, alpha * Math.max(glow.value(), 0.2) * 0.35));
             int background = panel.value() ? FxShapes.argb(0x000000, alpha * 0.45) : 0;
             f.text(new FxFrame.WorldText(e.x, y, e.z, runs, size, background, glowColor, false, e.yaw,
                     !occlusion.value(), alignValue));
@@ -394,8 +396,11 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
         return d >= 1 ? 0 : (1 - d) * (1 - d);
     }
 
-    /** Widest drawn line in font pixels; at 0.020 units per pixel this is 2.5 world units per font-size unit. */
-    static final int MAX_LINE_PIXELS = 125;
+    /**
+     * Widest drawn line in font pixels; at 0.020 units per pixel this is 4 world units per font-size unit, enough
+     * for a typical full lyric line so it reads as a sentence instead of a few words and an ellipsis.
+     */
+    static final int MAX_LINE_PIXELS = 200;
 
     /**
      * Text drawn in {@code slot} relative to the active {@code index}, fitted on a word boundary to

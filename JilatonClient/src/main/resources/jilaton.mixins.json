@@ -84,7 +84,9 @@
     "GameRendererPostEffectAccess",
     "FontProviderAccess",
     "PauseScreenRedirectMixin",
-    "FontTextureSamplerMixin"
+    "GlyphSamplerMixin",
+    "FontTextureRegistryMixin",
+    "HotbarStyleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

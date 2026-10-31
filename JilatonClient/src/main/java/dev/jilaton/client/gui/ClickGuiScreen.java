@@ -43,7 +43,8 @@ public final class ClickGuiScreen extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     private final Font font = JilatonType.font();
     private static final int ROW_HEIGHT = ShellMetrics.MODULE_CARD_HEIGHT;
-    private static final int VISUAL_HEIGHT = ShellMetrics.VISUAL_CARD_HEIGHT;
+    /** Visuals preview cards are taller than the shared metric so the miniature reads (board: 128px at 1280). */
+    private static final int VISUAL_HEIGHT = 104;
     private static final int COLUMN_GAP = ShellMetrics.COLUMN_GAP;
     private static final int ROW_GAP = ShellMetrics.ROW_GAP;
     private static final int SETTING_ROW = 30;
@@ -87,8 +88,13 @@ public final class ClickGuiScreen extends Screen {
                                 int appearY, int reducedY, int motionY, int motionX, int motionWidth,
                                 int controlsY, int height) { }
 
-    private record ThemePage(int top, int columns, int cardWidth, int cardHeight, int customTop,
-                             int sliderX, int sliderWidth, int rowStep, int panelHeight, int height) { }
+    /**
+     * Theme page geometry (board "ClickGUI · Theme"): accent swatches in a 4x2 grid, the custom HSB sliders when
+     * Custom is picked, the motion and type rows, and a 300px live preview on the right when there is room.
+     */
+    private record ThemePage(int x, int top, int width, int columns, int cardWidth, int cardHeight, int customTop,
+                             int customHeight, int motionTop, int sliderX, int sliderWidth, int rowStep,
+                             int previewX, int previewWidth) { }
 
     private final ModuleManager modules;
     private final ClientConfig config;
@@ -484,7 +490,7 @@ public final class ClickGuiScreen extends Screen {
         int top = layout.listTop();
         int offset = (int) Math.round(scroll);
         int bottom = layout.listBottom();
-        graphics.enableScissor(layout.contentX(), top, layout.contentRight(), bottom);
+        graphics.enableScissor(layout.contentX(), top, layout.contentX() + gridWidth(), bottom);
         // The viewport ends at listBottom, one hint strip above the panel floor: scrolled rows are
         // clipped there and never paint over the footer.
         if (view.modules().isEmpty()) {
@@ -503,6 +509,206 @@ public final class ClickGuiScreen extends Screen {
         }
         graphics.disableScissor();
         drawScrollbar(graphics, view.maxScroll(), top, bottom);
+        ClientModule drawer = drawerModule();
+        if (drawer != null) renderDrawer(graphics, drawer, mouseX, mouseY);
+    }
+
+    /*
+     * Settings drawer (board "ClickGUI · Visuals + Knife settings"): a 300px column on the right that replaces the
+     * inline expansion on the Visuals page, so opening settings never reflows the cards under the cursor. It renders
+     * any module's settings with the same row components; short choice lists become a 2-column chip grid.
+     */
+    private static final int DRAWER_W = 300, DRAWER_GAP = 12, DRAWER_HEAD = 46, DRAWER_PAD = 16;
+    private double drawerScroll;
+    private String drawerFor;
+
+    private record DrawerRow(Setting setting, int y, int height) { }
+
+    /** The Visuals module whose settings are open in the drawer, if any. */
+    private ClientModule drawerModule() {
+        if (page != Page.MODULES || !selectedCategory.equals("Visuals") || expandedId == null) return null;
+        for (ClientModule module : allModules)
+            if (module.id().equals(expandedId) && module.category() == ModuleCategory.RENDER) return module;
+        return null;
+    }
+
+    private int gridWidth() {
+        return drawerModule() == null ? layout.contentWidth() : layout.contentWidth() - DRAWER_W - DRAWER_GAP;
+    }
+
+    private int drawerX() { return layout.contentRight() - DRAWER_W; }
+
+    private int drawerY() { return layout.listTop() - 4; }
+
+    private static boolean chipGrid(Setting setting) {
+        return setting instanceof ChoiceSetting choice && choice.choices().size() >= 3 && choice.choices().size() <= 8;
+    }
+
+    /** Row positions relative to the drawer top, before scrolling. */
+    private List<DrawerRow> drawerRows(ClientModule module) {
+        List<DrawerRow> rows = new ArrayList<>();
+        int y = DRAWER_HEAD + 6;
+        for (Setting setting : module.settings()) {
+            int height;
+            if (chipGrid(setting)) height = 22 + ((((ChoiceSetting) setting).choices().size() + 1) / 2) * 30 + 8;
+            else if (setting instanceof NumberSetting) height = 44;
+            else height = SETTING_ROW + 2;
+            rows.add(new DrawerRow(setting, y, height));
+            y += height;
+        }
+        return rows;
+    }
+
+    private int drawerContentHeight(ClientModule module) {
+        List<DrawerRow> rows = drawerRows(module);
+        int end = rows.isEmpty() ? DRAWER_HEAD : rows.get(rows.size() - 1).y() + rows.get(rows.size() - 1).height();
+        return end + (module.id().equals("cosmetic_knife") ? 40 : 12);
+    }
+
+    private int drawerScrollLimit(ClientModule module) {
+        int view = layout.listBottom() - drawerY();
+        return Math.max(0, drawerContentHeight(module) - view);
+    }
+
+    private void renderDrawer(GuiGraphics graphics, ClientModule module, int mouseX, int mouseY) {
+        if (!module.id().equals(drawerFor)) {
+            drawerFor = module.id();
+            drawerScroll = 0;
+        }
+        drawerScroll = Math.max(0, Math.min(drawerScrollLimit(module), drawerScroll));
+        double open = animate("drawer", 1);
+        int x0 = drawerX() + (int) Math.round((1 - open) * 24), y0 = drawerY();
+        int height = layout.listBottom() - y0;
+        JilatonUi.fillRounded(graphics, x0, y0, DRAWER_W, height, 12, ShellPalette.EXPANSION);
+        JilatonUi.strokeRounded(graphics, x0, y0, DRAWER_W, height, 12, ShellPalette.STROKE);
+        int inner = x0 + DRAWER_PAD, right = x0 + DRAWER_W - DRAWER_PAD;
+
+        drawScaled(graphics, fit(module.name(), Math.round((DRAWER_W - 80) / 1.75F)), inner, y0 + 15, 1.75F, ShellPalette.TEXT);
+        boolean closeHover = inside(mouseX, mouseY, right - 22, y0 + 12, 22, 22);
+        double closeT = animate("drawer:close", closeHover ? 1 : 0);
+        if (closeT > 0.02) JilatonUi.fillRounded(graphics, right - 22, y0 + 12, 22, 22, 6, JilatonUi.alpha(ShellPalette.CONTROL_HOVER, closeT));
+        graphics.drawString(font, "\u00d7", right - 14, y0 + 19, JilatonUi.mix(ShellPalette.TEXT_2, ShellPalette.TEXT, closeT), false);
+        graphics.fill(x0 + 1, y0 + DRAWER_HEAD - 1, x0 + DRAWER_W - 1, y0 + DRAWER_HEAD, ShellPalette.STROKE);
+
+        int offset = (int) Math.round(drawerScroll);
+        graphics.enableScissor(x0, y0 + DRAWER_HEAD, x0 + DRAWER_W, y0 + height - 2);
+        for (DrawerRow row : drawerRows(module)) {
+            int y = y0 + row.y() - offset;
+            if (y + row.height() < y0 + DRAWER_HEAD || y > y0 + height) continue;
+            renderDrawerRow(graphics, module, row, inner, right, y, mouseX, mouseY);
+        }
+        if (module.id().equals("cosmetic_knife")) {
+            int y = y0 + drawerContentHeight(module) - 34 - offset;
+            graphics.drawString(font, "Hold V to keep a CS knife spinning.", inner, y, ShellPalette.TEXT_3, false);
+            graphics.drawString(font, "Blade colour follows the sword you hold.", inner, y + 11, ShellPalette.TEXT_3, false);
+        }
+        graphics.disableScissor();
+        int limit = drawerScrollLimit(module);
+        if (limit > 0) {
+            int view = height - DRAWER_HEAD;
+            int thumb = Math.max(20, view * view / (view + limit));
+            int ty = y0 + DRAWER_HEAD + (int) Math.round((view - thumb) * drawerScroll / limit);
+            JilatonUi.fillRounded(graphics, x0 + DRAWER_W - 5, ty, 2, thumb, 1, ShellPalette.STROKE_HOVER);
+        }
+    }
+
+    private void renderDrawerRow(GuiGraphics graphics, ClientModule module, DrawerRow row, int inner, int right, int y,
+                                 int mouseX, int mouseY) {
+        Setting setting = row.setting();
+        String key = module.id() + "." + setting.id();
+        if (chipGrid(setting)) {
+            ChoiceSetting choice = (ChoiceSetting) setting;
+            graphics.drawString(font, setting.label().toUpperCase(Locale.ROOT), inner, y + 6, ShellPalette.TEXT_3, false);
+            int columnWidth = (right - inner - 6) / 2;
+            List<String> options = choice.choices();
+            for (int i = 0; i < options.size(); i++) {
+                int cx = inner + (i % 2) * (columnWidth + 6), cy = y + 22 + (i / 2) * 30;
+                String option = options.get(i);
+                boolean selected = option.equals(choice.value());
+                boolean over = inside(mouseX, mouseY, cx, cy, columnWidth, 26);
+                double t = animate("chip:" + key + ":" + option, over ? 1 : 0);
+                int fill = selected ? ShellPalette.accentSurface(accent)
+                        : JilatonUi.mix(ShellPalette.CONTROL, ShellPalette.CONTROL_HOVER, t);
+                JilatonUi.fillRounded(graphics, cx, cy, columnWidth, 26, 7, fill);
+                JilatonUi.strokeRounded(graphics, cx, cy, columnWidth, 26, 7,
+                        selected ? ShellPalette.accentBorder(accent) : JilatonUi.mix(ShellPalette.STROKE, ShellPalette.STROKE_HOVER, t));
+                boolean cs = option.startsWith("CS ");
+                String label = cs ? option.substring(3) : option;
+                graphics.drawString(font, fit(label, columnWidth - (cs ? 36 : 20)), cx + 10, cy + 9,
+                        selected ? ShellPalette.TEXT : ShellPalette.TEXT_2, false);
+                if (cs) {
+                    int tagW = font.width("CS") + 8;
+                    JilatonUi.strokeRounded(graphics, cx + columnWidth - tagW - 7, cy + 6, tagW, 14, 4, ShellPalette.STROKE_HOVER);
+                    graphics.drawString(font, "CS", cx + columnWidth - tagW - 3, cy + 9, ShellPalette.TEXT_3, false);
+                }
+            }
+            return;
+        }
+        boolean rowHover = inside(mouseX, mouseY, inner - 6, y, right - inner + 12, row.height());
+        if (setting instanceof NumberSetting number) {
+            graphics.drawString(font, setting.label(), inner, y + 8, rowHover ? ShellPalette.TEXT : ShellPalette.TEXT_2, false);
+            String value = formatNumber(number);
+            graphics.drawString(font, value, right - font.width(value), y + 8, ShellPalette.TEXT, false);
+            double range = number.maximum() - number.minimum();
+            double fraction = range <= 0 ? 0 : (number.value() - number.minimum()) / range;
+            int width = right - inner;
+            int filled = (int) Math.round(width * animate("num:" + key, fraction));
+            JilatonUi.fillRounded(graphics, inner, y + 27, width, 4, 2, ShellPalette.CONTROL);
+            if (filled > 0) JilatonUi.fillRounded(graphics, inner, y + 27, Math.max(2, filled), 4, 2, accent);
+            double knob = animate("knob:" + key, rowHover ? 1 : 0);
+            int r = 5 + (int) Math.round(knob);
+            JilatonUi.fillRounded(graphics, inner + filled - r, y + 29 - r, r * 2, r * 2, r, ShellPalette.TEXT);
+            return;
+        }
+        graphics.drawString(font, setting.label(), inner, y + 11, rowHover ? ShellPalette.TEXT : ShellPalette.TEXT_2, false);
+        renderSettingControl(graphics, setting, module, right, y, mouseX, mouseY);
+    }
+
+    private boolean clickDrawer(ClientModule module, double mouseX, double mouseY, int button) {
+        int x0 = drawerX(), y0 = drawerY();
+        int inner = x0 + DRAWER_PAD, right = x0 + DRAWER_W - DRAWER_PAD;
+        if (inside(mouseX, mouseY, right - 22, y0 + 12, 22, 22)) {
+            expandedId = null;
+            syncStateToConfig();
+            return true;
+        }
+        if (button != 0 || mouseY < y0 + DRAWER_HEAD) return true;
+        int offset = (int) Math.round(drawerScroll);
+        for (DrawerRow row : drawerRows(module)) {
+            int y = y0 + row.y() - offset;
+            if (mouseY < y || mouseY >= y + row.height()) continue;
+            Setting setting = row.setting();
+            if (chipGrid(setting)) {
+                ChoiceSetting choice = (ChoiceSetting) setting;
+                int columnWidth = (right - inner - 6) / 2;
+                for (int i = 0; i < choice.choices().size(); i++) {
+                    int cx = inner + (i % 2) * (columnWidth + 6), cy = y + 22 + (i / 2) * 30;
+                    if (inside(mouseX, mouseY, cx, cy, columnWidth, 26)) {
+                        choice.setValue(choice.choices().get(i));
+                        config.save(modules);
+                    }
+                }
+            } else if (setting instanceof NumberSetting number) {
+                drag = DragKind.MODULE_NUMBER;
+                dragModule = module;
+                dragSetting = number;
+                dragTrackX = inner;
+                dragTrackWidth = right - inner;
+                applyModuleSlider(number, mouseX);
+            } else if (setting instanceof BooleanSetting booleanSetting) {
+                booleanSetting.toggle();
+                config.save(modules);
+            } else if (setting instanceof ChoiceSetting choice) {
+                if (mouseX >= right - 100) {
+                    choice.cycle(mouseX < right - 50 ? -1 : 1);
+                    config.save(modules);
+                }
+            } else if (setting instanceof TextSetting textSetting) {
+                minecraft.setScreen(new TextSettingScreen(this, textSetting, modules, config));
+            }
+            return true;
+        }
+        return true;
     }
 
     private void renderCard(GuiGraphics graphics, ModuleFlow.Card card, int x, int y, int mouseX, int mouseY) {
@@ -749,60 +955,103 @@ public final class ClickGuiScreen extends Screen {
 
     private void renderTheme(GuiGraphics graphics, int mouseX, int mouseY) {
         ThemePage theme = themePage();
+        graphics.drawString(font, "ACCENT", theme.x(), theme.top() - 15, ShellPalette.TEXT_3, false);
         ClientTheme[] themes = ClientTheme.values();
-        for (int index = 0; index < themes.length; index++) {
-            int x = layout.contentX() + (index % theme.columns()) * (theme.cardWidth() + 8);
+        for (int index = 0; index <= themes.length; index++) {
+            boolean custom = index == themes.length;
+            String id = custom ? "custom" : themes[index].id();
+            String label = custom ? "Custom" : themes[index].label();
+            int color = custom ? parseAccent(config.customAccent()) : themes[index].accent();
+            int x = theme.x() + (index % theme.columns()) * (theme.cardWidth() + 8);
             int y = theme.top() + (index / theme.columns()) * (theme.cardHeight() + 8);
-            boolean selected = config.themeId().equals(themes[index].id());
+            boolean selected = config.themeId().equals(id);
             boolean hovered = inside(mouseX, mouseY, x, y, theme.cardWidth(), theme.cardHeight());
-            JilatonUi.fillRounded(graphics, x, y, theme.cardWidth(), theme.cardHeight(), 7,
-                    selected ? ShellPalette.accentSurface(accent)
-                            : hovered ? ShellPalette.SURFACE_HOVER : ShellPalette.SURFACE);
-            JilatonUi.strokeRounded(graphics, x, y, theme.cardWidth(), theme.cardHeight(), 7,
-                    selected ? ShellPalette.accentBorder(accent) : ShellPalette.BORDER);
-            graphics.drawString(font, fit(themes[index].label(), theme.cardWidth() - 46), x + 12, y + 10,
-                    JilatonUi.TEXT);
-            graphics.drawString(font, themes[index].id().toUpperCase(Locale.ROOT), x + 12, y + 24,
-                    JilatonUi.TEXT_4);
-            JilatonUi.fillRounded(graphics, x + theme.cardWidth() - 32, y + 12, 18, 22, 5, themes[index].accent());
-            if (selected) {
-                graphics.fill(x + 6, y + 10, x + 8, y + theme.cardHeight() - 10, themes[index].accent());
-            }
+            double t = animate("swatch:" + id, hovered ? 1 : 0);
+            JilatonUi.fillRounded(graphics, x, y, theme.cardWidth(), theme.cardHeight(), 10,
+                    JilatonUi.mix(ShellPalette.CARD, ShellPalette.CARD_HOVER, Math.max(t, selected ? 0.6 : 0)));
+            JilatonUi.strokeRounded(graphics, x, y, theme.cardWidth(), theme.cardHeight(), 10,
+                    selected ? JilatonUi.mix(ShellPalette.STROKE, color, 0.85) : JilatonUi.mix(ShellPalette.STROKE, ShellPalette.STROKE_HOVER, t));
+            // The swatch dot glows in its own colour.
+            int dotX = x + 14, dotY = y + theme.cardHeight() / 2 - 7;
+            for (int halo = 3; halo >= 1; halo--)
+                JilatonUi.fillRounded(graphics, dotX - halo * 2, dotY - halo * 2, 14 + halo * 4, 14 + halo * 4, 7 + halo * 2,
+                        JilatonUi.alpha(color, (selected ? 0.10 : 0.05) / halo));
+            JilatonUi.fillRounded(graphics, dotX, dotY, 14, 14, 7, color);
+            graphics.drawString(font, fit(label, theme.cardWidth() - 46), x + 36, y + theme.cardHeight() / 2 - 8,
+                    selected ? ShellPalette.TEXT : ShellPalette.TEXT_2, false);
+            String sub = custom ? "#" + config.customAccent() : id.toUpperCase(Locale.ROOT);
+            graphics.drawString(font, fit(sub, theme.cardWidth() - 46), x + 36, y + theme.cardHeight() / 2 + 3,
+                    ShellPalette.TEXT_3, false);
         }
 
-        int panelTop = theme.customTop();
-        int panelHeight = theme.panelHeight();
-        JilatonUi.fillRounded(graphics, layout.contentX(), panelTop, layout.contentWidth(), panelHeight, 8,
-                ShellPalette.SURFACE);
-        JilatonUi.strokeRounded(graphics, layout.contentX(), panelTop, layout.contentWidth(), panelHeight, 8,
-                ShellPalette.BORDER);
-        graphics.drawString(font, "CUSTOM ACCENT", layout.contentX() + 14, panelTop + 11, JilatonUi.TEXT);
-        String hex = "#" + config.customAccent();
-        JilatonUi.fillRounded(graphics, layout.contentRight() - 30, panelTop + 9, 16, 14, 4,
-                parseAccent(config.customAccent()));
-        graphics.drawString(font, hex, layout.contentRight() - 38 - font.width(hex), panelTop + 12,
-                JilatonUi.TEXT_3);
-        graphics.fill(layout.contentX() + 12, panelTop + 28, layout.contentRight() - 12, panelTop + 29,
-                ShellPalette.BORDER);
-
-        String[] labels = {"HUE", "SATURATION", "BRIGHTNESS", "MOTION"};
-        float[] hsb = customHsb();
-        for (int channel = 0; channel < labels.length; channel++) {
-            int y = panelTop + 40 + channel * theme.rowStep();
-            graphics.drawString(font, labels[channel], layout.contentX() + 14, y - 3, JilatonUi.TEXT_2);
-            if (channel == 3) {
-                drawTrack(graphics, theme.sliderX(), y, theme.sliderWidth(),
-                        animate("theme.motion", config.animationIntensity() / 1.5), accent);
-            } else {
+        if (theme.customHeight() > 0) {
+            String[] labels = {"Hue", "Saturation", "Brightness"};
+            float[] hsb = customHsb();
+            for (int channel = 0; channel < 3; channel++) {
+                int y = theme.customTop() + 12 + channel * theme.rowStep();
+                graphics.drawString(font, labels[channel], theme.x(), y - 3, ShellPalette.TEXT_2, false);
                 drawGradient(graphics, theme.sliderX(), y, theme.sliderWidth(), channel, hsb);
+                String value = Math.round(hsb[channel] * 100) + "%";
+                graphics.drawString(font, value, theme.x() + theme.width() - font.width(value), y - 3, ShellPalette.TEXT_3, false);
             }
-            String value = channel == 3 ? Math.round(config.animationIntensity() * 100) + "%"
-                    : Math.round(hsb[channel] * 100) + "%";
-            graphics.drawString(font, value, theme.sliderX() + theme.sliderWidth() + 8, y - 3, JilatonUi.TEXT_3);
         }
-        int reducedY = panelTop + 40 + 4 * theme.rowStep() + 2;
-        graphics.drawString(font, "REDUCED MOTION", layout.contentX() + 14, reducedY + 4, JilatonUi.TEXT_2);
-        drawToggle(graphics, layout.contentRight() - 36, reducedY, config.reducedMotion(), "theme.reduced");
+
+        int y = theme.motionTop();
+        graphics.drawString(font, "MOTION & TYPE", theme.x(), y, ShellPalette.TEXT_3, false);
+        int row = y + 18;
+        graphics.drawString(font, "Reduced motion", theme.x(), row + 6, ShellPalette.TEXT_2, false);
+        drawToggle(graphics, theme.x() + theme.width() - 36, row, config.reducedMotion(), "theme.reduced");
+        row += theme.rowStep() + 4;
+        graphics.drawString(font, "Animation intensity", theme.x(), row - 3, ShellPalette.TEXT_2, false);
+        drawTrack(graphics, theme.sliderX(), row, theme.sliderWidth(),
+                animate("theme.motion", config.animationIntensity() / 1.5), accent);
+        String intensity = Math.round(config.animationIntensity() * 100) + "%";
+        graphics.drawString(font, intensity, theme.x() + theme.width() - font.width(intensity), row - 3, ShellPalette.TEXT_3, false);
+        row += theme.rowStep();
+        graphics.drawString(font, "Font", theme.x(), row + 3, ShellPalette.TEXT_2, false);
+        String[] fonts = {"Inter", "Minecraft"};
+        int segX = theme.x() + theme.width() - fontSegmentWidth();
+        JilatonUi.fillRounded(graphics, segX, row - 3, fontSegmentWidth(), 22, 7, ShellPalette.CONTROL);
+        int cx = segX + 2;
+        for (int i = 0; i < 2; i++) {
+            int w = font.width(fonts[i]) + 20;
+            boolean on = (i == 0) == JilatonType.enabled();
+            if (on) JilatonUi.fillRounded(graphics, cx, row - 1, w, 18, 6, ShellPalette.CONTROL_HOVER);
+            graphics.drawString(font, fonts[i], cx + 10, row + 4, on ? ShellPalette.TEXT : ShellPalette.TEXT_3, false);
+            cx += w;
+        }
+
+        if (theme.previewWidth() > 0) renderThemePreview(graphics, theme);
+    }
+
+    private int fontSegmentWidth() {
+        return font.width("Inter") + font.width("Minecraft") + 44;
+    }
+
+    /** Live preview: a nav row and two cards in the chosen accent, so the change shows before closing. */
+    private void renderThemePreview(GuiGraphics graphics, ThemePage theme) {
+        int x = theme.previewX(), y = theme.top() - 18, w = theme.previewWidth();
+        int h = Math.min(layout.listBottom() - y, 260);
+        JilatonUi.fillRounded(graphics, x, y, w, h, 12, ShellPalette.EXPANSION);
+        JilatonUi.strokeRounded(graphics, x, y, w, h, 12, ShellPalette.STROKE);
+        graphics.drawString(font, "LIVE PREVIEW", x + 16, y + 14, ShellPalette.TEXT_3, false);
+        int navY = y + 34;
+        JilatonUi.fillRounded(graphics, x + 12, navY, w - 24, 28, 8, JilatonUi.alpha(accent, 0.08));
+        ShellChrome.icon(graphics, "combat", x + 22, navY + 9, accent);
+        graphics.drawString(font, "Combat", x + 42, navY + 10, accent, false);
+        String pill = "3/28";
+        graphics.drawString(font, pill, x + w - 24 - font.width(pill), navY + 10, ShellPalette.TEXT_2, false);
+        String[][] cards = {{"KillAura", "R \u00b7 Attacks the closest target"}, {"Velocity", "Unbound \u00b7 Reduces knockback"}};
+        for (int i = 0; i < cards.length; i++) {
+            int cy = navY + 40 + i * 64;
+            boolean on = i == 0;
+            JilatonUi.fillRounded(graphics, x + 12, cy, w - 24, 56, 10, on ? ShellPalette.accentSurface(accent) : ShellPalette.CARD);
+            JilatonUi.strokeRounded(graphics, x + 12, cy, w - 24, 56, 10, on ? ShellPalette.accentBorder(accent) : ShellPalette.STROKE);
+            drawScaled(graphics, cards[i][0], x + 26, cy + 13, CARD_TITLE, ShellPalette.TEXT);
+            graphics.drawString(font, fit(cards[i][1], w - 110), x + 26, cy + 33, ShellPalette.TEXT_3, false);
+            ShellChrome.toggle(graphics, x + w - 24 - 46, cy + 18, on ? 1 : 0, accent);
+        }
+        graphics.drawString(font, fit("Applies to the GUI, HUD and menus.", w - 32), x + 16, navY + 176, ShellPalette.TEXT_3, false);
     }
 
     private void drawFeatureCard(GuiGraphics graphics, int x, int y, int width, int height, String icon,
@@ -932,11 +1181,13 @@ public final class ClickGuiScreen extends Screen {
             visible = sorted;
         }
         int cardHeight = visual ? VISUAL_HEIGHT : ROW_HEIGHT;
-        int columns = visual ? ShellMetrics.visualColumns(layout.contentWidth())
-                : ShellMetrics.moduleColumns(layout.contentWidth());
-        int cardWidth = ShellMetrics.cardWidth(layout.contentWidth(), columns);
-        ModuleFlow flow = ModuleFlow.layout(visible, expandedId, columns, cardWidth, cardHeight,
-                layout.contentWidth(), COLUMN_GAP, ROW_GAP, EXPANSION_HEADER, SETTING_ROW);
+        int gridWidth = gridWidth();
+        int columns = visual ? (drawerModule() != null ? (gridWidth >= 3 * 150 + 2 * COLUMN_GAP ? 3 : 2)
+                : Math.min(3, ShellMetrics.visualColumns(gridWidth)))
+                : ShellMetrics.moduleColumns(gridWidth);
+        int cardWidth = ShellMetrics.cardWidth(gridWidth, columns);
+        ModuleFlow flow = ModuleFlow.layout(visible, visual ? null : expandedId, columns, cardWidth, cardHeight,
+                gridWidth, COLUMN_GAP, ROW_GAP, EXPANSION_HEADER, SETTING_ROW);
         int maxScroll = Math.max(0, flow.height() - layout.listHeight());
         return new View(visible, flow, cardHeight, maxScroll);
     }
@@ -973,18 +1224,22 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private ThemePage themePage() {
-        int top = layout.listTop();
-        int columns = layout.contentWidth() >= 600 ? 4 : layout.contentWidth() >= 400 ? 3 : 2;
-        int cardWidth = (layout.contentWidth() - 8 * (columns - 1)) / columns;
-        int rows = (ClientTheme.values().length + columns - 1) / columns;
-        int cardHeight = 46;
-        int customTop = top + rows * (cardHeight + 8) + 14;
-        int sliderX = layout.contentX() + Math.min(104, Math.max(72, layout.contentWidth() / 4));
-        int sliderWidth = Math.max(60, layout.contentRight() - 46 - sliderX);
-        int rowStep = layout.compact() ? 21 : 26;
-        int panelHeight = 70 + 4 * rowStep;
-        return new ThemePage(top, columns, cardWidth, cardHeight, customTop, sliderX, sliderWidth,
-                rowStep, panelHeight, customTop + panelHeight - top);
+        int previewWidth = layout.contentWidth() >= 640 ? 300 : 0;
+        int width = layout.contentWidth() - (previewWidth > 0 ? previewWidth + 16 : 0);
+        int x = layout.contentX();
+        int top = layout.listTop() + 18;
+        int columns = width >= 360 ? 4 : 2;
+        int cardWidth = (width - 8 * (columns - 1)) / columns;
+        int cardHeight = 58;
+        int rows = (ClientTheme.values().length + 1 + columns - 1) / columns;
+        int customTop = top + rows * (cardHeight + 8) + 2;
+        int rowStep = 26;
+        int customHeight = "custom".equals(config.themeId()) ? 14 + 3 * rowStep : 0;
+        int motionTop = customTop + customHeight + 16;
+        int sliderX = x + Math.min(150, Math.max(96, width / 3));
+        int sliderWidth = Math.max(60, x + width - 52 - sliderX);
+        return new ThemePage(x, top, width, columns, cardWidth, cardHeight, customTop, customHeight, motionTop,
+                sliderX, sliderWidth, rowStep, x + width + 16, previewWidth);
     }
 
     private int scrollLimit() {
@@ -1246,6 +1501,8 @@ public final class ClickGuiScreen extends Screen {
                 || mouseX < layout.contentX() || mouseX >= layout.contentRight()) {
             return false;
         }
+        ClientModule drawer = drawerModule();
+        if (drawer != null && mouseX >= drawerX()) return clickDrawer(drawer, mouseX, mouseY, button);
         View view = view();
         double contentX = mouseX - layout.contentX();
         double contentY = mouseY - top + scroll;
@@ -1319,7 +1576,7 @@ public final class ClickGuiScreen extends Screen {
             return true;
         }
         if (button != 0) return true;
-        if (inside(mouseX, mouseY, toggleX, y + 22, 36, 20)) {
+        if (inside(mouseX, mouseY, toggleX, visual ? y + 12 : y + 22, 36, 20)) {
             module.toggle();
             config.save(modules);
             return true;
@@ -1426,45 +1683,52 @@ public final class ClickGuiScreen extends Screen {
     private boolean clickTheme(double mouseX, double mouseY) {
         ThemePage theme = themePage();
         ClientTheme[] themes = ClientTheme.values();
-        for (int index = 0; index < themes.length; index++) {
-            int x = layout.contentX() + (index % theme.columns()) * (theme.cardWidth() + 8);
+        for (int index = 0; index <= themes.length; index++) {
+            int x = theme.x() + (index % theme.columns()) * (theme.cardWidth() + 8);
             int y = theme.top() + (index / theme.columns()) * (theme.cardHeight() + 8);
             if (inside(mouseX, mouseY, x, y, theme.cardWidth(), theme.cardHeight())) {
-                config.setThemeId(themes[index].id());
+                config.setThemeId(index == themes.length ? "custom" : themes[index].id());
                 accent = selectedAccent();
                 config.save(modules);
                 return true;
             }
         }
-        int panelTop = theme.customTop();
-        if (mouseX < layout.contentX() || mouseX > layout.contentRight()
-                || mouseY < panelTop || mouseY > panelTop + theme.panelHeight()) {
-            return false;
-        }
-        if (mouseY <= panelTop + 30) return true;
-        for (int channel = 0; channel < 4; channel++) {
-            if (inside(mouseX, mouseY, theme.sliderX() - 4,
-                    panelTop + 40 + channel * theme.rowStep() - 6, theme.sliderWidth() + 8, 14)) {
-                dragTrackX = theme.sliderX();
-                dragTrackWidth = theme.sliderWidth();
-                if (channel == 3) {
-                    drag = DragKind.MOTION;
-                    applyMotion(mouseX);
-                } else {
+        if (theme.customHeight() > 0) {
+            for (int channel = 0; channel < 3; channel++) {
+                int y = theme.customTop() + 12 + channel * theme.rowStep();
+                if (inside(mouseX, mouseY, theme.sliderX() - 4, y - 6, theme.sliderWidth() + 8, 14)) {
+                    dragTrackX = theme.sliderX();
+                    dragTrackWidth = theme.sliderWidth();
                     drag = DragKind.THEME_HSB;
                     dragChannel = channel;
                     applyHsb(channel, mouseX);
+                    return true;
                 }
-                return true;
             }
         }
-        int reducedY = panelTop + 40 + 4 * theme.rowStep() + 2;
-        if (inside(mouseX, mouseY, layout.contentRight() - 40, reducedY - 2, 44, 22)) {
+        int row = theme.motionTop() + 18;
+        if (inside(mouseX, mouseY, theme.x(), row - 4, theme.width(), 24)) {
             config.setReducedMotion(!config.reducedMotion());
             config.save(modules);
             return true;
         }
-        return true;
+        row += theme.rowStep() + 4;
+        if (inside(mouseX, mouseY, theme.sliderX() - 4, row - 6, theme.sliderWidth() + 8, 14)) {
+            dragTrackX = theme.sliderX();
+            dragTrackWidth = theme.sliderWidth();
+            drag = DragKind.MOTION;
+            applyMotion(mouseX);
+            return true;
+        }
+        row += theme.rowStep();
+        int segX = theme.x() + theme.width() - fontSegmentWidth();
+        if (inside(mouseX, mouseY, segX, row - 3, fontSegmentWidth(), 22)) {
+            boolean inter = mouseX < segX + 2 + font.width("Inter") + 20;
+            config.setUiFont(inter ? "inter" : "minecraft");
+            config.save(modules);
+            return true;
+        }
+        return inside(mouseX, mouseY, layout.contentX(), layout.listTop(), layout.contentWidth(), layout.listHeight());
     }
 
     private void applyModuleSlider(NumberSetting setting, double mouseX) {
@@ -1555,6 +1819,12 @@ public final class ClickGuiScreen extends Screen {
     }
 
     private boolean scrolledBoard(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        ClientModule drawer = drawerModule();
+        if (drawer != null && mouseX >= drawerX() && mouseX <= layout.contentRight()
+                && mouseY >= drawerY() && mouseY <= layout.listBottom()) {
+            drawerScroll = Math.max(0, Math.min(drawerScrollLimit(drawer), drawerScroll - verticalAmount * 30));
+            return true;
+        }
         if (mouseX >= layout.contentX() && mouseX <= layout.contentRight()
                 && mouseY >= layout.listTop() && mouseY <= layout.listBottom()) {
             targetScroll = Math.max(0, Math.min(scrollLimit(), targetScroll - verticalAmount * 34));

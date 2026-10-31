@@ -214,10 +214,57 @@ public final class ViewmodelShots {
 
     /** Every Jilaton screen in turn, for comparison with the design boards. */
     private void screens(Minecraft client) {
-        then(5, () -> enable(true, "hud"));
+        // An unfocused capture window would otherwise auto-open the pause menu over the in-game shots.
+        client.options.pauseOnLostFocus = false;
+        then(5, () -> {
+            enable(true, "hud");
+            if (client.screen != null) client.setScreen(null);
+        });
         shot(40, "ui-hud");
+        // World lyrics: play the demo track from the capture client's music folder (config/jilaton/music).
+        then(1, () -> {
+            var center = dev.jilaton.client.music.MusicCenter.get();
+            if (JilatonClient.moduleManager().get("music_center") instanceof dev.jilaton.client.module.impl.MusicCenterModule music)
+                music.setSource("Local files");
+            center.setSource(dev.jilaton.client.music.MusicCenter.Source.LOCAL);
+            center.rescan();
+        });
+        then(30, () -> {
+            var center = dev.jilaton.client.music.MusicCenter.get();
+            var library = center.library();
+            LOGGER.info("[JilatonShots] library playlists {}", library.playlistNames());
+            if (!library.playlistNames().isEmpty())
+                center.player().setQueue(library.playlist(library.playlistNames().get(0)), 0);
+            enable(true, "spatial_lyrics");
+            enable(true, "now_playing");
+        });
+        then(1, () -> { if (client.screen != null) client.setScreen(null); });
+        shot(90, "ui-lyrics-a");
+        then(1, () -> { if (client.screen != null) client.setScreen(null); });
+        shot(70, "ui-lyrics-b");
         then(1, () -> JilatonClient.openClickGui(null));
         shot(30, "ui-clickgui");
+        then(1, () -> {
+            client.setScreen(null);
+            JilatonClient.clientConfig().setGuiPage("MODULES");
+            JilatonClient.clientConfig().setGuiCategory("Visuals");
+            JilatonClient.clientConfig().setGuiExpandedModule("cosmetic_knife");
+            JilatonClient.clientConfig().setGuiSelectedModule("cosmetic_knife");
+            JilatonClient.openClickGui(null);
+        });
+        shot(30, "ui-visuals");
+        then(1, () -> {
+            client.setScreen(null);
+            JilatonClient.clientConfig().setGuiPage("THEME");
+            JilatonClient.openClickGui(null);
+        });
+        shot(30, "ui-theme");
+        then(1, () -> {
+            client.setScreen(null);
+            JilatonClient.clientConfig().setGuiPage("MODULES");
+            JilatonClient.clientConfig().setGuiCategory("All");
+            JilatonClient.clientConfig().setGuiExpandedModule("");
+        });
         then(1, () -> client.setScreen(new dev.jilaton.client.gui.MusicCenterScreen(null)));
         shot(30, "ui-music");
         then(1, () -> client.setScreen(new dev.jilaton.client.gui.JilatonServersScreen(null)));

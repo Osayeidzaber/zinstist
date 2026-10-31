@@ -337,7 +337,10 @@ public final class HudRenderer {
             int width = 9 + 3 * (labelWidth + 2 + column) + 2 * 8 + 10 + speedColumn
                     + HudNumberPainter.SUFFIX_GAP + suffixWidth + 9;
             int x = widgetX("coordinates", 8, width, guiWidth);
-            int y = widgetY("coordinates", guiHeight - 29, 21, guiHeight);
+            // Bottom-left beside the hotbar when it fits; on narrow windows it moves under the brand chip instead
+            // of running under the hotbar.
+            boolean fitsBeside = 8 + width <= guiWidth / 2 - 91 - 6;
+            int y = widgetY("coordinates", fitsBeside ? guiHeight - 29 : 36, 21, guiHeight);
             beginWidget(graphics, "coordinates", x, y, width, 21, editorPreview);
             accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
             drawPanel(graphics, x, y, width, 21);
