@@ -34,7 +34,7 @@ import java.util.function.IntUnaryOperator;
  * Each stack of lines gets one anchor, chosen where the player is looking when the stack is born, and then
  * stays fixed in world space while lines change. Only a stack that stays out of view or out of reach is
  * moved, as a single eased glide, so the text reads as an object in the air instead of a camera overlay; the
- * active line fades and scales in, and a bright sheen sweeps across it.
+ * active line fades and scales in, with sung words lit as they are sung.
  */
 public final class SpatialLyricsModule extends ClientModule implements FxEmitter {
     private static final int OWNER = FxParticles.ownerId("spatial_lyrics");
@@ -66,7 +66,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private final BooleanSetting titleFallback = addSetting(new BooleanSetting("title_fallback", "Show track title when no lyrics", true));
     private final NumberSetting trailLines = addSetting(new NumberSetting("trail_lines", "World Trail: lines kept", 1, 8, 1, 5));
     private final NumberSetting linger = addSetting(new NumberSetting("linger", "World Trail: linger (s)", 3, 40, 1, 14));
-    private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 2));
+    private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 0));
     private final LyricTrail trail = new LyricTrail();
     private long lastTrailNanos;
 
@@ -370,30 +370,20 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     }
 
     /**
-     * Colours the active line one character at a time so a bright band can travel along it. Text with word
-     * timings keeps its sung/unsung colours and gets the same sheen on top.
+     * The lit line: sung words in the accent and the rest in a readable grey (word timing from {@link Lyrics}), or
+     * the whole line bright when the lyric has no word timing. Colours change only when a word is sung, so the world
+     * text renderer keeps one cached image per state instead of re-rasterising every frame.
      */
     private static void shine(String text, Lyrics.Line timed, int sungWords, int accent, double alpha, double time,
                               List<FxFrame.Run> runs) {
-        double sweep = (time * 0.28 % 1.0) * (text.length() + 16) - 8;
         if (timed == null) {
-            for (int i = 0; i < text.length(); i++) runs.add(new FxFrame.Run(text.substring(i, i + 1),
-                    FxShapes.argb(shaded(0xD2D2D2, 0xFFFFFF, sheen(i, sweep)), alpha)));
+            runs.add(new FxFrame.Run(text, FxShapes.argb(0xF5F5F5, alpha)));
             return;
         }
-        int cursor = 0;
-        for (int w = 0; w < timed.words().size(); w++) {
-            String word = timed.words().get(w).text();
-            int base = w < sungWords ? accent : 0x8A8A8A;
-            for (int i = 0; i < word.length(); i++) runs.add(new FxFrame.Run(word.substring(i, i + 1),
-                    FxShapes.argb(shaded(base, 0xFFFFFF, sheen(cursor + i, sweep)), alpha)));
-            cursor += word.length();
-        }
-    }
-
-    private static double sheen(int index, double sweep) {
-        double d = Math.abs(index - sweep) / 6.0;
-        return d >= 1 ? 0 : (1 - d) * (1 - d);
+        StringBuilder sung = new StringBuilder(), rest = new StringBuilder();
+        for (int w = 0; w < timed.words().size(); w++) (w < sungWords ? sung : rest).append(timed.words().get(w).text());
+        if (sung.length() > 0) runs.add(new FxFrame.Run(sung.toString(), FxShapes.argb(accent, alpha)));
+        if (rest.length() > 0) runs.add(new FxFrame.Run(rest.toString(), FxShapes.argb(0xA8A8A8, alpha)));
     }
 
     /**

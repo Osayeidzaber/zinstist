@@ -1363,8 +1363,9 @@ public final class ClickGuiScreen extends Screen {
 
     private void fitBoard() {
         int realW = minecraft.getWindow().getGuiScaledWidth(), realH = minecraft.getWindow().getGuiScaledHeight();
-        // 1024x576 virtual: the shell's 9px type then lands near the board's 11-13px sizes.
-        boardScale = Math.min(realW / 1024F, realH / 576F);
+        // About 1000x562 virtual, so the shell's 9px type reads like the board's 11-13px sizes. Text is rasterised at
+        // its exact on-screen size (JilatonText), so any scale stays sharp.
+        boardScale = Math.min(realW / 1000F, realH / 562F);
         width = Math.max(1, Math.round(realW / boardScale));
         height = Math.max(1, Math.round(realH / boardScale));
     }

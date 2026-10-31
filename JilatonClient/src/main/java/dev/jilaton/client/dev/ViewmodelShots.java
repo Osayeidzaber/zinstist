@@ -230,6 +230,7 @@ public final class ViewmodelShots {
             center.rescan();
         });
         then(30, () -> {
+            client.player.setXRot(4);
             var center = dev.jilaton.client.music.MusicCenter.get();
             var library = center.library();
             LOGGER.info("[JilatonShots] library playlists {}", library.playlistNames());
@@ -238,9 +239,15 @@ public final class ViewmodelShots {
             enable(true, "spatial_lyrics");
             enable(true, "now_playing");
         });
-        then(1, () -> { if (client.screen != null) client.setScreen(null); });
+        then(1, () -> {
+            if (client.screen != null) client.setScreen(null);
+            client.player.setXRot(4);
+        });
         shot(90, "ui-lyrics-a");
-        then(1, () -> { if (client.screen != null) client.setScreen(null); });
+        then(1, () -> {
+            if (client.screen != null) client.setScreen(null);
+            client.player.setXRot(4);
+        });
         shot(70, "ui-lyrics-b");
         then(1, () -> JilatonClient.openClickGui(null));
         shot(30, "ui-clickgui");

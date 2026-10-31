@@ -86,7 +86,9 @@
     "PauseScreenRedirectMixin",
     "GlyphSamplerMixin",
     "FontTextureRegistryMixin",
-    "HotbarStyleMixin"
+    "HotbarStyleMixin",
+    "JilatonTextMixin",
+    "JilatonFontWidthMixin"
   ],
   "injectors": {
     "defaultRequire": 1

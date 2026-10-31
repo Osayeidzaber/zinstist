@@ -28,8 +28,8 @@ public final class ShellPalette {
     public static final int CONTROL_HOVER = 0xFF242424;
     /** Text ramp. */
     public static final int TEXT = 0xFFF5F5F5;
-    public static final int TEXT_2 = 0xFF8F8F8F;
-    public static final int TEXT_3 = 0xFF5F5F5F;
+    public static final int TEXT_2 = 0xFFB8B8B8;
+    public static final int TEXT_3 = 0xFF8C8C8C;
     /** Single accent plus its deep partner, used only for state. */
     public static final int ACCENT = 0xFFF5F5F5;
     public static final int ACCENT_DEEP = 0xFFBDBDBD;

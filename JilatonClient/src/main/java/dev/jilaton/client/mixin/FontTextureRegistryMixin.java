@@ -16,6 +16,11 @@ import java.util.function.Supplier;
 public abstract class FontTextureRegistryMixin extends AbstractTexture {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void jilaton$register(Supplier<String> label, GlyphRenderTypes renderTypes, boolean colored, CallbackInfo callback) {
-        if (String.valueOf(label.get()).startsWith("jilaton:")) JilatonAtlases.register(textureView);
+        String name = String.valueOf(label.get());
+        // Atlas labels are "<font id>/<page>", for example "jilaton:ui_o1h/0".
+        if (name.startsWith("jilaton:")) {
+            int page = name.lastIndexOf('/');
+            JilatonAtlases.register(textureView, page > 0 ? name.substring(0, page) : name);
+        }
     }
 }

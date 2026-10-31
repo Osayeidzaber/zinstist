@@ -14,8 +14,9 @@ public final class Ui {
     // Neutral black and white (zaber.tech): no hue in any surface or text token.
     public static final int BACKDROP = 0xFF0A0A0A, DEEP = 0xFF060606, PANEL = 0xFF0E0E0E, SIDEBAR = 0xFF0A0A0A,
             CARD = 0xFF131313, RAISED = 0xFF1B1B1B, DRAWER = 0xFF0F0F0F, STROKE = 0xFF262626;
-    public static final int TEXT = 0xFFF5F5F5, TEXT_2 = 0xFF8F8F8F, TEXT_3 = 0xFF5F5F5F, SOFT = 0xFFCBCBCB,
-            FAINT = 0xFF3A3A3A;
+    // Secondary text stays readable on #0A0A0A: TEXT_2 is about 9:1, TEXT_3 about 5:1 (above WCAG AA).
+    public static final int TEXT = 0xFFF5F5F5, TEXT_2 = 0xFFB8B8B8, TEXT_3 = 0xFF8C8C8C, SOFT = 0xFFD6D6D6,
+            FAINT = 0xFF4A4A4A;
     public static final int DANGER = 0xFFE5484D, ONLINE = 0xFF30A46C, WARN = 0xFFE5A13E;
 
     private Ui() { }

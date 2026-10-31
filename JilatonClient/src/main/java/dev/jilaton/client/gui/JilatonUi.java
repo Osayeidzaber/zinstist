@@ -16,9 +16,9 @@ public final class JilatonUi {
     public static final int HAIRLINE_STRONG = 0xFF2E2E2E;
     /** Typography. */
     public static final int TEXT = 0xFFF2F2F2;
-    public static final int TEXT_2 = 0xFFA6A6A6;
-    public static final int TEXT_3 = 0xFF6E6E6E;
-    public static final int TEXT_4 = 0xFF474747;
+    public static final int TEXT_2 = 0xFFB8B8B8;
+    public static final int TEXT_3 = 0xFF8C8C8C;
+    public static final int TEXT_4 = 0xFF6A6A6A;
     public static final int DANGER = 0xFFE5797F;
 
     private JilatonUi() { }

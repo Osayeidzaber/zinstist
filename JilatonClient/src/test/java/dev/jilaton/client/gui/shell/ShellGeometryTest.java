@@ -225,8 +225,8 @@ class ShellGeometryTest {
         assertEquals(0xFF1B1B1B, ShellPalette.CARD_HOVER);
         assertEquals(0xFF262626, ShellPalette.STROKE);
         assertEquals(0xFFF5F5F5, ShellPalette.TEXT);
-        assertEquals(0xFF8F8F8F, ShellPalette.TEXT_2);
-        assertEquals(0xFF5F5F5F, ShellPalette.TEXT_3);
+        assertEquals(0xFFB8B8B8, ShellPalette.TEXT_2);
+        assertEquals(0xFF8C8C8C, ShellPalette.TEXT_3);
         assertEquals(0xFFF5F5F5, ShellPalette.ACCENT);
         assertEquals(0xFFBDBDBD, ShellPalette.ACCENT_DEEP);
         assertEquals(0xFFE5484D, ShellPalette.DANGER);

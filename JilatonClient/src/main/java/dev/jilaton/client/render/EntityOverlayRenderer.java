@@ -246,37 +246,67 @@ public final class EntityOverlayRenderer implements AutoCloseable {
                 .setLight(LightTexture.FULL_BRIGHT).setNormal(pose, 0, 0, 1);
     }
 
+    /** World text em in texture pixels: large enough to stay crisp up close; mipmaps keep it smooth far away. */
+    private static final float WORLD_TEXT_EM = 64;
+
+    /**
+     * World text (lyrics) is drawn as high-resolution text images from {@link dev.jilaton.client.gui.design.TextRaster}:
+     * Inter with a baked dark outline, mipmapped and linearly filtered, on one quad per line. The pixel font's 8px
+     * glyphs shimmered and broke up at any distance; these stay smooth and readable.
+     */
     private void drawTexts(PoseStack matrices, Frame frame) {
-        Font font = Minecraft.getInstance().font;
         for (FxFrame.WorldText text : frame.texts()) {
+            // Colours are baked at full opacity so a fading line reuses one texture; the fade rides on the vertices.
+            List<dev.jilaton.client.gui.design.TextRaster.Run> runs = new ArrayList<>();
+            int alpha = 0;
+            for (FxFrame.Run run : text.runs()) {
+                alpha = Math.max(alpha, run.color() >>> 24);
+                int rgb = 0xFF000000 | (run.color() & 0xFFFFFF);
+                int last = runs.size() - 1;
+                if (last >= 0 && runs.get(last).argb() == rgb)
+                    runs.set(last, new dev.jilaton.client.gui.design.TextRaster.Run(runs.get(last).text() + run.text(), rgb));
+                else runs.add(new dev.jilaton.client.gui.design.TextRaster.Run(run.text(), rgb));
+            }
+            if (runs.isEmpty() || alpha == 0) continue;
+            boolean outlined = (text.glow() >>> 24) != 0;
+            var image = dev.jilaton.client.gui.design.TextRaster.world(runs, dev.jilaton.client.gui.design.TextRaster.Face.SEMIBOLD,
+                    WORLD_TEXT_EM, outlined ? WORLD_TEXT_EM * 0.085F : 0);
+            // The vanilla font's line is 9 font pixels with the baseline at 7; keep that footprint per font pixel.
+            float unit = text.scale() * 8.6F / WORLD_TEXT_EM;
+            float width = image.width() * unit, height = image.height() * unit, advance = image.advance() * unit;
+            float left = (text.align() < 0 ? 0 : text.align() > 0 ? -advance : -advance / 2F) - image.padLeft() * unit;
+            float top = 7 * text.scale() - image.baseline() * unit;
+
             matrices.pushPose();
             matrices.translate(text.x(), text.y(), text.z());
             if (text.billboard()) matrices.mulPose(frame.rotation());
             else matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-text.yaw()));
-            matrices.scale(text.scale(), -text.scale(), text.scale());
-            org.joml.Matrix4f matrix = matrices.last().pose();
-            Font.DisplayMode mode = text.seeThrough() ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL;
-            int width = font.width(text.plain());
-            float x = text.align() < 0 ? 0 : text.align() > 0 ? -width : -width / 2F;
-            // Lit text (the "glow" lines, i.e. the active lyric) gets the glowing-sign 8-way dark outline, which keeps
-            // the pixel font readable on bright sky, snow or sand; soft offset copies only smeared the letters.
-            boolean outlined = (text.glow() >>> 24) != 0 && !text.seeThrough();
-            if (outlined && (text.background() >>> 24) != 0) {
-                font.drawInBatch(text.plain(), x, 0, 0, false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
+            matrices.scale(1, -1, 1);
+            PoseStack.Pose pose = matrices.last();
+            if ((text.background() >>> 24) != 0) {
+                VertexConsumer panel = buffers.getBuffer(text.seeThrough() ? RenderTypes.textSeeThrough(WHITE) : RenderTypes.text(WHITE));
+                float pad = 3 * text.scale();
+                textQuad(panel, pose, left + image.padLeft() * unit - pad, top + (image.baseline() * unit) - 8 * text.scale(),
+                        advance + pad * 2, 10 * text.scale(), 0, 0, 1, 1, text.background(), -0.001F);
             }
-            for (FxFrame.Run run : text.runs()) {
-                if (outlined) {
-                    int outline = (int) Math.round(((run.color() >>> 24) & 0xFF) * 0.9) << 24 | 0x060606;
-                    font.drawInBatch8xOutline(net.minecraft.network.chat.Component.literal(run.text()).getVisualOrderText(),
-                            x, 0, run.color(), outline, matrix, buffers, LightTexture.FULL_BRIGHT);
-                } else {
-                    font.drawInBatch(run.text(), x, 0, run.color(), false, matrix, buffers, mode, text.background(), LightTexture.FULL_BRIGHT);
-                }
-                x += font.width(run.text());
-            }
+            int color = alpha << 24 | 0xFFFFFF;
+            VertexConsumer buffer = buffers.getBuffer(text.seeThrough()
+                    ? RenderTypes.textSeeThrough(image.id()) : RenderTypes.text(image.id()));
+            textQuad(buffer, pose, left, top, width, height, 0, 0, 1, 1, color, 0);
             matrices.popPose();
         }
         buffers.endBatch();
+    }
+
+    private static final net.minecraft.resources.Identifier WHITE =
+            net.minecraft.resources.Identifier.fromNamespaceAndPath("jilaton", "textures/misc/white.png");
+
+    private static void textQuad(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float w, float h,
+                                 float u0, float v0, float u1, float v1, int color, float z) {
+        buffer.addVertex(pose, x, y, z).setColor(color).setUv(u0, v0).setLight(LightTexture.FULL_BRIGHT);
+        buffer.addVertex(pose, x, y + h, z).setColor(color).setUv(u0, v1).setLight(LightTexture.FULL_BRIGHT);
+        buffer.addVertex(pose, x + w, y + h, z).setColor(color).setUv(u1, v1).setLight(LightTexture.FULL_BRIGHT);
+        buffer.addVertex(pose, x + w, y, z).setColor(color).setUv(u1, v0).setLight(LightTexture.FULL_BRIGHT);
     }
 
     private static void boxFaces(VertexConsumer buffer, PoseStack.Pose pose, Box box) {

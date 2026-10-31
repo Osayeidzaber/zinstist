@@ -37,21 +37,24 @@ public final class JilatonType {
     }
 
     /**
-     * Oversample factors shipped for every face (base 4 plus {@code assets/jilaton/font/*_o<tag>.json}). Text is drawn
-     * from the smallest raster at least as large as its real on-screen size, so glyphs only ever shrink a little and,
-     * with the bilinear atlas sampling of {@code FontTextureSamplerMixin}, small text stays whole and smooth.
+     * Oversample factors shipped for every face (base 4 plus {@code assets/jilaton/font/*_o<tag>.json}): glyph rasters
+     * of 9 * factor physical pixels per em. Text is drawn at a size snapped so its em lands exactly on one of these
+     * rasters, so every glyph is sampled 1:1 (sharp, no dropped rows) at any window size and GUI scale. Neighbouring
+     * levels are at most 25% apart, so a size moves by at most about 12% when snapped.
      */
-    static final float[] LEVELS = {1, 1.5F, 2, 3, 4, 5, 6, 8, 10};
-    private static final String[] LEVEL_TAGS = {"1", "1h", "2", "3", "4", "5", "6", "8", "10"};
+    static final float[] LEVELS = {1, 1.25F, 1.5F, 1.75F, 2, 2.5F, 3, 3.5F, 4, 5, 6, 8, 10};
+    private static final String[] LEVEL_TAGS = {"1", "1q", "1h", "1t", "2", "2h", "3", "3h", "4", "5", "6", "8", "10"};
+    /** On-screen em height below which Regular and Mono draw one weight heavier, so thin strokes stay visible. */
+    private static final double HEAVIER_BELOW_PX = 15;
 
     private static Font inter;
-    /** Extra pose scale that the current screen draws under ({@link #withScale}), for picking a sharp raster. */
+    /** Pose scale, relative to GUI units, that text is currently drawn under ({@link #withScale}, {@code Canvas}). */
     private static float contextScale = 1;
 
-    /** Runs {@code body} with text known to be drawn under an extra pose scale of {@code scale}. */
+    /** Runs {@code body} with text drawn under a further pose scale of {@code scale} (it multiplies the current one). */
     public static void withScale(float scale, Runnable body) {
         float previous = contextScale;
-        contextScale = scale;
+        contextScale = previous * scale;
         try {
             body.run();
         } finally {
@@ -59,17 +62,64 @@ public final class JilatonType {
         }
     }
 
-    /** Index into {@link #LEVELS} of the smallest raster (9 * oversample px) that covers {@code emPixels}. */
+    /** Multiplies the context scale by {@code scale}; returns the previous value for {@link #restoreScale}. */
+    public static float enterScale(float scale) {
+        float previous = contextScale;
+        contextScale = previous * scale;
+        return previous;
+    }
+
+    public static void restoreScale(float previous) {
+        contextScale = previous;
+    }
+
+    private static double guiScale() {
+        return Minecraft.getInstance().getWindow().getGuiScale();
+    }
+
+    /** Index into {@link #LEVELS} of the raster nearest (in ratio) to an em of {@code emPixels} physical pixels. */
     static int level(double emPixels) {
-        double wanted = emPixels / 9.0;
-        for (int i = 0; i < LEVELS.length; i++) if (LEVELS[i] >= wanted * 0.97) return i;
-        return LEVELS.length - 1;
+        double wanted = Math.max(1e-3, emPixels / 9.0);
+        int best = 0;
+        for (int i = 1; i < LEVELS.length; i++)
+            if (Math.abs(Math.log(LEVELS[i] / wanted)) < Math.abs(Math.log(LEVELS[best] / wanted))) best = i;
+        return best;
+    }
+
+    /** The largest level whose raster fits {@code emPixels}, for picking a layout scale that lands exactly on one. */
+    public static float levelAtMost(double emPixels) {
+        float best = LEVELS[0];
+        for (float level : LEVELS) if (9 * level <= emPixels * 1.001) best = level;
+        return best;
+    }
+
+    /** The smallest level whose raster covers {@code emPixels}. */
+    public static float levelAtLeast(double emPixels) {
+        for (float level : LEVELS) if (9 * level >= emPixels * 0.999) return level;
+        return LEVELS[LEVELS.length - 1];
+    }
+
+    /** {@code size} snapped so that, at {@code pixelsPerUnit}, the em is exactly one raster level. */
+    static float snap(float size, double pixelsPerUnit) {
+        if (!enabled() || pixelsPerUnit <= 0) return size;
+        return (float) (9 * LEVELS[level(size * pixelsPerUnit)] / pixelsPerUnit);
+    }
+
+    /** Thin faces get one step heavier at small on-screen sizes. */
+    static Face weighted(Face face, double emPixels) {
+        if (emPixels >= HEAVIER_BELOW_PX) return face;
+        return switch (face) {
+            case REGULAR -> Face.MEDIUM;
+            case MONO -> Face.MONO_MEDIUM;
+            default -> face;
+        };
     }
 
     private static FontDescription sharpFor(FontDescription description) {
-        int level = level(9 * contextScale * Minecraft.getInstance().getWindow().getGuiScale());
-        if (FontDescription.DEFAULT.equals(description)) return Face.REGULAR.sharp[level];
-        for (Face face : Face.values()) if (face.description.equals(description)) return face.sharp[level];
+        double em = 9 * contextScale * guiScale();
+        int level = level(em);
+        if (FontDescription.DEFAULT.equals(description)) return weighted(Face.REGULAR, em).sharp[level];
+        for (Face face : Face.values()) if (face.description.equals(description)) return weighted(face, em).sharp[level];
         return description;
     }
 
@@ -109,37 +159,47 @@ public final class JilatonType {
         return Component.literal(value).withStyle(style -> style.withFont(face.description));
     }
 
-    /** Draws text at {@code size} GUI pixels tall (the base face is 9), sharp at any pose scale. */
-    public static void draw(GuiGraphics graphics, String value, Face face, float x, float y, float size, int color) {
-        Font font = font();
-        float scale = size / 9F;
-        Component text;
-        if (enabled()) {
-            double guiScale = Minecraft.getInstance().getWindow().getGuiScale();
-            var pose = graphics.pose();
-            double pixelsPerUnit = pose.m00() * guiScale;
-            // Glyph raster is 9 * oversample px tall; pick the level nearest the on-screen em height.
-            final int level = level(size * pixelsPerUnit);
-            text = Component.literal(value).withStyle(style -> style.withFont(face.sharp[level]));
-            // Start on a whole physical pixel so 1:1 glyphs are not split across two pixels.
-            if (pixelsPerUnit > 0) {
-                double px = (pose.m00() * x + pose.m20()) * guiScale;
-                double py = (pose.m11() * y + pose.m21()) * guiScale;
-                x += (float) ((Math.round(px) - px) / pixelsPerUnit);
-                y += (float) ((Math.round(py) - py) / pixelsPerUnit);
+    /** The Inter font if it has been created, for {@code JilatonText.handles}; never creates it. */
+    public static Font interIfCreated() {
+        return inter;
+    }
+
+    /** The face a style's font id stands for (any raster level of it); {@code bold} upgrades Regular and Medium. */
+    public static Face faceOf(FontDescription description, boolean bold) {
+        Face found = Face.REGULAR;
+        if (description != null && !FontDescription.DEFAULT.equals(description)) {
+            search:
+            for (Face face : Face.values()) {
+                if (face.description.equals(description)) { found = face; break; }
+                for (FontDescription level : face.sharp) if (level.equals(description)) { found = face; break search; }
             }
-        } else {
-            text = Component.literal(value);
         }
+        if (bold && (found == Face.REGULAR || found == Face.MEDIUM)) return Face.BOLD;
+        return found;
+    }
+
+    /**
+     * Draws text {@code size} GUI pixels tall (the base face is 9) with Jilaton's text renderer
+     * ({@link dev.jilaton.client.gui.design.JilatonText}): rasterised at its exact on-screen size and placed on whole
+     * pixels, so it is sharp at any scale.
+     */
+    public static void draw(GuiGraphics graphics, String value, Face face, float x, float y, float size, int color) {
+        if (enabled()) {
+            dev.jilaton.client.gui.design.JilatonText.draw(graphics,
+                    java.util.List.of(new dev.jilaton.client.gui.design.JilatonText.Segment(value, face, color)), x, y, size, false);
+            return;
+        }
+        float scale = size / 9F;
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         graphics.pose().scale(scale, scale);
-        graphics.drawString(font, text, 0, 0, color, false);
+        graphics.drawString(font(), Component.literal(value), 0, 0, color, false);
         graphics.pose().popMatrix();
     }
 
     /** Width in GUI pixels of {@code value} drawn by {@link #draw} at {@code size}. */
     public static float width(String value, Face face, float size) {
-        return font().width(text(value, face)) * size / 9F;
+        if (!enabled()) return font().width(value) * size / 9F;
+        return dev.jilaton.client.gui.design.JilatonText.width(value, face, size);
     }
 }

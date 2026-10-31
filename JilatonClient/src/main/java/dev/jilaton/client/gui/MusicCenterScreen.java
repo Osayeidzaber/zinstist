@@ -146,7 +146,7 @@ public final class MusicCenterScreen extends Screen {
                 g.pose().translate(LEGACY_X, LEGACY_Y);
                 g.pose().scale(LEGACY_SCALE, LEGACY_SCALE);
                 int lmx = (int) Math.round((mx - LEGACY_X) / LEGACY_SCALE), lmy = (int) Math.round((my - LEGACY_Y) / LEGACY_SCALE);
-                JilatonType.withScale(canvas.scale() * LEGACY_SCALE, () -> {
+                JilatonType.withScale(LEGACY_SCALE, () -> {
                     switch (tab) {
                         case LIBRARY -> renderLibrary(g, 0, 0, lmx, lmy);
                         case SPOTIFY -> renderSpotify(g, 0, 0, lmx, lmy);

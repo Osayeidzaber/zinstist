@@ -15,6 +15,7 @@ public final class Canvas {
     private int width, height;
     private long openedAt;
     private float rise;
+    private float previousTypeScale = 1;
 
     /** Fits the board inside a {@code width}x{@code height} GUI-pixel screen, centred. */
     public Canvas fit(int width, int height) {
@@ -43,11 +44,13 @@ public final class Canvas {
         graphics.pose().pushMatrix();
         graphics.pose().translate(offsetX, offsetY + rise * scale);
         graphics.pose().scale(scale, scale);
+        previousTypeScale = dev.jilaton.client.gui.JilatonType.enterScale(scale);
     }
 
     /** Pops the board transform and veils the frame while the entrance is still fading in. */
     public void end(GuiGraphics graphics) {
         graphics.pose().popMatrix();
+        dev.jilaton.client.gui.JilatonType.restoreScale(previousTypeScale);
         double e = entrance();
         if (e < 1) graphics.fill(0, 0, width, height, ((int) Math.round((1 - e) * 255) << 24) | 0x060606);
     }
