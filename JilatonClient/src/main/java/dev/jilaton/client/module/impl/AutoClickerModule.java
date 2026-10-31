@@ -129,6 +129,12 @@ public final class AutoClickerModule extends ClientModule {
             tickEntityAttack(client, hit, scheduledClicks);
         } else if (isBlockHit(client)
                 && AutoClickerPolicy.clicksBlock(objective.value())) {
+            // The block branch breaks blocks through vanilla, so it must honour the same break delay
+            // as the entity branch instead of starting the next block immediately.
+            if (AutoClickerPolicy.delayAfterBlockBreak(System.nanoTime(), lastBlockBreakAtNanos,
+                    delayOnBlockBreak.value())) {
+                return;
+            }
             for (int click = 0; click < scheduledClicks; click++) {
                 KeyMapping.click(((KeyMappingAccessor) client.options.keyAttack).jilaton$getBoundKey());
             }
