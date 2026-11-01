@@ -170,9 +170,13 @@ public final class AutoEatModule extends ClientModule {
     }
 
     private void restoreSlotIfOwned(Minecraft client) {
-        if (client.player != null && previousSlot >= 0 && eatingSlot >= 0
-                && client.player.getInventory().getSelectedSlot() == eatingSlot && !client.player.isUsingItem()) {
-            client.player.getInventory().setSelectedSlot(previousSlot);
+        Player player = client.player;
+        if (player == null) {
+            return;
+        }
+        if (HotbarSlotRestore.shouldRestore(
+                player.getInventory().getSelectedSlot(), eatingSlot, previousSlot)) {
+            player.getInventory().setSelectedSlot(previousSlot);
         }
     }
 
