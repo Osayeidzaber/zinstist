@@ -37,7 +37,9 @@ public final class TextRaster {
     /** A face's TTF inside the mod jar. */
     public enum Face {
         REGULAR("inter-regular.ttf"), MEDIUM("inter-medium.ttf"), SEMIBOLD("inter-semibold.ttf"), BOLD("inter-bold.ttf"),
-        MONO("jetbrains-mono-regular.ttf"), MONO_MEDIUM("jetbrains-mono-medium.ttf");
+        MONO("jetbrains-mono-regular.ttf"), MONO_MEDIUM("jetbrains-mono-medium.ttf"),
+        SERIF("instrument-serif.ttf"), SERIF_ITALIC("instrument-serif-italic.ttf"),
+        DISPLAY("bricolage-medium.ttf"), DISPLAY_HEAVY("bricolage-heavy.ttf");
 
         final String file;
         Font font;

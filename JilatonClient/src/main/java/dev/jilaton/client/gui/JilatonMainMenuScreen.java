@@ -226,15 +226,15 @@ public final class JilatonMainMenuScreen extends Screen {
             String ch = word.substring(i, i + 1);
             double in = Kit.enter(openedAt, 0.15 + i * 0.05);
             float rise = (float) ((1 - in) * size * 0.9);
-            Kit.text(g, ch, cx, base + rise, size, JilatonType.Face.BOLD, Kit.LABEL);
-            cx += Kit.width(ch, size, JilatonType.Face.BOLD) - 4;
+            Kit.text(g, ch, cx, base + rise, size, JilatonType.Face.DISPLAY_HEAVY, Kit.LABEL);
+            cx += Kit.width(ch, size, JilatonType.Face.DISPLAY_HEAVY) - 2;
         }
         g.disableScissor();
         double sub = Kit.enter(openedAt, 0.55);
         String line = "client for people who notice the details.";
         int shown = (int) Math.round(line.length() * sub);
         float lx = cx + 24;
-        Kit.text(g, "/ minecraft", lx, base + 52, 34, JilatonType.Face.REGULAR, Kit.a(Kit.accentSoft(), sub));
+        Kit.text(g, "Minecraft client", lx, base + 44, 46, JilatonType.Face.SERIF_ITALIC, Kit.a(Kit.accentSoft(), sub));
         Kit.text(g, line.substring(0, shown), lx, base + 102, Kit.HEADLINE, JilatonType.Face.REGULAR, Kit.a(Kit.LABEL_2, sub));
         if (shown < line.length() && !Kit.reduced()) {
             float caret = lx + Kit.width(line.substring(0, shown), Kit.HEADLINE, JilatonType.Face.REGULAR) + 2;
@@ -278,8 +278,8 @@ public final class JilatonMainMenuScreen extends Screen {
             float ox = (float) (mag * hv), oy = (float) ((1 - in) * 24 + pr * 2);
             Ui.rect(g, x, y - 26, (float) (colW * hv), 2, Kit.a(Kit.accentStrong(), hv));
             mono(g, COL_NUM[i], x + ox, y + oy, Kit.a(Kit.mix(Kit.LABEL_3, Kit.LABEL, hv), in));
-            Kit.text(g, COL_TITLE[i], x + ox + (float) (8 * hv), y + 28 + oy, 24, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
-            float tw = Kit.width(COL_TITLE[i], 24, JilatonType.Face.SEMIBOLD);
+            Kit.text(g, COL_TITLE[i], x + ox + (float) (8 * hv), y + 28 + oy, 26, JilatonType.Face.DISPLAY_HEAVY, Kit.a(Kit.LABEL, in));
+            float tw = Kit.width(COL_TITLE[i], 26, JilatonType.Face.DISPLAY_HEAVY);
             if (hv > 0.02) {
                 Kit.text(g, "↗", x + ox + tw + 18 + (float) (4 * hv), y + 30 + oy - (float) (4 * hv), 20,
                         JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL, hv * in));

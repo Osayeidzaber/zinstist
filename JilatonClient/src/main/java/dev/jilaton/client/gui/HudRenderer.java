@@ -474,25 +474,38 @@ public final class HudRenderer {
         long now = System.nanoTime();
         var notices = modules.notifications().current(now);
         if (notices.isEmpty() && !preview) return;
-        int width = 174;
+        int width = 196;
         int rows = Math.max(1, notices.size());
-        int height = rows * 26 - 3;
+        int height = rows * 34 - 4;
         int x = widgetX("notifications", graphics.guiWidth() - width - 8, width, graphics.guiWidth());
         int y = widgetY("notifications", graphics.guiHeight() / 2, height, graphics.guiHeight());
         beginWidget(graphics, "notifications", x, y, width, height, preview);
         int accent = activeStyle.accentColor(ClientTheme.resolveAccent(config.themeId(), config.customAccent()));
+        boolean reduced = config.reducedMotion();
         for (int index = 0; index < rows; index++) {
             var notice = notices.isEmpty() ? null : notices.get(index);
             String label = notice == null ? "Module notifications" : notice.text();
-            int top = y + index * 26;
-            drawPanel(graphics, x, top, width, 23);
-            JilatonUi.fillRounded(graphics, x + 8, top + 9, 5, 5, 3, notice == null || notice.enabled() ? 0xFF30A46C : 0xFF5F5F5F);
-            graphics.drawString(JilatonType.font(), JilatonType.font().plainSubstrByWidth(label, width - 26), x + 18, top + 7, 0xFFF0F0F0, false);
-            double remaining = notice == null ? 1.0 : Math.max(0, 1.0
-                    - (now - notice.createdAt()) / (double) dev.jilaton.client.notification.NotificationCenter.LIFETIME_NANOS);
-            int track = width - 16;
-            JilatonUi.fillRounded(graphics, x + 8, top + 19, Math.max(2, (int) Math.round(track * remaining)), 1, 0,
-                    HudDesign.withAlpha(0xFFF5F5F5, 0.35));
+            double age = notice == null ? 1 : (now - notice.createdAt()) / 1e9;
+            double life = dev.jilaton.client.notification.NotificationCenter.LIFETIME_NANOS / 1e9;
+            // Enter: slide in from the right with a slight overshoot; exit: slide back out over the last 0.35 s.
+            double in = reduced ? 1 : Math.min(1, age / 0.32);
+            double back = 1 + 1.6 * Math.pow(in - 1, 3) + 0.6 * Math.pow(in - 1, 2);
+            double out = reduced ? 1 : Math.min(1, Math.max(0, (life - age) / 0.35));
+            float shift = (float) ((1 - back) * 60 + (1 - out) * 60);
+            double alpha = Math.min(in, out);
+            int top = y + index * 34;
+            int left = Math.round(x + shift);
+            JilatonUi.fillRounded(graphics, left, top, width, 30, 4, HudDesign.withAlpha(0xEE080808, alpha));
+            JilatonUi.strokeRounded(graphics, left, top, width, 30, 4, HudDesign.withAlpha(0x22FFFFFF, alpha));
+            boolean enabled = notice == null || notice.enabled();
+            graphics.fill(left, top + 6, left + 2, top + 24, HudDesign.withAlpha(enabled ? (0xFF000000 | accent) : 0xFF5F5F5F, alpha));
+            String tag = notice == null ? "INFO" : "notice".equals(notice.id()) ? "ALERT" : enabled ? "ON" : "OFF";
+            graphics.drawString(JilatonType.font(), JilatonType.text(tag, JilatonType.Face.MONO), left + 10, top + 6, HudDesign.withAlpha(0xFF8A8A8A, alpha), false);
+            graphics.drawString(JilatonType.font(), JilatonType.font().plainSubstrByWidth(label, width - 20), left + 10, top + 16,
+                    HudDesign.withAlpha(0xFFF5F5F5, alpha), false);
+            double remaining = notice == null ? 1.0 : Math.max(0, 1.0 - age / life);
+            graphics.fill(left + 2, top + 29, left + 2 + (int) Math.round((width - 4) * remaining), top + 30,
+                    HudDesign.withAlpha(0x88FFFFFF, alpha));
         }
         graphics.pose().popMatrix();
     }
@@ -1577,10 +1590,20 @@ public final class HudRenderer {
         glass(graphics, x, y, width, height, activeStyle.panelColor());
     }
 
-    /** Board HUD surface: rounded 7px ink chip with a faint white hairline. */
+    /**
+     * Editorial HUD surface: a tight 3px ink plate with a hairline, a brighter top edge and two corner ticks, so
+     * every widget reads as part of the same instrument panel.
+     */
     private static void glass(GuiGraphics graphics, int x, int y, int width, int height, int fill) {
-        JilatonUi.fillRounded(graphics, x, y, width, height, 7, fill);
-        JilatonUi.strokeRounded(graphics, x, y, width, height, 7, HudDesign.withAlpha(0x14FFFFFF, (fill >>> 24) / 255.0));
+        double a = (fill >>> 24) / 255.0;
+        JilatonUi.fillRounded(graphics, x, y, width, height, 3, fill);
+        JilatonUi.strokeRounded(graphics, x, y, width, height, 3, HudDesign.withAlpha(0x1AFFFFFF, a));
+        graphics.fill(x + 3, y, x + width - 3, y + 1, HudDesign.withAlpha(0x33FFFFFF, a));
+        int tick = HudDesign.withAlpha(0x66FFFFFF, a);
+        graphics.fill(x - 2, y - 2, x + 3, y - 1, tick);
+        graphics.fill(x - 2, y - 2, x - 1, y + 3, tick);
+        graphics.fill(x + width - 3, y + height + 1, x + width + 2, y + height + 2, tick);
+        graphics.fill(x + width + 1, y + height - 3, x + width + 2, y + height + 2, tick);
     }
 
     private record StaffEntry(UUID id, String name, boolean present) { }

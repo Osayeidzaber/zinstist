@@ -29,9 +29,10 @@ public final class HudEditorScreen extends Screen {
     private double dragOffsetX;
     private double dragOffsetY;
     private boolean changed;
+    private double guideX = Double.NaN, guideY = Double.NaN;
     private static final Integer[] ACCENTS = {null, 0xF2F2F2, 0x9C9C9C, 0x8878FF, 0x58AEFF, 0x51D6CB, 0xF080A5, 0xE9B65B};
     private static final String[] ACTIONS = {"Scale -", "Scale +", "Panel -", "Panel +", "Color", "Align", "Visible", "Reset"};
-    private static final String HINT = "Drag · TAB select · P preset · T target · M motion · ESC back";
+    private static final String HINT = "Drag (snaps; Alt = free) · TAB select · P preset · T target · M motion · ESC back";
     private static final int PRESET_Y = 12;
     private static final int PRESET_HEIGHT = 14;
     private static final int TARGET_PRESET_Y = PRESET_Y + PRESET_HEIGHT + 2;
@@ -55,9 +56,9 @@ public final class HudEditorScreen extends Screen {
         }
         List<HudRenderer.WidgetBounds> widgets = renderer.lastBounds();
         for (HudRenderer.WidgetBounds widget : widgets) {
-            int color = !config.hudStyle(widget.id()).visible() ? 0xFF765362
+            int color = !config.hudStyle(widget.id()).visible() ? 0xFF6A6A6A
                     : widget.id().equals(selectedWidget) ? 0xFFDDDDDD : 0xFF919191;
-            drawOutline(graphics, widget.x() - 2, widget.y() - 2, widget.width() + 4, widget.height() + 4, color);
+            brackets(graphics, widget.x() - 3, widget.y() - 3, widget.width() + 6, widget.height() + 6, color);
             if (widget.id().equals(selectedWidget)) {
                 graphics.fill(widget.x() - 2, widget.y() - 14, widget.x() + font.width(widget.id().toUpperCase()) + 6,
                         widget.y() - 3, 0xEE1B1B1B);
@@ -65,10 +66,15 @@ public final class HudEditorScreen extends Screen {
             }
         }
 
+        int accentGuide = 0xCC000000 | (ClientTheme.resolveAccent(config.themeId(), config.customAccent()) & 0xFFFFFF);
+        if (!Double.isNaN(guideX)) graphics.fill((int) Math.round(guideX), 0, (int) Math.round(guideX) + 1, height, accentGuide);
+        if (!Double.isNaN(guideY)) graphics.fill(0, (int) Math.round(guideY), width, (int) Math.round(guideY) + 1, accentGuide);
+
         int toolbarWidth = toolbarWidth();
         int toolbarX = toolbarX();
         int toolbarAccent = ClientTheme.resolveAccent(config.themeId(), config.customAccent());
-        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 60, 0xB0111111);
+        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 60, 0xE6080808);
+        graphics.fill(toolbarX, 8, toolbarX + toolbarWidth, 9, 0x33FFFFFF);
         String title = font.plainSubstrByWidth("HUD EDITOR" + (config.reducedMotion() ? " · Reduced motion" : ""),
                 Math.max(0, Math.min(presetButtonX(0), targetPresetButtonX(0)) - toolbarX - 16));
         graphics.drawString(font, title, toolbarX + 9, 13, toolbarAccent);
@@ -79,7 +85,7 @@ public final class HudEditorScreen extends Screen {
             int left = presetButtonX(index);
             int buttonWidth = presetButtonWidth();
             graphics.fill(left, PRESET_Y, left + buttonWidth, PRESET_Y + PRESET_HEIGHT,
-                    active ? 0xFF2A2338 : 0xFF1C1C1C);
+                    active ? 0xFF2A2A2A : 0xFF121212);
             graphics.fill(left, PRESET_Y + PRESET_HEIGHT - 2, left + buttonWidth, PRESET_Y + PRESET_HEIGHT,
                     active ? toolbarAccent : 0x00000000);
             graphics.drawString(font, HudPreset.CHOICES.get(index).toUpperCase(Locale.ROOT), left + 6,
@@ -90,7 +96,7 @@ public final class HudEditorScreen extends Screen {
             int left = targetPresetButtonX(index);
             int buttonWidth = targetPresetButtonWidth();
             graphics.fill(left, TARGET_PRESET_Y, left + buttonWidth, TARGET_PRESET_Y + TARGET_PRESET_HEIGHT,
-                    active ? 0xFF2A2338 : 0xFF1C1C1C);
+                    active ? 0xFF2A2A2A : 0xFF121212);
             graphics.fill(left, TARGET_PRESET_Y + TARGET_PRESET_HEIGHT - 1, left + buttonWidth,
                     TARGET_PRESET_Y + TARGET_PRESET_HEIGHT, active ? toolbarAccent : 0x00000000);
             graphics.drawString(font, TargetPreset.CHOICES.get(index).toUpperCase(Locale.ROOT), left + 5,
@@ -100,6 +106,19 @@ public final class HudEditorScreen extends Screen {
             renderInspector(graphics, mouseX, mouseY);
         }
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    /** Corner brackets around a widget instead of a full box outline. */
+    private static void brackets(GuiGraphics graphics, int x, int y, int w, int h, int color) {
+        int l = Math.min(8, Math.min(w, h) / 3);
+        graphics.fill(x, y, x + l, y + 1, color);
+        graphics.fill(x, y, x + 1, y + l, color);
+        graphics.fill(x + w - l, y, x + w, y + 1, color);
+        graphics.fill(x + w - 1, y, x + w, y + l, color);
+        graphics.fill(x, y + h - 1, x + l, y + h, color);
+        graphics.fill(x, y + h - l, x + 1, y + h, color);
+        graphics.fill(x + w - l, y + h - 1, x + w, y + h, color);
+        graphics.fill(x + w - 1, y + h - l, x + w, y + h, color);
     }
 
     @Override
@@ -164,6 +183,20 @@ public final class HudEditorScreen extends Screen {
 
         double x = Math.max(0.0, Math.min(width - bounds.width(), event.x() - dragOffsetX));
         double y = Math.max(0.0, Math.min(height - bounds.height(), event.y() - dragOffsetY));
+        // Snap to the screen centre and edges and to other widgets; hold Alt to place freely.
+        guideX = Double.NaN;
+        guideY = Double.NaN;
+        if (!event.hasAltDown()) {
+            List<HudSnap.Box> others = new java.util.ArrayList<>();
+            for (HudRenderer.WidgetBounds other : renderer.lastBounds()) {
+                if (!other.id().equals(draggingWidget)) others.add(new HudSnap.Box(other.x(), other.y(), other.width(), other.height()));
+            }
+            HudSnap.Result snapped = HudSnap.snap(new HudSnap.Box(x, y, bounds.width(), bounds.height()), others, width, height);
+            x = Math.max(0.0, Math.min(width - bounds.width(), snapped.x()));
+            y = Math.max(0.0, Math.min(height - bounds.height(), snapped.y()));
+            guideX = snapped.guideX();
+            guideY = snapped.guideY();
+        }
         double xFraction = width <= bounds.width() ? 0.0 : x / (width - bounds.width());
         double yFraction = height <= bounds.height() ? 0.0 : y / (height - bounds.height());
         config.setHudPosition(draggingWidget, xFraction, yFraction);
@@ -180,6 +213,8 @@ public final class HudEditorScreen extends Screen {
     public boolean mouseReleased(MouseButtonEvent event) {
         if (event.button() == 0 && draggingWidget != null) {
             draggingWidget = null;
+            guideX = Double.NaN;
+            guideY = Double.NaN;
             if (changed) {
                 config.save(modules);
             }

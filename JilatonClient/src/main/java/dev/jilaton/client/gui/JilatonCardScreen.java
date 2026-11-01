@@ -153,7 +153,7 @@ public abstract class JilatonCardScreen<T> extends Screen {
         double backHover = Kit.spring("list:back", Ui.inside(mx, my, LEFT, TOP, 36, 36));
         Kit.glass(graphics, LEFT, TOP, 36, 36, 18, backHover);
         Ui.textCentre(graphics, "\u2039", LEFT + 17, TOP + 6, 20, JilatonType.Face.MEDIUM, Kit.mix(Kit.LABEL_2, Kit.LABEL, backHover));
-        Kit.text(graphics, getTitle().getString(), LEFT + 52, TOP + 2, Kit.TITLE, JilatonType.Face.BOLD, Kit.a(Kit.LABEL, p));
+        Kit.text(graphics, getTitle().getString(), LEFT + 52, TOP - 2, 32, JilatonType.Face.DISPLAY_HEAVY, Kit.a(Kit.LABEL, p));
         List<String> segs = segments();
         if (!segs.isEmpty()) {
             Kit.segmented(graphics, "list:" + getClass().getSimpleName(), segs.toArray(new String[0]), segment,
@@ -240,7 +240,7 @@ public abstract class JilatonCardScreen<T> extends Screen {
     }
 
     private float segmentX() {
-        return LEFT + 72 + Ui.width(getTitle().getString(), Kit.TITLE, JilatonType.Face.BOLD);
+        return LEFT + 72 + Ui.width(getTitle().getString(), 32, JilatonType.Face.DISPLAY_HEAVY);
     }
 
     /** Row surface helpers for subclasses: a square icon, texture or monogram tile, in board coordinates. */

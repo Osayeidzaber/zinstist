@@ -397,12 +397,12 @@ public final class JilatonClickGui extends Screen {
 
     private void renderTitle(GuiGraphics g, String title, String subtitle, String right, double mx, double my, int accent) {
         float r = mainRight();
-        Ui.text(g, title, MAIN_X, TITLE_Y - 6, 32, JilatonType.Face.BOLD, Ui.TEXT);
-        float tx = MAIN_X + Ui.width(title, 32, JilatonType.Face.BOLD) + 14;
+        Ui.text(g, title, MAIN_X, TITLE_Y - 8, 36, JilatonType.Face.DISPLAY_HEAVY, Ui.TEXT);
+        float tx = MAIN_X + Ui.width(title, 36, JilatonType.Face.DISPLAY_HEAVY) + 14;
         float rightW = right == null ? 0 : Ui.width(right, 12, JilatonType.Face.REGULAR) + 14;
         float filterW = page == Page.MODULES ? Ui.width("Enabled only", 12, JilatonType.Face.MEDIUM) + 34 : 0;
         float room = r - tx - rightW - filterW - 24;
-        Ui.text(g, Ui.fit(subtitle, room, 12, JilatonType.Face.REGULAR), tx, TITLE_Y + 10, 12, Ui.TEXT_2);
+        Ui.text(g, Ui.fit(subtitle, room, 19, JilatonType.Face.SERIF_ITALIC), tx, TITLE_Y + 4, 19, JilatonType.Face.SERIF_ITALIC, Ui.TEXT_2);
         if (right != null) {
             Ui.textRight(g, right, r, TITLE_Y + 10, 12, JilatonType.Face.REGULAR, Ui.TEXT_2);
             Ui.circle(g, r - rightW + 5, TITLE_Y + 16, 3, accent);
@@ -809,6 +809,7 @@ public final class JilatonClickGui extends Screen {
         y += 40;
         slider(g, "Transition speed", x, y, w, (config.transitionSpeed() - 0.5) / 1.5,
                 String.format(java.util.Locale.ROOT, "%.2fx", config.transitionSpeed()), accent);
+        renderPresets(g, mx, my, accent);
         // Live preview.
         float pvx = mainRight() - 300, pvy = LIST_Y - 2;
         Ui.card(g, pvx, pvy, 300, 250, 12, Ui.DRAWER, Ui.STROKE);
@@ -837,6 +838,57 @@ public final class JilatonClickGui extends Screen {
         Ui.round(g, tx, y + 10, (float) (tw * f), 4, 2, accent);
         Ui.circle(g, (float) (tx + tw * f), y + 12, 7, Ui.TEXT);
         Ui.textRight(g, value, x + w, y + 6, 12, JilatonType.Face.MONO, Ui.TEXT);
+    }
+
+    private static final float PRESET_ROW = 30;
+
+    private float presetsTop() {
+        return LIST_Y - 2 + 262;
+    }
+
+    /** Interface presets under the live preview, then a row that cycles the menu background. */
+    private void renderPresets(GuiGraphics g, double mx, double my, int accent) {
+        float x = mainRight() - 300, y = presetsTop();
+        Ui.spaced(g, "PRESETS", x + 2, y, 10, 1.8F, JilatonType.Face.MONO, Ui.TEXT_3);
+        y += 16;
+        var current = dev.jilaton.client.gui.design.UiPresets.current(config);
+        for (var preset : dev.jilaton.client.gui.design.UiPresets.ALL) {
+            boolean on = preset == current;
+            double hv = dev.jilaton.client.gui.design.Kit.spring("cg:preset:" + preset.name(), Ui.inside(mx, my, x, y, 300, PRESET_ROW - 2));
+            double sel = dev.jilaton.client.gui.design.Kit.spring("cg:presets:" + preset.name(), on);
+            Ui.round(g, x, y, 300, PRESET_ROW - 2, 5, Ui.alpha(0xFFFFFFFF, 0.03 + 0.04 * hv + 0.05 * sel));
+            if (sel > 0.01) Ui.rect(g, x, y + 6, 2, (float) ((PRESET_ROW - 14) * sel), accent);
+            Ui.text(g, preset.name(), x + 12 + (float) (3 * hv), y + 8, 12, on ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM,
+                    on ? Ui.TEXT : Ui.mix(Ui.TEXT_2, Ui.TEXT, hv));
+            Ui.textRight(g, Ui.fit(preset.blurb(), 180, 10, JilatonType.Face.REGULAR), x + 290, y + 9, 10,
+                    JilatonType.Face.REGULAR, Ui.TEXT_3);
+            y += PRESET_ROW;
+        }
+        boolean bh = Ui.inside(mx, my, x, y + 4, 300, 28);
+        Ui.round(g, x, y + 4, 300, 28, 5, Ui.alpha(0xFFFFFFFF, bh ? 0.08 : 0.04));
+        Ui.spaced(g, "BACKGROUND", x + 12, y + 14, 9, 1.6F, JilatonType.Face.MONO, Ui.TEXT_3);
+        Ui.textRight(g, config.menuBackground() + "  \u203a", x + 290, y + 12, 12, JilatonType.Face.MEDIUM, Ui.TEXT);
+    }
+
+    private boolean clickPresets(double mx, double my) {
+        float x = mainRight() - 300, y = presetsTop() + 16;
+        for (var preset : dev.jilaton.client.gui.design.UiPresets.ALL) {
+            if (Ui.inside(mx, my, x, y, 300, PRESET_ROW - 2)) {
+                dev.jilaton.client.gui.design.UiPresets.apply(config, preset);
+                canvas.fit(width, height);
+                config.save(modules);
+                return true;
+            }
+            y += PRESET_ROW;
+        }
+        if (Ui.inside(mx, my, x, y + 4, 300, 28)) {
+            var modes = dev.jilaton.client.gui.design.Backdrops.MODES;
+            int i = modes.indexOf(config.menuBackground());
+            config.setMenuBackground(modes.get((i + 1) % modes.size()));
+            config.save(modules);
+            return true;
+        }
+        return false;
     }
 
     private int customAccent() {
@@ -1134,6 +1186,7 @@ public final class JilatonClickGui extends Screen {
     }
 
     private boolean clickTheme(double mx, double my) {
+        if (clickPresets(mx, my)) return true;
         float w = mainRight() - MAIN_X - 316, x = MAIN_X;
         ClientTheme[] themes = ClientTheme.values();
         float sw = (w - 3 * 8) / 4;

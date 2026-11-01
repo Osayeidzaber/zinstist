@@ -19,7 +19,8 @@ import net.minecraft.resources.Identifier;
  */
 public final class JilatonType {
     public enum Face {
-        REGULAR("ui"), MEDIUM("ui_medium"), SEMIBOLD("ui_semibold"), BOLD("ui_bold"), MONO("mono"), MONO_MEDIUM("mono_medium");
+        REGULAR("ui"), MEDIUM("ui_medium"), SEMIBOLD("ui_semibold"), BOLD("ui_bold"), MONO("mono"), MONO_MEDIUM("mono_medium"),
+        SERIF("serif"), SERIF_ITALIC("serif_italic"), DISPLAY("display"), DISPLAY_HEAVY("display_heavy");
 
         final FontDescription description;
 

@@ -102,7 +102,7 @@ public final class JilatonPauseScreen extends Screen {
         dev.jilaton.client.gui.design.Paint.outline(graphics, X0, y0, SHEET_W, sheetH, Kit.R_PANEL, 0, Kit.a(0xFFFFFFFF, 0.08 * in));
 
         float x = X0 + 28, w = SHEET_W - 56, y = y0 + 28;
-        Kit.text(graphics, "Paused", x, y, Kit.TITLE, JilatonType.Face.BOLD, Kit.a(Kit.LABEL, in));
+        Kit.text(graphics, "Paused", x, y - 4, 34, JilatonType.Face.DISPLAY_HEAVY, Kit.a(Kit.LABEL, in));
         Ui.textRight(graphics, worldName(), x + w, y + 9, Kit.FOOTNOTE, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL_2, in));
         y += 52;
 
