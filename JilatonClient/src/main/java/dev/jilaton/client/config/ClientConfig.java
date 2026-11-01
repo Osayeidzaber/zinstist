@@ -44,6 +44,7 @@ public final class ClientConfig {
     private boolean backdropBlur = true;
     private double guiScale = 1.0;
     private double transitionSpeed = 1.0;
+    private String menuBackground = "Ambient";
     /**
      * Explicit opt-in for the desktop media bridge (PowerShell/AppleScript reading the OS media session).
      * Off by default and never enabled implicitly: while off no process is spawned and no media is read.
@@ -144,6 +145,12 @@ public final class ClientConfig {
     public double transitionSpeed() { return transitionSpeed; }
     public void setTransitionSpeed(double speed) {
         this.transitionSpeed = Double.isFinite(speed) ? Math.max(0.5, Math.min(2.0, Math.round(speed * 20) / 20.0)) : 1.0;
+    }
+
+    /** Full-screen menu backdrop mode (see gui.design.Backdrops.MODES). */
+    public String menuBackground() { return menuBackground; }
+    public void setMenuBackground(String mode) {
+        this.menuBackground = dev.jilaton.client.gui.design.Backdrops.MODES.contains(mode) ? mode : "Ambient";
     }
 
     public double guiScroll() { return guiScroll; }
@@ -370,6 +377,7 @@ public final class ClientConfig {
         backdropBlur = Boolean.parseBoolean(values.getProperty("ui.backdrop_blur", "true"));
         try {
             setGuiScale(Double.parseDouble(values.getProperty("ui.gui_scale", "1.0")));
+            setMenuBackground(values.getProperty("ui.menu_background", "Ambient"));
             setTransitionSpeed(Double.parseDouble(values.getProperty("ui.transition_speed", "1.0")));
         } catch (NumberFormatException ignored) {
             guiScale = 1.0;
@@ -462,6 +470,7 @@ public final class ClientConfig {
                 }
             }
 
+            module.settingsLoaded();
             String keyCode = values.getProperty("module." + module.id() + ".keycode");
             if (keyCode != null) {
                 try {
@@ -492,6 +501,7 @@ public final class ClientConfig {
         values.setProperty("ui.backdrop_opacity", Double.toString(backdropOpacity));
         values.setProperty("ui.backdrop_blur", Boolean.toString(backdropBlur));
         values.setProperty("ui.gui_scale", Double.toString(guiScale));
+        values.setProperty("ui.menu_background", menuBackground);
         values.setProperty("ui.transition_speed", Double.toString(transitionSpeed));
         values.setProperty("music.desktop_bridge", Boolean.toString(desktopMediaBridge));
         values.setProperty("ui.font", uiFont);

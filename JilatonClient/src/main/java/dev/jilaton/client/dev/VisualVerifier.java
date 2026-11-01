@@ -46,6 +46,7 @@ import java.util.Set;
 public final class VisualVerifier {
     private static final Logger LOGGER = LogUtils.getLogger();
     private double spiderStartY;
+    private double autoWalkStartZ, autoWalkTurnZ;
     private static final Set<String> VISUALS = Set.of("target_esp", "jump_circles", "trails", "hit_particles", "hit_effects",
             "damage_particles", "player_effects", "custom_sky", "ambience", "visual_engine", "explosive_highlights",
             "custom_crosshair", "nametags", "player_esp", "tracers", "item_esp", "kill_aura", "fullbright");
@@ -1016,6 +1017,98 @@ public final class VisualVerifier {
             studio(client);
         });
 
+        // Redesign tour: full-screen menus captured over the live world.
+        then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen()));
+        shot(40, "50-home");
+        then(2, () -> client.setScreen(null));
+
+        // Hand-pose port: linked mirrored hands, real held items, shared map, knife and ease-out.
+        then(2, () -> {
+            studio(client);
+            client.options.hideGui = false;
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            disable("cosmetic_knife");
+            command(client, "time set 6000");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+            command(client, "item replace entity @p weapon.offhand with minecraft:shield");
+            JilatonClient.moduleManager().get("view_model").resetSettings();
+            setting("view_model", "pivot", "Hand");
+            setting("view_model", "link_hands", true);
+            setting("view_model", "glide", 0.4);
+            setting("view_model", "main_x", 0.15);
+            setting("view_model", "main_y", 0.15);
+            setting("view_model", "main_ry", 20.0);
+            setting("view_model", "main_scale", 0.8);
+            enable("view_model");
+        });
+        shot(30, "44-hand-pose-linked");
+        then(2, () -> {
+            enable("cosmetic_knife");
+            enable("swing_animations");
+            client.player.swing(InteractionHand.MAIN_HAND);
+        });
+        shot(2, "44b-hand-pose-knife-swing");
+        then(8, () -> {
+            disable("cosmetic_knife");
+            disable("swing_animations");
+            command(client, "item replace entity @p weapon.offhand with minecraft:air");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:filled_map");
+        });
+        shot(20, "44c-hand-pose-shared-map");
+        then(2, () -> disable("view_model"));
+        then(35, () -> {
+            var model = (dev.jilaton.client.module.impl.ViewModelModule) JilatonClient.moduleManager().get("view_model");
+            LOGGER.info("[JilatonVerify] hand-pose disabled={} renderActive={}", !model.enabled(), model.renderActive());
+            if (model.renderActive()) throw new IllegalStateException("Hand pose did not return to rest");
+        });
+        shot(2, "44d-hand-pose-restored");
+        then(2, () -> {
+            JilatonClient.moduleManager().get("view_model").resetSettings();
+            command(client, "item replace entity @p weapon.mainhand with minecraft:air");
+        });
+
+        // AutoWalk changes direction without leaving either physical key held, then yields to manual input.
+        then(2, () -> {
+            studio(client);
+            client.options.keyUp.setDown(false);
+            client.options.keyDown.setDown(false);
+            JilatonClient.moduleManager().get("auto_walk").resetSettings();
+            setting("auto_walk", "safe", false);
+            setting("auto_walk", "auto_jump", false);
+        });
+        then(5, () -> {
+            autoWalkStartZ = client.player.getZ();
+            enable("auto_walk");
+        });
+        then(10, () -> {
+            autoWalkTurnZ = client.player.getZ();
+            setting("auto_walk", "direction", "Backward");
+        });
+        then(12, () -> {
+            double forward = autoWalkTurnZ - autoWalkStartZ;
+            double backward = autoWalkTurnZ - client.player.getZ();
+            disable("auto_walk");
+            LOGGER.info("[JilatonVerify] auto-walk forward={} backward={} forwardKey={} backwardKey={}",
+                    forward, backward, client.options.keyUp.isDown(), client.options.keyDown.isDown());
+            if (forward < 0.2 || backward < 0.2 || client.options.keyUp.isDown() || client.options.keyDown.isDown())
+                throw new IllegalStateException("AutoWalk direction/physical-key regression");
+        });
+        shot(2, "45-auto-walk-restored");
+        then(2, () -> {
+            setting("auto_walk", "disable_on_input", true);
+            enable("auto_walk");
+            client.options.keyLeft.setDown(true);
+        });
+        then(3, () -> {
+            boolean yielded = !JilatonClient.moduleManager().get("auto_walk").enabled();
+            client.options.keyLeft.setDown(false);
+            disable("auto_walk");
+            LOGGER.info("[JilatonVerify] auto-walk manual input yielded={}", yielded);
+            if (!yielded) throw new IllegalStateException("AutoWalk did not yield to manual input");
+            JilatonClient.moduleManager().get("auto_walk").resetSettings();
+            studio(client);
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {
@@ -1287,7 +1380,8 @@ public final class VisualVerifier {
         return name.startsWith("10-") || name.startsWith("27") || name.startsWith("31") || name.startsWith("11-") || name.startsWith("12-")
                 || name.startsWith("14-") || name.startsWith("15-") || name.startsWith("16-")
                 || name.startsWith("17-") || name.startsWith("18-") || name.startsWith("19-")
-                || name.startsWith("20-") || name.startsWith("33") || name.startsWith("35") || name.startsWith("37");
+                || name.startsWith("20-") || name.startsWith("33") || name.startsWith("35") || name.startsWith("37")
+                || name.startsWith("44");
     }
 
     private void logDisabled() {
