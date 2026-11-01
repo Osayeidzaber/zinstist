@@ -12,6 +12,7 @@ import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.Setting;
+import dev.jilaton.client.setting.TextSetting;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -962,6 +963,7 @@ public final class VisualVerifier {
             if (setting instanceof ChoiceSetting choice) choice.setValue((String) value);
             else if (setting instanceof BooleanSetting bool) bool.setValue((Boolean) value);
             else if (setting instanceof NumberSetting number) number.setValue(((Number) value).doubleValue());
+            else if (setting instanceof TextSetting text) text.setValue((String) value);
             else LOGGER.warn("[JilatonVerify] setting {}.{} not found", moduleId, settingId);
         } catch (RuntimeException failure) {
             LOGGER.warn("[JilatonVerify] could not set {}.{} = {}: {}", moduleId, settingId, value, failure.getMessage());
