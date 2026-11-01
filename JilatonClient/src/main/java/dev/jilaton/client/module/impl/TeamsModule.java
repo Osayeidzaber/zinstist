@@ -23,7 +23,7 @@ public final class TeamsModule extends ClientModule {
         super("teams", "Teams", "Filters scoreboard allies and matching name colors, prefixes or dyed armor.",
                 ModuleCategory.COMBAT);
         ignoreTeammates = addSetting(new BooleanSetting("ignore_teammates", "Ignore teammates", true));
-        matchNameColor = addSetting(new BooleanSetting("match_name_color", "Match same name color", true));
+        matchNameColor = addSetting(new BooleanSetting("match_name_color", "Match same name color", false));
         matchScoreboard = addSetting(new BooleanSetting("match_scoreboard", "Match scoreboard team", true));
         matchPrefix = addSetting(new BooleanSetting("match_prefix", "Match name prefix", false));
         armorHead = addSetting(new BooleanSetting("armor_head", "Match helmet color", true));
@@ -34,7 +34,9 @@ public final class TeamsModule extends ClientModule {
 
     @Override
     public boolean enabledByDefault() {
-        return true;
+        // Off by default: on most servers every player shares a rank colour and a tab-sorting scoreboard team,
+        // so an always-on Teams filter marks everyone as a teammate and combat modules find no targets.
+        return false;
     }
 
     public boolean ignoreTeammates() {
