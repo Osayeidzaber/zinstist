@@ -494,7 +494,8 @@ public final class VisualVerifier {
             setting("radiance", "strength", 0.34);
             setting("radiance", "thickness", 0.24);
             setting("radiance", "pulse", false);
-            summonAhead(client, "zombie");
+            // On the camera axis the player would hide the zombie; step it sideways so both auras read.
+            summonAhead(client, "zombie", 1.6);
             enable("radiance");
         });
         shot(20, "23-radiance");
@@ -781,9 +782,14 @@ public final class VisualVerifier {
 
     /** Summons a mob roughly three blocks along the player's current facing, in view of a level camera. */
     private static void summonAhead(Minecraft client, String type) {
+        summonAhead(client, type, 0.0);
+    }
+
+    /** As {@link #summonAhead(Minecraft, String)}, shifted sideways so it does not sit behind the player. */
+    private static void summonAhead(Minecraft client, String type, double lateral) {
         double yaw = Math.toRadians(client.player.getYRot());
-        double x = client.player.getX() - Math.sin(yaw) * 3.0;
-        double z = client.player.getZ() + Math.cos(yaw) * 3.0;
+        double x = client.player.getX() - Math.sin(yaw) * 3.0 + Math.cos(yaw) * lateral;
+        double z = client.player.getZ() + Math.cos(yaw) * 3.0 + Math.sin(yaw) * lateral;
         command(client, "summon minecraft:" + type + " " + x + " " + client.player.getY() + " " + z
                 + " {NoAI:1b,PersistenceRequired:1b,Silent:1b}");
     }
