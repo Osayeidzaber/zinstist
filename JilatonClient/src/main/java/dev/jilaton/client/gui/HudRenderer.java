@@ -56,7 +56,7 @@ public final class HudRenderer {
     private static final EquipmentSlot[] ARMOR_SLOTS = {EquipmentSlot.HEAD, EquipmentSlot.CHEST,
             EquipmentSlot.LEGS, EquipmentSlot.FEET};
     private static final String[] ARMOR_LABELS = {"HEAD", "BODY", "LEGS", "FEET"};
-    private static final String[] CHIP_LABELS = {"FALL", "ARMOR", "ABSORB"};
+    private static final String[] CHIP_LABELS = {"COMBO", "HITS", "LEAD"};
     private final List<EffectRow> effectRows = new ArrayList<>();
     private long lastEffectTick = Long.MIN_VALUE;
     private Object lastLevel;
@@ -76,6 +76,7 @@ public final class HudRenderer {
     private dev.jilaton.client.render.WorldOverlayProjection projection;
     private float partialTick;
     private java.util.UUID lastTargetId;
+    private final dev.jilaton.client.render.FightStats fightStats = new dev.jilaton.client.render.FightStats();
     private final ModuleManager modules;
     private final ClientConfig config;
     private final List<ClientModule> sortedModules;
@@ -118,9 +119,7 @@ public final class HudRenderer {
     private final TenthsText compactDistanceValue = new TenthsText();
     private final TenthsText aboveHeadHealthValue = new TenthsText();
     private final TenthsText aboveHeadDistanceValue = new TenthsText();
-    private final IntText chipFallValue = new IntText();
-    private final IntText chipArmorValue = new IntText();
-    private final IntText chipAbsorbValue = new IntText();
+    private final IntText chipComboValue = new IntText();
     private final IntText aboveHeadArmorValue = new IntText();
     private final IntText heldCountValue = new IntText();
     private final NumericCrossfade targetDistanceFade = new NumericCrossfade();
@@ -710,8 +709,8 @@ public final class HudRenderer {
             String heldName = held.isEmpty() ? "EMPTY" : held.getHoverName().getString().toUpperCase(Locale.ROOT);
             int pillY = y + card.pillY();
             int pillWidth = HudDesign.pillWidth(font.width(heldName), card.contentWidth());
-            graphics.fill(contentX, pillY, contentX + pillWidth, pillY + card.pillHeight(), 0xFF241A38);
-            graphics.fill(contentX, pillY + 1, contentX + 2, pillY + card.pillHeight() - 1, 0xFF8B5CF6);
+            graphics.fill(contentX, pillY, contentX + pillWidth, pillY + card.pillHeight(), 0xFF1C1C1C);
+            graphics.fill(contentX, pillY + 1, contentX + 2, pillY + card.pillHeight() - 1, 0xFFF2F2F2);
             if (!held.isEmpty()) {
                 graphics.pose().pushMatrix();
                 graphics.pose().translate(contentX + 3, pillY - 1);
@@ -723,7 +722,7 @@ public final class HudRenderer {
                     ? heldName
                     : HudText.ellipsize(heldName, character -> font.width(String.valueOf(character)),
                         Math.max(0, pillWidth - HudDesign.PILL_TEXT_INSET));
-            graphics.drawString(font, pillLabel, contentX + 15, pillY + 2, 0xFFD9CFFF);
+            graphics.drawString(font, pillLabel, contentX + 15, pillY + 2, 0xFFF2F2F2);
         }
 
         float health = Math.max(0.0F, target.getHealth());
@@ -736,15 +735,15 @@ public final class HudRenderer {
         float displayedHealth = (float) targetHealth.update(healthRatio, now, config.reducedMotion());
         targetHealthValue.update(Math.round(health * 10.0F));
         targetHealthFade.update(targetHealthValue.text(), now, config.reducedMotion());
-        int healthX = painter.drawLeft(graphics, HEART_MARK, contentX, y + card.healthY(), 0xFFF0E9FF);
-        painter.drawFadeLeft(graphics, targetHealthFade, now, healthX, y + card.healthY(), 0xFFF0E9FF);
+        int healthX = painter.drawLeft(graphics, HEART_MARK, contentX, y + card.healthY(), 0xFFF2F2F2);
+        painter.drawFadeLeft(graphics, targetHealthFade, now, healthX, y + card.healthY(), 0xFFF2F2F2);
 
         HudDesign.Bar bar = HudDesign.healthBar(card);
         int barY = y + bar.y();
         for (int index = 0; index < bar.segments(); index++) {
             int left = x + bar.segmentLeft(index);
             int right = x + bar.segmentRight(index);
-            graphics.fill(left, barY, right, barY + bar.height(), 0xFF23202B);
+            graphics.fill(left, barY, right, barY + bar.height(), 0xFF232323);
             int filled = left + (int) Math.round((right - left) * HudDesign.segmentFill(index, displayedHealth));
             if (filled > left) {
                 graphics.fill(left, barY, filled, barY + bar.height(),
@@ -754,16 +753,21 @@ public final class HudRenderer {
         graphics.fill(contentX, y + card.ruleY(), x + card.contentRight(),
                 y + card.ruleY() + 1, 0x26FFFFFF);
 
+        // Combo, hit score and health lead, counted only from hurt flashes this client saw (FightStats).
+        if (chips) fightStats.observe(target.getId(), target.hurtTime, client.player.hurtTime,
+                CombatTargetTracker.sinceAttack(target, now));
+        double lead = client.player.getHealth() + client.player.getAbsorptionAmount()
+                - target.getHealth() - target.getAbsorptionAmount();
         for (int index = 0; chips && index < CHIP_LABELS.length; index++) {
             int left = x + card.chipX(index);
             int top = y + card.chipsY();
             int chipWidth = card.chipWidth();
-            graphics.fill(left, top, left + chipWidth, top + card.chipHeight(), 0xFF17151D);
-            graphics.fill(left, top, left + 2, top + card.chipHeight(), 0x668B5CF6);
+            graphics.fill(left, top, left + chipWidth, top + card.chipHeight(), 0xFF161616);
+            graphics.fill(left, top, left + 2, top + card.chipHeight(), 0x66FFFFFF);
             String value = switch (index) {
-                case 0 -> chipFallValue.update((int) Math.round(target.fallDistance * 10.0));
-                case 1 -> chipArmorValue.update(target.getArmorValue());
-                default -> chipAbsorbValue.update(Math.round(target.getAbsorptionAmount()));
+                case 0 -> chipComboValue.update(fightStats.combo());
+                case 1 -> fightStats.landed() + "-" + fightStats.taken();
+                default -> (lead >= 0 ? "+" : "") + String.format(Locale.ROOT, "%.1f", lead);
             };
             int valueRight = left + chipWidth - 6;
             int labelSpace = Math.max(0, valueRight - painter.width(value) - 3 - (left + 6));
@@ -771,8 +775,8 @@ public final class HudRenderer {
                 chipLabelSpace[index] = labelSpace;
                 chipLabelCache[index] = font.plainSubstrByWidth(CHIP_LABELS[index], labelSpace);
             }
-            graphics.drawString(font, chipLabelCache[index], left + 6, top + 2, 0xFFAFA6C4);
-            painter.drawRight(graphics, value, valueRight, top + 2, 0xFFD9CFFF);
+            graphics.drawString(font, chipLabelCache[index], left + 6, top + 2, 0xFF9A9A9A);
+            painter.drawRight(graphics, value, valueRight, top + 2, 0xFFF2F2F2);
         }
         graphics.pose().popMatrix();
     }
@@ -955,7 +959,7 @@ public final class HudRenderer {
             if (!key.isEmpty()) {
                 int chipX = x + width - chipWidth - 7;
                 graphics.fill(chipX, rowY - 1, chipX + chipWidth, rowY + 10,
-                        down ? (accent & 0x00FFFFFF) | 0x66000000 : 0xFF17151D);
+                        down ? (accent & 0x00FFFFFF) | 0x66000000 : 0xFF161616);
                 graphics.drawString(font, key, chipX + (chipWidth - font.width(key)) / 2, rowY + 1,
                         down ? 0xFFFFFFFF : 0xFFF5F5F5);
             }
@@ -1030,7 +1034,7 @@ public final class HudRenderer {
             graphics.renderItem(stack, 0, 0);
             graphics.pose().popMatrix();
         } else {
-            graphics.fill(x + 10, y + 10, x + 42, y + 42, 0xFF17151D);
+            graphics.fill(x + 10, y + 10, x + 42, y + 42, 0xFF161616);
         }
         graphics.drawString(font, label, x + HudDesign.HELD_ITEM_LABEL_X, y + 10,
                 HudDesign.withAlpha(0xFFF2F2F2, presence));
@@ -1254,7 +1258,7 @@ public final class HudRenderer {
             double angle = Math.PI * 2 * index / 64.0;
             int px = centerX + (int) Math.round(Math.cos(angle) * radius);
             int py = centerY + (int) Math.round(Math.sin(angle) * radius);
-            graphics.fill(px, py, px + 1, py + 1, 0x558B5CF6);
+            graphics.fill(px, py, px + 1, py + 1, 0x55FFFFFF);
         }
         int inner = Math.max(1, radius / 2);
         for (int index = 0; index < 48; index++) {

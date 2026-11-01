@@ -21,6 +21,11 @@ public final class CombatTargetTracker {
         return (now - lastAttackNanos) / 1_000_000_000.0 <= windowSeconds ? target : null;
     }
 
+    /** Nanoseconds since you last attacked {@code target}, or -1 if your last attack was on someone else. */
+    public static long sinceAttack(LivingEntity target, long now) {
+        return target != null && target == lastTarget ? now - lastAttackNanos : -1L;
+    }
+
     /**
      * Entity id of the current combat target for target-aware visuals: what you hit in the last few seconds, or
      * -1 when there is none.
