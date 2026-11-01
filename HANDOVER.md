@@ -309,3 +309,5 @@ All other agent branches are merged into `jilaton/2026-10-31-work`.
 - ChestStealer (Player) and AutoRespawn (Player): runtime-verified in scene 41 (5/5 diamonds moved, junk left, chest closed; respawned with no screen).
 - XRay: faithful Anubis port (9 mixins, Sodium refuses); NoRender (LB AntiBlind option set). Runtime-verified scene 42 (xray fade + ores; pumpkin blur gone).
 - Port policy from the user (2026-11-01): when Anubis has the module, port its code (decompiled at analysis/anubis-vineflower, remap with tools/remap-anubis.py using Loom mappings.tiny); LiquidBounce source is at analysis/liquidbounce-upstream (GPL-3, Kotlin). Record each port in ATTRIBUTION.md.
+- Anubis ports TimeChanger/Spider/Sneak/SpeedMine: scene 43 verified time=6000, crouch, spider +3.8 blocks. Sneak Packet mode and SpeedMine are boot-verified only (mixins apply), not behaviour-verified.
+- Anubis porting PAUSED by the user (2026-11-01); remaining candidates: StorageESP/Waypoints/AutoWalk upgrades, Trajectories, HoleESP, Jesus, ElytraSwap, FastUse, LowHealthWarning.

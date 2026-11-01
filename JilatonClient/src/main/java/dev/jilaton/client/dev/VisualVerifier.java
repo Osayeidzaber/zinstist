@@ -45,6 +45,7 @@ import java.util.Set;
  */
 public final class VisualVerifier {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private double spiderStartY;
     private static final Set<String> VISUALS = Set.of("target_esp", "jump_circles", "trails", "hit_particles", "hit_effects",
             "damage_particles", "player_effects", "custom_sky", "ambience", "visual_engine", "explosive_highlights",
             "custom_crosshair", "nametags", "player_esp", "tracers", "item_esp", "kill_aura", "fullbright");
@@ -974,6 +975,39 @@ public final class VisualVerifier {
             command(client, at("setblock", 1, -3, 3) + " minecraft:air");
             command(client, at("setblock", -1, -2, 3) + " minecraft:air");
             command(client, at("setblock", 0, 0, 2) + " minecraft:air");
+        });
+
+        // Anubis ports: Time Changer forces noon, Sneak (Vanilla) crouches, Spider climbs a wall.
+        then(2, () -> {
+            studio(client);
+            client.player.setYRot(0);
+            client.player.setXRot(-10);
+            setting("time_changer", "time", 6000.0);
+            enable("time_changer");
+            setting("sneak", "mode", "Vanilla");
+            enable("sneak");
+        });
+        then(10, () -> LOGGER.info("[JilatonVerify] time_changer dayTime={} sneak crouching={}",
+                client.level.getDayTime() % 24000, client.player.isCrouching()));
+        shot(4, "43-time-changer-noon");
+        then(2, () -> {
+            disable("sneak");
+            disable("time_changer");
+            command(client, "fill " + (int) Math.floor(studioX - 1) + " " + (int) Math.floor(studioY) + " " + (int) Math.floor(studioZ + 1)
+                    + " " + (int) Math.floor(studioX + 1) + " " + (int) Math.floor(studioY + 5) + " " + (int) Math.floor(studioZ + 1) + " minecraft:stone");
+            enable("spider");
+        });
+        then(4, () -> {
+            spiderStartY = client.player.getY();
+            client.options.keyUp.setDown(true);
+        });
+        then(20, () -> {
+            client.options.keyUp.setDown(false);
+            LOGGER.info("[JilatonVerify] spider climbed={}", String.format(java.util.Locale.ROOT, "%.2f", client.player.getY() - spiderStartY));
+            disable("spider");
+            command(client, "fill " + (int) Math.floor(studioX - 1) + " " + (int) Math.floor(studioY) + " " + (int) Math.floor(studioZ + 1)
+                    + " " + (int) Math.floor(studioX + 1) + " " + (int) Math.floor(studioY + 5) + " " + (int) Math.floor(studioZ + 1) + " minecraft:air");
+            studio(client);
         });
 
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just

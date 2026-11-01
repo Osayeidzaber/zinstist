@@ -147,6 +147,10 @@ public final class ModuleManager {
         register(new dev.jilaton.client.module.impl.AutoRespawnModule());
         register(new dev.jilaton.client.module.impl.NoRenderModule());
         register(new dev.jilaton.client.module.impl.XRayModule());
+        register(new dev.jilaton.client.module.impl.TimeChangerModule());
+        register(new dev.jilaton.client.module.impl.SpiderModule());
+        register(new dev.jilaton.client.module.impl.SneakModule());
+        register(new dev.jilaton.client.module.impl.SpeedMineModule());
         register(new dev.jilaton.client.module.impl.ZoomModule());
         register(new dev.jilaton.client.module.impl.FreecamModule());
         register(new dev.jilaton.client.module.impl.FreeLookModule());

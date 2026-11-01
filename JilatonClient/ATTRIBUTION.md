@@ -182,3 +182,6 @@ The KillAura scanning halo, feathered ribbon, corner markers, tracking/fade anim
   `MixinVisGraph`), GPL-3.0, Horcus and 4ldenz. Logic kept; names remapped to Mojang mappings and the
   block-colour list setting replaced by a text id list. Files: `module/impl/XRayModule.java`, `mixin/XRay*Mixin.java`.
 - **NoRender** — option set follows LiquidBounce `ModuleAntiBlind` (GPL-3.0-or-later, CCBlueX); hooks are Jilaton's.
+- **TimeChanger, Spider, Sneak, SpeedMine** — ported from Anubis Client (`TimeChangerModule`, `SpiderModule`,
+  `SneakModule`, `SpeedMineModule` and their mixins), GPL-3.0, Horcus and 4ldenz. Sneak's LocalPlayer injector
+  relaxed from require/allow 3 to require 1 for this build.
