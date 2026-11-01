@@ -53,16 +53,7 @@ public final class Canvas {
         graphics.pose().popMatrix();
         dev.jilaton.client.gui.JilatonType.restoreScale(previousTypeScale);
         double e = entrance();
-        if (e < 1) {
-            // Masked reveal: a dark curtain lifts off the screen with a bright hairline on its edge, plus a light
-            // veil, so every screen arrives with the same directional motion instead of a plain fade.
-            int edge = (int) Math.round(height * (1 - e));
-            if (edge > 0) {
-                graphics.fill(0, 0, width, edge, 0xFF050505);
-                graphics.fill(0, edge, width, edge + 1, ((int) Math.round(255 * (1 - e) * 0.9) << 24) | 0xFFFFFF);
-            }
-            graphics.fill(0, 0, width, height, ((int) Math.round((1 - e) * 120) << 24) | 0x050505);
-        }
+        if (e < 1) graphics.fill(0, 0, width, height, ((int) Math.round((1 - e) * 200) << 24) | 0x050505);
     }
 
     /** Screen x to board x. */

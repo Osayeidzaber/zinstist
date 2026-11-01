@@ -70,6 +70,8 @@ public final class JilatonClickGui extends Screen {
     private boolean resumed;
     private long openedAt;
     private double scroll, targetScroll, drawerScroll;
+    /** Increments each time a drawer opens, so its slide-in replays. */
+    private int drawerOpenedAt;
     private EditBox search;
     private EditBox profileName;
     private String selectedProfile;
@@ -563,28 +565,41 @@ public final class JilatonClickGui extends Screen {
     }
 
     private void renderDrawer(GuiGraphics g, ClientModule module, double mx, double my, int accent) {
+        // Slides in each time a module opens; the offset is applied to the whole drawer via the pose.
+        double slide = dev.jilaton.client.gui.design.Kit.springFrom("cg:drawer:" + module.id() + ":" + drawerOpenedAt, 1, 0);
+        g.pose().pushMatrix();
+        g.pose().translate((float) (slide * 60), 0);
         float x0 = PX + PW - DRAWER, x = x0 + 18, r = PX + PW - 18;
-        Ui.round(g, x0, PY + 1, DRAWER - 1, PH - 2, 13, Ui.DRAWER);
-        Ui.rect(g, x0, PY + 1, 1, PH - 2, Ui.STROKE);
-        Ui.text(g, Ui.fit(module.name(), DRAWER - 90, 16, JilatonType.Face.SEMIBOLD), x, PY + 24, 16, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+        Ui.round(g, x0, PY + 1, DRAWER - 1, PH - 2, 8, Ui.alpha(0xFF090909, 0.98));
+        Ui.rect(g, x0, PY + 1, 1, PH - 2, Ui.alpha(0xFFFFFFFF, 0.12));
+        Ui.spaced(g, "SETTINGS \u00b7 " + module.settings().size(), x, PY + 16, 9, 1.8F, JilatonType.Face.MONO, Ui.TEXT_3);
+        Ui.text(g, Ui.fit(module.name(), DRAWER - 110, 22, JilatonType.Face.DISPLAY_HEAVY), x, PY + 28, 22,
+                JilatonType.Face.DISPLAY_HEAVY, Ui.TEXT);
         boolean closeOver = Ui.inside(mx, my, r - 28, PY + 18, 28, 28);
-        Ui.card(g, r - 28, PY + 18, 28, 28, 7, Ui.alpha(Ui.RAISED, Ui.ease("cg:close", closeOver)), Ui.STROKE);
+        Ui.round(g, r - 28, PY + 18, 28, 28, 5, Ui.alpha(Ui.RAISED, Ui.ease("cg:close", closeOver)));
+        dev.jilaton.client.gui.design.Paint.outline(g, r - 28, PY + 18, 28, 28, 5, 0, Ui.alpha(0xFFFFFFFF, 0.12));
         Ui.textCentre(g, "×", r - 14, PY + 23, 14, JilatonType.Face.REGULAR, Ui.TEXT_2);
         boolean changed = module.settings().stream().anyMatch(s -> !s.isDefault());
         boolean resetOver = changed && Ui.inside(mx, my, r - 92, PY + 18, 58, 28);
-        Ui.card(g, r - 92, PY + 18, 58, 28, 7, Ui.alpha(Ui.RAISED, Ui.ease("cg:reset", resetOver)), Ui.STROKE);
+        Ui.round(g, r - 92, PY + 18, 58, 28, 5, Ui.alpha(Ui.RAISED, Ui.ease("cg:reset", resetOver)));
+        dev.jilaton.client.gui.design.Paint.outline(g, r - 92, PY + 18, 58, 28, 5, 0, Ui.alpha(0xFFFFFFFF, changed ? 0.16 : 0.06));
         Ui.textCentre(g, "Reset", r - 63, PY + 26, 11, JilatonType.Face.MEDIUM, changed ? Ui.TEXT_2 : Ui.FAINT);
         // Description, two lines at most.
         String[] lines = wrap(module.description(), DRAWER - 36, 11, 2);
-        for (int i = 0; i < lines.length; i++) Ui.text(g, lines[i], x, PY + 52 + i * 15, 11, Ui.TEXT_2);
+        for (int i = 0; i < lines.length; i++) Ui.text(g, lines[i], x, PY + 58 + i * 14, 11, Ui.TEXT_2);
         // Keybind and on/off.
         float ky = PY + 90;
         Ui.text(g, "Keybind", x, ky + 9, 12, Ui.TEXT_2);
         String key = keyName(module);
         float kw = Math.max(36, Ui.width(key, 11, JilatonType.Face.MONO) + 16);
         boolean keyOver = Ui.inside(mx, my, r - kw - 46, ky + 2, kw, 26);
-        Ui.card(g, r - kw - 46, ky + 2, kw, 26, 6, keyOver || module.id().equals(bindingId) ? Ui.RAISED : Ui.CARD,
-                module.id().equals(bindingId) ? Ui.alpha(accent, 0.6) : Ui.STROKE);
+        // Keycap: a raised cap with a darker base edge; while binding it pulses in the accent.
+        boolean binding = module.id().equals(bindingId);
+        double pulse = binding && !dev.jilaton.client.gui.design.Kit.reduced() ? 0.5 + 0.5 * Math.sin(dev.jilaton.client.gui.design.Kit.clock() * 6) : 0;
+        Ui.round(g, r - kw - 46, ky + 5, kw, 26, 5, 0xFF050505);
+        Ui.round(g, r - kw - 46, ky + 2, kw, 25, 5, keyOver || binding ? 0xFF2A2A2A : 0xFF1C1C1C);
+        dev.jilaton.client.gui.design.Paint.outline(g, r - kw - 46, ky + 2, kw, 25, 5, 0,
+                binding ? Ui.alpha(accent, 0.4 + 0.5 * pulse) : Ui.alpha(0xFFFFFFFF, 0.14));
         Ui.textCentre(g, key, r - kw / 2 - 46, ky + 9, 11, JilatonType.Face.MONO, module.id().equals(bindingId) ? accent : Ui.TEXT);
         Ui.smallToggle(g, r - 32, ky + 6, Ui.ease("cg:tog:" + module.id(), module.enabled()), accent);
         Ui.hline(g, x0 + 1, drawerTop() - 8, DRAWER - 2, Ui.STROKE);
@@ -603,6 +618,7 @@ public final class JilatonClickGui extends Screen {
             Ui.text(g, "Blade colour follows the sword you hold.", x, hy + 15, 11, Ui.TEXT_3);
         }
         g.disableScissor();
+        g.pose().popMatrix();
     }
 
     private void drawerRow(GuiGraphics g, ClientModule module, Row row, float x, float r, double mx, double my, int accent) {
@@ -620,12 +636,13 @@ public final class JilatonClickGui extends Screen {
                 boolean selected = option.equals(choice.value());
                 boolean over = Ui.inside(mx, my, cx, cy, cw, 34);
                 double t = Ui.ease("cg:chip:" + key + ":" + option, over);
-                Ui.round(g, cx, cy, cw, 34, 8, selected ? Ui.alpha(accent, 0.14) : Ui.mix(Ui.CARD, Ui.RAISED, t));
-                Ui.outline(g, cx, cy, cw, 34, 8, selected ? Ui.alpha(accent, 0.55) : Ui.mix(Ui.STROKE, Ui.FAINT, t));
+                double sel = dev.jilaton.client.gui.design.Kit.spring("cg:chipsel:" + key + ":" + option, selected);
+                Ui.round(g, cx, cy, cw, 34, 5, Ui.mix(Ui.mix(0xFF141414, 0xFF1F1F1F, t), Ui.TEXT, sel));
+                if (sel < 0.99) dev.jilaton.client.gui.design.Paint.outline(g, cx, cy, cw, 34, 5, 0, Ui.alpha(0xFFFFFFFF, 0.08 + 0.1 * t));
                 boolean cs = option.startsWith("CS ");
                 String label = cs ? option.substring(3) : option;
                 Ui.text(g, Ui.fit(label, cw - (cs ? 44 : 20), 12, JilatonType.Face.MEDIUM), cx + 10, cy + 11, 12,
-                        JilatonType.Face.MEDIUM, selected ? Ui.TEXT : Ui.TEXT_2);
+                        selected ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM, Ui.mix(Ui.TEXT_2, 0xFF0A0A0A, sel));
                 if (cs) Ui.textRight(g, "CS", cx + cw - 10, cy + 12, 10, JilatonType.Face.MEDIUM, Ui.TEXT_3);
             }
             return;
@@ -639,17 +656,21 @@ public final class JilatonClickGui extends Screen {
             double f = range <= 0 ? 0 : (number.value() - number.minimum()) / range;
             float w = r - x;
             double shown = Ui.ease("cg:numhint:" + key, true) * 0 + f;
-            Ui.round(g, x, y + 31, w, 4, 2, Ui.STROKE);
-            if (shown > 0) Ui.round(g, x, y + 31, (float) (w * shown), 4, 2, accent);
+            // Hairline track with quarter ticks, accent fill, square knob that grows while held.
+            Ui.rect(g, x, y + 32, w, 2, Ui.alpha(0xFFFFFFFF, 0.12));
+            for (int tick = 0; tick <= 4; tick++) Ui.rect(g, x + w * tick / 4F - 0.5F, y + 28, 1, 10, Ui.alpha(0xFFFFFFFF, 0.14));
+            if (shown > 0) Ui.rect(g, x, y + 32, (float) (w * shown), 2, accent);
             double k = Ui.ease("cg:knob:" + key, over || dragging == number);
-            Ui.circle(g, (float) (x + w * shown), y + 33, (float) (7 + k), Ui.TEXT);
+            float ks = (float) (10 + 4 * k);
+            Ui.round(g, (float) (x + w * shown) - ks / 2, y + 33 - ks / 2, ks, ks, 3, Ui.TEXT);
         } else if (setting instanceof BooleanSetting bool) {
             Ui.text(g, Ui.fit(setting.label(), r - x - 50, 12, JilatonType.Face.REGULAR), x, y + 10, 12, labelColor);
             Ui.smallToggle(g, r - 32, y + 8, Ui.ease("cg:b:" + key, bool.value()), accent);
         } else if (setting instanceof ChoiceSetting choice) {
             Ui.text(g, Ui.fit(setting.label(), r - x - 130, 12, JilatonType.Face.REGULAR), x, y + 10, 12, labelColor);
             float pw = 120;
-            Ui.card(g, r - pw, y + 4, pw, 26, 7, over ? Ui.RAISED : Ui.CARD, Ui.STROKE);
+            Ui.round(g, r - pw, y + 4, pw, 26, 5, over ? 0xFF1F1F1F : 0xFF141414);
+            dev.jilaton.client.gui.design.Paint.outline(g, r - pw, y + 4, pw, 26, 5, 0, Ui.alpha(0xFFFFFFFF, 0.1));
             Ui.text(g, "‹", r - pw + 8, y + 9, 13, Ui.TEXT_3);
             Ui.textCentre(g, Ui.fit(choice.value(), pw - 36, 12, JilatonType.Face.MEDIUM), r - pw / 2, y + 11, 12,
                     JilatonType.Face.MEDIUM, Ui.TEXT);
@@ -657,8 +678,9 @@ public final class JilatonClickGui extends Screen {
         } else if (setting instanceof TextSetting text) {
             Ui.text(g, Ui.fit(setting.label(), r - x - 130, 12, JilatonType.Face.REGULAR), x, y + 10, 12, labelColor);
             float pw = 120;
-            Ui.card(g, r - pw, y + 4, pw, 26, 7, over ? Ui.RAISED : Ui.CARD, Ui.STROKE);
-            String value = text.value().isEmpty() ? "Edit…" : text.value();
+            Ui.round(g, r - pw, y + 4, pw, 26, 5, over ? 0xFF1F1F1F : 0xFF141414);
+            dev.jilaton.client.gui.design.Paint.outline(g, r - pw, y + 4, pw, 26, 5, 0, Ui.alpha(0xFFFFFFFF, 0.1));
+            String value = text.value().isEmpty() ? "Edit\u2026" : text.value();
             Ui.text(g, Ui.fit(value, pw - 20, 12, JilatonType.Face.REGULAR), r - pw + 10, y + 11, 12,
                     text.value().isEmpty() ? Ui.TEXT_3 : Ui.TEXT);
         }
@@ -1014,6 +1036,7 @@ public final class JilatonClickGui extends Screen {
                 config.save(modules);
             } else {
                 drawerId = module.id().equals(drawerId) ? null : module.id();
+                drawerOpenedAt++;
                 drawerScroll = 0;
             }
             remember();

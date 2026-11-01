@@ -96,6 +96,12 @@ public final class Kit {
         return spring(key, on ? 1 : 0);
     }
 
+    /** Like {@link #spring(String, double)} but a new key starts at {@code from}, so the first frames animate in. */
+    public static double springFrom(String key, double from, double target) {
+        SPRINGS.computeIfAbsent(key, k -> new double[]{from, System.nanoTime()});
+        return spring(key, target);
+    }
+
     /** Eased value toward any {@code target} (used for sliding thumbs and panel positions). */
     public static double spring(String key, double target) {
         long now = System.nanoTime();
