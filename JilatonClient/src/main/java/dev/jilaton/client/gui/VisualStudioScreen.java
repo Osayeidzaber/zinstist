@@ -132,20 +132,21 @@ public final class VisualStudioScreen extends Screen {
 
     private void renderHeader(GuiGraphics graphics, double vis) {
         int top = margin / 2 + 4;
-        JilatonLogo.draw(graphics, margin, top, 9, JilatonUi.alpha(JilatonUi.TEXT_2, vis));
-        graphics.drawString(font, "JILATON", margin + 14, top + 1, JilatonUi.alpha(JilatonUi.TEXT_2, vis), false);
-        graphics.drawString(font, "— VISUAL STUDIO", margin + 18 + font.width("JILATON"), top + 1,
-                JilatonUi.alpha(JilatonUi.TEXT_4, vis), false);
+        // Editorial header: monospace section line, heavy title with an italic serif companion, a quiet subtitle.
+        dev.jilaton.client.gui.design.Ui.spaced(graphics, "03 — APPEARANCE STUDIO", margin, top + 1, 7, 1.2F,
+                JilatonType.Face.MONO, JilatonUi.alpha(JilatonUi.TEXT_3, vis));
         String out = "ESC — BACK";
-        graphics.drawString(font, out, width - margin - font.width(out), top + 1, JilatonUi.alpha(JilatonUi.TEXT_4, vis), false);
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(margin, margin + (tight ? 4 : 6));
-        graphics.pose().scale(tight ? 2 : 3, tight ? 2 : 3);
-        graphics.drawString(font, Component.literal("Visual Studio").withStyle(net.minecraft.ChatFormatting.BOLD), 0, 0,
-                JilatonUi.alpha(JilatonUi.TEXT, vis), false);
-        graphics.pose().popMatrix();
+        float ow = dev.jilaton.client.gui.design.Ui.spacedWidth(out, 7, 1.2F, JilatonType.Face.MONO);
+        dev.jilaton.client.gui.design.Ui.spaced(graphics, out, width - margin - ow, top + 1, 7, 1.2F,
+                JilatonType.Face.MONO, JilatonUi.alpha(JilatonUi.TEXT_4, vis));
+        float size = tight ? 20 : 30;
+        float ty = margin + (tight ? 2 : 4);
+        JilatonType.draw(graphics, "Studio", JilatonType.Face.DISPLAY_HEAVY, margin, ty, size, JilatonUi.alpha(JilatonUi.TEXT, vis));
+        float tw = JilatonType.width("Studio", JilatonType.Face.DISPLAY_HEAVY, size);
+        JilatonType.draw(graphics, "Appearance", JilatonType.Face.SERIF_ITALIC, margin + tw + 8, ty + size * 0.18F, size * 0.8F,
+                JilatonUi.alpha(JilatonUi.TEXT_2, vis));
         graphics.drawString(font, "Compare skies, halos, wings and effects before they touch the world.", margin + 1,
-                margin + (tight ? 28 : 34), JilatonUi.alpha(JilatonUi.TEXT_3, vis), false);
+                margin + (tight ? 28 : 40), JilatonUi.alpha(JilatonUi.TEXT_3, vis), false);
     }
 
     private void renderPreview(GuiGraphics graphics, double vis) {
