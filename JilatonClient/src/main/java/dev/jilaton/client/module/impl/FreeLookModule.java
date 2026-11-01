@@ -37,6 +37,12 @@ public final class FreeLookModule extends ClientModule {
 
     @Override public boolean holdKey() { return hold.value(); }
 
+    /**
+     * A momentary hold module must not resume enabled after a restart: nobody holds the key then,
+     * so the client would start with the camera detached. Freecam follows the same rule.
+     */
+    @Override public boolean persistEnabled() { return false; }
+
     @Override protected void onEnable(Minecraft client) {
         if (client == null || client.player == null) return;
         if (releasing && player == client.player) {

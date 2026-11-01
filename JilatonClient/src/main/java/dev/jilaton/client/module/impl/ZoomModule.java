@@ -29,6 +29,12 @@ public final class ZoomModule extends ClientModule {
 
     @Override public boolean holdKey() { return hold.value(); }
 
+    /**
+     * A momentary hold module must not resume enabled after a restart: nobody holds the key then,
+     * so the client would start zoomed. Freecam follows the same rule.
+     */
+    @Override public boolean persistEnabled() { return false; }
+
     @Override protected void onEnable(Minecraft client) { configuredFov = activeFov = fov.value(); }
 
     public float applyFov(Minecraft client, float original, boolean reducedMotion) {
