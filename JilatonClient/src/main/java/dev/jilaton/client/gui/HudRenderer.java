@@ -632,7 +632,9 @@ public final class HudRenderer {
         int scaledWidth = (int) Math.ceil(width * widgetScale);
         int scaledHeight = (int) Math.ceil(height * widgetScale);
         int x = widgetX("target", (guiWidth - scaledWidth) / 2, scaledWidth, guiWidth);
-        int y = widgetY("target", guiHeight - 76, scaledHeight, guiHeight);
+        // Bottom-anchored: the card's own height (chip row, held-item pill) moves its top up, never its
+        // bottom edge onto the hotbar. A saved drag still overrides this default in widgetY.
+        int y = widgetY("target", HudDesign.aboveHotbarTop(guiHeight, scaledHeight), scaledHeight, guiHeight);
         if (!editorPreview && hud.followTarget()) {
             Vec3 anchor = target.getPosition(partialTick).add(0, target.getBbHeight() * 0.75, 0);
             if (projection == null || !projection.isCurrent(client) || !projection.project(anchor, guiWidth, guiHeight)) {

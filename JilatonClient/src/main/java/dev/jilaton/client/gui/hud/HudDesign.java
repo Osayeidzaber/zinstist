@@ -35,6 +35,10 @@ public final class HudDesign {
     public static final int STACK_GAP = 6;
     /** Margin a bottom-anchored column keeps from the screen edge. */
     public static final int HUD_MARGIN = 8;
+    /** Height of the vanilla hotbar sprite, drawn against the bottom edge at every GUI scale. */
+    public static final int HOTBAR_HEIGHT = 22;
+    /** Bottom-centre widgets keep one {@link #HUD_MARGIN} between their bottom edge and the hotbar. */
+    public static final int ABOVE_HOTBAR_INSET = HOTBAR_HEIGHT + HUD_MARGIN;
     public static final int SERVER_WIDTH = 148;
     public static final int SERVER_HEIGHT = 66;
     public static final int SERVER_ROW = 12;
@@ -251,6 +255,21 @@ public final class HudDesign {
 
     public static int chipTextWidth(TargetCard card) {
         return Math.max(0, card.chipWidth() - 8);
+    }
+
+    /** Top edge of the vanilla hotbar strip; widgets centred over it must stay above this line. */
+    public static int hotbarTop(int guiHeight) {
+        return Math.max(0, guiHeight - HOTBAR_HEIGHT);
+    }
+
+    /**
+     * Default top of a bottom-centre widget. The bottom edge is anchored one {@link #HUD_MARGIN} above the
+     * hotbar and the card grows upward, so adding a row (the target card's chip strip, the held-item pill)
+     * can never reach the hotbar. For the 46 px card the old fixed {@code guiHeight - 76} was tuned for,
+     * this returns exactly {@code guiHeight - 76}.
+     */
+    public static int aboveHotbarTop(int guiHeight, int cardHeight) {
+        return Math.max(0, guiHeight - ABOVE_HOTBAR_INSET - Math.max(0, cardHeight));
     }
 
     public static int staffHeight(int rows) {
