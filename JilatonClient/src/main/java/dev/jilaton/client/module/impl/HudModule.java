@@ -36,6 +36,7 @@ public final class HudModule extends ClientModule {
     private final NumberSetting vanishWindow;
     private final ChoiceSetting targetPlacement = addSetting(new ChoiceSetting("target_placement", "Target card position", List.of("HUD", "Follow target"), "Follow target"));
     private final ChoiceSetting targetStyle = addSetting(new ChoiceSetting("target_style", "Target card style", List.of("Detailed", "Compact"), "Detailed"));
+    private final BooleanSetting targetSideBar = addSetting(new BooleanSetting("target_side_bar", "Health bar beside target", true));
     private final NumberSetting followScale = addSetting(new NumberSetting("target_follow_scale", "Pinned target card scale", 0.3, 1.5, 0.05, 0.6));
     private final NumberSetting targetScale = addSetting(new NumberSetting("target_scale", "Target card scale", 0.5, 2.0, 0.05, 1.0));
     private final NumberSetting targetWidth = addSetting(new NumberSetting("target_width", "Target card width (0 = auto)", 0, 320, 8, 0));
@@ -156,6 +157,7 @@ public final class HudModule extends ClientModule {
     public long vanishWindowMillis() { return Math.round(vanishWindow.value() * 1000.0); }
     /** Extra scale for the card while it is pinned beside the target, where it shares the view with them. */
     public double followScale() { return followScale.value(); }
+    public boolean targetSideBar() { return targetSideBar.value(); }
     public boolean followTarget() { return targetPlacement.value().equals("Follow target"); }
     public boolean compactTarget() { return targetStyle.value().equals("Compact"); }
     /** The preset whose exact shape is on screen, or "Custom" once any shaping setting is edited. */

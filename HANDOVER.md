@@ -129,6 +129,14 @@ and `git log`): shockwave + Radiance runtime checks, ClickGUI persistence (resta
 terrain-wave budget, Ambience/CustomSky precedence, AutoArmor hotbar equip, P5 HitEffects allocations,
 unused `FxShapes.softRing`, pinned target card.
 
+### 2026-11-01 additions (from the user's reference videos)
+
+- Target card chips now show COMBO / HITS / LEAD (`FightStats`, counted from hurt flashes the client saw).
+- Vertical health bar beside the target (`hud.target_side_bar`, on by default), right side; the card stays left.
+- Lyrics and music banner keep a clear cone around the crosshair (wider in a fight); World Trail spawns at the
+  side angle; first-person music cards moved lower-left. Polled sources run through `PlaybackClock`.
+- Not built: Clarity-style crystal visuals (glass crystals, player outline) and a smooth third-person "alt cam".
+
 ### Open
 
 Nothing. Every backlog item is closed and runtime-verified where it has visible behaviour.

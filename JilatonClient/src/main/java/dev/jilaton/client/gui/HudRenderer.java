@@ -76,6 +76,7 @@ public final class HudRenderer {
     private dev.jilaton.client.render.WorldOverlayProjection projection;
     private float partialTick;
     private java.util.UUID lastTargetId;
+    private final AnimatedValue sideBarHealth = new AnimatedValue();
     private final dev.jilaton.client.render.FightStats fightStats = new dev.jilaton.client.render.FightStats();
     private final ModuleManager modules;
     private final ClientConfig config;
@@ -200,6 +201,7 @@ public final class HudRenderer {
                 renderTargetCard(graphics, font, client, displayTarget,
                         accent, guiWidth, guiHeight, true, target != null && targetRecentlyAttacked);
             } else if (target != null && client.screen == null) {
+                if (hud.targetSideBar()) renderTargetSideBar(graphics, font, client, target, guiWidth, guiHeight);
                 renderTargetCard(graphics, font, client, target, accent, guiWidth, guiHeight,
                         false, targetRecentlyAttacked);
             }
@@ -828,6 +830,35 @@ public final class HudRenderer {
         // No fabricated combo or hit count: this is local attack-attempt feedback.
         graphics.drawString(font, recentlyAttacked ? "ATTACKING" : "TRACKING",
                 x + card.textX(), y + card.statusY(), 0xFF858585);
+    }
+
+    /**
+     * Vertical health bar standing beside the target, as tall as their body on screen, with the health in HP under
+     * it. It sits on the camera-right side; the pinned card prefers the left, so the two never overlap.
+     */
+    private void renderTargetSideBar(GuiGraphics graphics, Font font, Minecraft client, LivingEntity target,
+                                     int guiWidth, int guiHeight) {
+        if (projection == null || !projection.isCurrent(client)) return;
+        Vec3 feet = target.getPosition(partialTick);
+        double yaw = Math.toRadians(client.gameRenderer.getMainCamera().yRot());
+        double side = target.getBbWidth() * 0.5 + 0.3;
+        Vec3 bottom = feet.add(-Math.cos(yaw) * side, 0, -Math.sin(yaw) * side);
+        if (!projection.project(bottom, guiWidth, guiHeight)) return;
+        double bx = projection.x(guiWidth), by = projection.y(guiHeight);
+        if (!projection.project(bottom.add(0, target.getBbHeight(), 0), guiWidth, guiHeight)) return;
+        double ty = projection.y(guiHeight);
+        int height = (int) Math.round(by - ty);
+        if (height < 12) return;
+        int x = (int) Math.round(bx), top = (int) Math.round(ty), width = Math.max(2, Math.min(4, height / 30));
+        double ratio = Mth.clamp(target.getHealth() / Math.max(1F, target.getMaxHealth()), 0F, 1F);
+        int filled = (int) Math.round(height * sideBarHealth.update(ratio, System.nanoTime(), config.reducedMotion()));
+        graphics.fill(x - 1, top - 1, x + width + 1, top + height + 1, 0xA0000000);
+        graphics.fill(x, top, x + width, top + height, 0xFF2A2A2A);
+        graphics.fill(x, top + height - filled, x + width, top + height, ratio > 0.3 ? 0xFFF2F2F2 : 0xFF9A9A9A);
+        String label = Math.round(target.getHealth() + target.getAbsorptionAmount()) + " HP";
+        int labelX = x + width / 2 - font.width(label) / 2;
+        graphics.fill(labelX - 2, top + height + 3, labelX + font.width(label) + 2, top + height + 14, 0xA0000000);
+        graphics.drawString(font, label, labelX, top + height + 5, 0xFFF2F2F2);
     }
 
     private LivingEntity resolveCombatTarget(Minecraft client, boolean editorPreview) {
