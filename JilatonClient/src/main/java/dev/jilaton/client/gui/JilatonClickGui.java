@@ -82,6 +82,8 @@ public final class JilatonClickGui extends Screen {
     private float dragX, dragW;
     private boolean dragMotion;
     private boolean dragBackdrop;
+    private boolean dragScale;
+    private boolean dragSpeed;
     /** Card reorder: the card held by its grip, the press point and the slot it would drop into. */
     private String dragCard;
     private double dragCardX, dragCardY;
@@ -771,6 +773,11 @@ public final class JilatonClickGui extends Screen {
             Ui.text(g, fonts[i], cx + 14, y + 9, 12, JilatonType.Face.MEDIUM, on ? Ui.DEEP : Ui.TEXT_2);
             cx += fw;
         }
+        y += 40;
+        slider(g, "GUI size", x, y, w, (config.guiScale() - 0.7) / 0.3, Math.round(config.guiScale() * 100) + "%", accent);
+        y += 40;
+        slider(g, "Transition speed", x, y, w, (config.transitionSpeed() - 0.5) / 1.5,
+                String.format(java.util.Locale.ROOT, "%.2fx", config.transitionSpeed()), accent);
         // Live preview.
         float pvx = mainRight() - 300, pvy = LIST_Y - 2;
         Ui.card(g, pvx, pvy, 300, 250, 12, Ui.DRAWER, Ui.STROKE);
@@ -788,6 +795,17 @@ public final class JilatonClickGui extends Screen {
             Ui.text(g, cards[i][1], pvx + 28, cy + 35, 11, Ui.TEXT_2);
             Ui.toggle(g, pvx + 288 - 16 - 40, cy + 20, i == 0 ? 1 : 0, accent);
         }
+    }
+
+    /** A labelled slider row in the Theme page's style; {@code f} is 0..1. */
+    private void slider(GuiGraphics g, String label, float x, float y, float w, double f, String value, int accent) {
+        float tx = x + 170, tw = w - 170 - 50;
+        f = Math.max(0, Math.min(1, f));
+        Ui.text(g, label, x, y + 6, 13, Ui.TEXT_2);
+        Ui.round(g, tx, y + 10, tw, 4, 2, Ui.STROKE);
+        Ui.round(g, tx, y + 10, (float) (tw * f), 4, 2, accent);
+        Ui.circle(g, (float) (tx + tw * f), y + 12, 7, Ui.TEXT);
+        Ui.textRight(g, value, x + w, y + 6, 12, JilatonType.Face.MONO, Ui.TEXT);
     }
 
     private int customAccent() {
@@ -1137,6 +1155,22 @@ public final class JilatonClickGui extends Screen {
             config.save(modules);
             return true;
         }
+        y += 40;
+        if (Ui.inside(mx, my, tx - 6, y, tw + 12, 24)) {
+            dragScale = true;
+            dragX = tx;
+            dragW = tw;
+            applySlider(mx);
+            return true;
+        }
+        y += 40;
+        if (Ui.inside(mx, my, tx - 6, y, tw + 12, 24)) {
+            dragSpeed = true;
+            dragX = tx;
+            dragW = tw;
+            applySlider(mx);
+            return true;
+        }
         return Ui.inside(mx, my, MAIN_X, LIST_Y, mainRight() - MAIN_X, listBottom() - LIST_Y);
     }
 
@@ -1144,6 +1178,8 @@ public final class JilatonClickGui extends Screen {
         double f = Math.max(0, Math.min(1, (mx - dragX) / Math.max(1, dragW)));
         if (dragMotion) config.setAnimationIntensity(f * 1.5);
         else if (dragBackdrop) config.setBackdropOpacity(0.2 + f * 0.75);
+        else if (dragScale) config.setGuiScale(0.7 + f * 0.3);
+        else if (dragSpeed) config.setTransitionSpeed(0.5 + f * 1.5);
         else if (dragging != null) dragging.setValue(dragging.minimum() + f * (dragging.maximum() - dragging.minimum()));
     }
 
@@ -1155,7 +1191,7 @@ public final class JilatonClickGui extends Screen {
             if (cardDragging) dropIndex = dropIndexAt(mx, my);
             return true;
         }
-        if (dragging != null || dragMotion || dragBackdrop) {
+        if (dragging != null || dragMotion || dragBackdrop || dragScale || dragSpeed) {
             applySlider(canvas.x(event.x()));
             return true;
         }
@@ -1182,10 +1218,13 @@ public final class JilatonClickGui extends Screen {
             }
             return true;
         }
-        if (dragging != null || dragMotion || dragBackdrop) {
+        if (dragging != null || dragMotion || dragBackdrop || dragScale || dragSpeed) {
             dragging = null;
             dragMotion = false;
             dragBackdrop = false;
+            if (dragScale) canvas.fit(width, height);
+            dragScale = false;
+            dragSpeed = false;
             config.save(modules);
             return true;
         }

@@ -21,7 +21,8 @@ public final class Canvas {
     public Canvas fit(int width, int height) {
         this.width = width;
         this.height = height;
-        scale = Math.min(width / W, height / H);
+        double user = JilatonClient.clientConfig() == null ? 1.0 : JilatonClient.clientConfig().guiScale();
+        scale = (float) (Math.min(width / W, height / H) * user);
         offsetX = (width - W * scale) / 2F;
         offsetY = (height - H * scale) / 2F;
         return this;
@@ -35,7 +36,7 @@ public final class Canvas {
         if (JilatonClient.clientConfig().reducedMotion()) return 1;
         long now = System.nanoTime();
         if (openedAt == 0) openedAt = now;
-        double t = Math.min(1, (now - openedAt) / 0.42e9);
+        double t = Math.min(1, (now - openedAt) / (0.42e9 / JilatonClient.clientConfig().transitionSpeed()));
         return 1 - Math.pow(1 - t, 3);
     }
 

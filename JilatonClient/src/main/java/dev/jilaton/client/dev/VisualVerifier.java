@@ -379,6 +379,12 @@ public final class VisualVerifier {
         shot(12, "16-clickgui-settings-open");
         then(2, () -> openGui("THEME", "Combat", ""));
         shot(12, "17-clickgui-theme");
+        then(2, () -> {
+            JilatonClient.clientConfig().setGuiScale(0.8);
+            openGui("MODULES", "Visuals", "");
+        });
+        shot(12, "17b-clickgui-size-80");
+        then(2, () -> JilatonClient.clientConfig().setGuiScale(1.0));
         then(2, () -> openGui("CONFIGS", "Combat", ""));
         shot(12, "18-clickgui-configs");
 

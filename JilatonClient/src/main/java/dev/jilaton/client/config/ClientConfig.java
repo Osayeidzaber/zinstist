@@ -42,6 +42,8 @@ public final class ClientConfig {
     private double animationIntensity = 1.0;
     private double backdropOpacity = 0.55;
     private boolean backdropBlur = true;
+    private double guiScale = 1.0;
+    private double transitionSpeed = 1.0;
     /**
      * Explicit opt-in for the desktop media bridge (PowerShell/AppleScript reading the OS media session).
      * Off by default and never enabled implicitly: while off no process is spawned and no media is read.
@@ -130,6 +132,18 @@ public final class ClientConfig {
     public double guiDrawerScroll() { return guiDrawerScroll; }
     public void setGuiDrawerScroll(double scroll) {
         this.guiDrawerScroll = Double.isFinite(scroll) ? Math.max(0.0, scroll) : 0.0;
+    }
+
+    /** Size of the redesigned screens relative to the largest that fits the window (0.7 - 1.0). */
+    public double guiScale() { return guiScale; }
+    public void setGuiScale(double scale) {
+        this.guiScale = Double.isFinite(scale) ? Math.max(0.7, Math.min(1.0, Math.round(scale * 100) / 100.0)) : 1.0;
+    }
+
+    /** Multiplier on screen entrance and panel transition speed (0.5 slow - 2.0 fast). */
+    public double transitionSpeed() { return transitionSpeed; }
+    public void setTransitionSpeed(double speed) {
+        this.transitionSpeed = Double.isFinite(speed) ? Math.max(0.5, Math.min(2.0, Math.round(speed * 20) / 20.0)) : 1.0;
     }
 
     public double guiScroll() { return guiScroll; }
@@ -354,6 +368,13 @@ public final class ClientConfig {
             backdropOpacity = 0.55;
         }
         backdropBlur = Boolean.parseBoolean(values.getProperty("ui.backdrop_blur", "true"));
+        try {
+            setGuiScale(Double.parseDouble(values.getProperty("ui.gui_scale", "1.0")));
+            setTransitionSpeed(Double.parseDouble(values.getProperty("ui.transition_speed", "1.0")));
+        } catch (NumberFormatException ignored) {
+            guiScale = 1.0;
+            transitionSpeed = 1.0;
+        }
         desktopMediaBridge = Boolean.parseBoolean(values.getProperty("music.desktop_bridge", "false"));
         String configuredFriends = values.getProperty("friends.names");
         if (configuredFriends != null) {
@@ -470,6 +491,8 @@ public final class ClientConfig {
         values.setProperty("ui.animation_intensity", Double.toString(animationIntensity));
         values.setProperty("ui.backdrop_opacity", Double.toString(backdropOpacity));
         values.setProperty("ui.backdrop_blur", Boolean.toString(backdropBlur));
+        values.setProperty("ui.gui_scale", Double.toString(guiScale));
+        values.setProperty("ui.transition_speed", Double.toString(transitionSpeed));
         values.setProperty("music.desktop_bridge", Boolean.toString(desktopMediaBridge));
         values.setProperty("ui.font", uiFont);
         values.setProperty("ui.visual_order", String.join(",", visualOrder));
