@@ -641,14 +641,24 @@ public final class HudRenderer {
                 targetPlacement.reset();
                 return;
             }
+            double anchorX = projection.x(guiWidth), anchorY = projection.y(guiHeight);
+            // Project a point at the body's side (camera-right, plus room for arms and a held item) so the card
+            // clears the opponent at any distance instead of sitting a fixed number of pixels from their centre.
+            double yaw = Math.toRadians(client.gameRenderer.getMainCamera().yRot());
+            double side = target.getBbWidth() * 0.5 + 0.15;
+            double bodyHalfWidth = projection.project(anchor.add(-Math.cos(yaw) * side, 0, -Math.sin(yaw) * side), guiWidth, guiHeight)
+                    ? Math.abs(projection.x(guiWidth) - anchorX) : 0;
             HudStyle stored = config.hudStyle("target");
             activeStyle = new HudStyle((float) widgetScale, stored.panelOpacity(), stored.accent(),
                     HudStyle.Alignment.FREE, stored.visible());
-            activeLayout = targetPlacement.place(target.getUUID(), projection.x(guiWidth), projection.y(guiHeight),
-                    width, height, guiWidth, guiHeight, activeStyle, System.nanoTime(), config.reducedMotion());
+            // The pinned scale sits below HudStyle's 0.5 floor, so it shrinks the laid-out content instead.
+            float pinned = (float) hud.followScale();
+            activeLayout = targetPlacement.place(target.getUUID(), anchorX, anchorY, bodyHalfWidth,
+                    Math.max(1, Math.round(width * pinned)), Math.max(1, Math.round(height * pinned)),
+                    guiWidth, guiHeight, activeStyle, System.nanoTime(), config.reducedMotion());
             graphics.pose().pushMatrix();
             graphics.pose().translate(activeLayout.x(), activeLayout.y());
-            graphics.pose().scale(activeLayout.scale(), activeLayout.scale());
+            graphics.pose().scale(activeLayout.scale() * pinned, activeLayout.scale() * pinned);
             x = y = 0;
         } else beginWidgetAtScale(graphics, "target", x, y, width, height, editorPreview, widgetScale);
         if (compact) {

@@ -708,6 +708,42 @@ public final class VisualVerifier {
             client.options.setCameraType(CameraType.FIRST_PERSON);
         });
 
+        // Target card pinned beside the opponent: the card must sit left of the zombie's body without covering
+        // it, at normal range (33) and point-blank (33b), where the projected body is several times wider.
+        then(1, () -> studio(client));
+        then(5, () -> {
+            client.options.hideGui = false;
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "time set 13000");
+            client.player.setYRot(0);
+            client.player.setXRot(0);
+            setting("hud", "target_placement", "Follow target");
+            summonAhead(client, "zombie", 2.5);
+        });
+        then(6, () -> aimAt(client, nearestZombie(client)));
+        then(4, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
+        });
+        shot(10, "33-target-follow");
+        then(2, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) {
+                net.minecraft.world.phys.Vec3 look = client.player.getLookAngle();
+                double flat = Math.max(1e-6, Math.hypot(look.x, look.z));
+                // A server-side teleport: moving the client copy alone is overwritten by the next position packet.
+                command(client, "tp @e[type=minecraft:zombie,limit=1,sort=nearest] " + (client.player.getX() + look.x / flat * 1.6)
+                        + " " + zombie.getY() + " " + (client.player.getZ() + look.z / flat * 1.6));
+                CombatTargetTracker.record(zombie, System.nanoTime());
+            }
+        });
+        then(4, () -> aimAt(client, nearestZombie(client)));
+        shot(10, "33b-target-follow-near");
+        then(3, () -> {
+            setting("hud", "target_placement", "HUD");
+            command(client, "kill @e[type=minecraft:zombie]");
+        });
+
         then(5, () -> {
             preset(hudPresetBefore);
             client.options.hideGui = false;
@@ -886,7 +922,7 @@ public final class VisualVerifier {
         return name.startsWith("10-") || name.startsWith("27") || name.startsWith("31") || name.startsWith("11-") || name.startsWith("12-")
                 || name.startsWith("14-") || name.startsWith("15-") || name.startsWith("16-")
                 || name.startsWith("17-") || name.startsWith("18-") || name.startsWith("19-")
-                || name.startsWith("20-");
+                || name.startsWith("20-") || name.startsWith("33");
     }
 
     private void logDisabled() {
