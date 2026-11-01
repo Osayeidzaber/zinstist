@@ -46,9 +46,9 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     /** "Sky Lyrics" pins each line to its own compass point in the sky, like the sun and stars. */
     static final String SKY = "Sky Lyrics";
     private final ChoiceSetting mode = addSetting(new ChoiceSetting("mode", "Position mode", modes(), WORLD_TRAIL));
-    private final NumberSetting radius = addSetting(new NumberSetting("radius", "Radius (blocks)", 1.5, 4, 0.05, 2.3));
+    private final NumberSetting radius = addSetting(new NumberSetting("radius", "Distance (blocks)", 1.5, 8, 0.05, 4.5));
     private final NumberSetting height = addSetting(new NumberSetting("height", "Height", -1, 2, 0.05, 0.3));
-    private final NumberSetting side = addSetting(new NumberSetting("side", "Horizontal angle (°)", -90, 90, 1, 26));
+    private final NumberSetting side = addSetting(new NumberSetting("side", "Horizontal angle (°)", -90, 90, 1, 36));
     private final NumberSetting spread = addSetting(new NumberSetting("spread", "Line spacing on arc (°)", 6, 40, 1, 16));
     private final NumberSetting fontSize = addSetting(new NumberSetting("font_size", "Font size", 0.5, 2, 0.05, 1));
     private final ChoiceSetting align = addSetting(new ChoiceSetting("align", "Text alignment", List.of("Center", "Left", "Right"), "Center"));
@@ -252,7 +252,6 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             double maxD = maxDistance.value();
             if (distance > maxD) continue;
             alpha *= Math.min(1, Math.max(0, (maxD - distance) / (maxD * 0.3)));
-            alpha *= clearance(f, x, y, z);
             if (alpha < 0.02) continue;
             if (slot == 0) {
                 boolean timed = active != null && active.timedWords() && lineIndex == index
@@ -262,7 +261,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             } else runs.add(new FxFrame.Run(text, FxShapes.argb(0xDCDCDC, alpha)));
             // The text is already fitted to MAX_LINE_PIXELS, so glyphs keep one size: an overlong line loses
             // whole words to an ellipsis instead of shrinking below the readable size.
-            float size = (float) (0.020 * fontSize.value() * scale);
+            float size = (float) (0.020 * fontSize.value() * distanceScale() * scale);
             int glowColor = FxShapes.argb(rgb, Math.max(0.05, alpha * Math.max(glow.value(), 0.2) * 0.35));
             int background = panel.value() ? FxShapes.argb(0x000000, alpha * 0.45) : 0;
             boolean billboard = facing.value().equals("Face camera");
@@ -328,11 +327,10 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             double distance = Math.sqrt(f.distanceSqr(e.x, y, e.z));
             if (distance > maxD) continue;
             alpha *= Math.min(1, Math.max(0, (maxD - distance) / (maxD * 0.3)));
-            alpha *= clearance(f, e.x, y, e.z);
             if (alpha < 0.02) continue;
             double appear = f.reducedMotion ? 1 : LyricTrail.appear(e, f.now);
             y -= 0.12 * (1 - appear);
-            float size = (float) (0.020 * fontSize.value() * (0.86 + 0.14 * appear));
+            float size = (float) (0.020 * fontSize.value() * distanceScale() * (0.86 + 0.14 * appear));
             // Depth layers first, back to front, so see-through mode still paints the face last. Only the lit line
             // is extruded: on dimmed lines the layers smeared the letters into the terrain.
             for (int layer = isActive ? layers : 0; layer >= 1; layer--) {
@@ -402,12 +400,6 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             boolean isActive = e == current;
             double alpha = opacity.value() * f.intensity * LyricSky.alpha(e, f.now, linger.value(), isActive)
                     * (isActive ? 1 : dim.value());
-            // Sky lines are scenery, so they only give way to the crosshair during a fight.
-            if (dev.jilaton.client.render.CombatTargetTracker.targetId() >= 0) {
-                double h = Math.cos(e.elevation);
-                alpha *= LyricLayout.centerClearance(-Math.sin(e.azimuth) * h, Math.sin(e.elevation),
-                        Math.cos(e.azimuth) * h, f.forwardX, f.forwardY, f.forwardZ, true);
-            }
             if (alpha < 0.02) continue;
             double appear = f.reducedMotion ? 1 : LyricSky.appear(e, f.now);
             List<TextRaster.Run> runs = skyRuns;
@@ -473,10 +465,12 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
      * World-space home for a stack in front of the player's gaze, lifted above whatever terrain is under it.
      * First person never lets the arc come closer than {@link LyricLayout#MIN_FIRST_PERSON_RADIUS} to the eye.
      */
-    /** Fades text that sits on the crosshair; the clear zone widens while you are in a fight. */
-    static double clearance(FxFrame f, double x, double y, double z) {
-        return LyricLayout.centerClearance(x - f.camX, y - f.camY, z - f.camZ, f.forwardX, f.forwardY, f.forwardZ,
-                dev.jilaton.client.render.CombatTargetTracker.targetId() >= 0);
+    /**
+     * Lines sit a few blocks out so they feel part of the world you walk and fight in, not pasted on the screen;
+     * text grows with the square root of that distance so it stays readable without looming.
+     */
+    private double distanceScale() {
+        return Math.sqrt(Math.max(1, radius.value()) / 2.3);
     }
 
     private Vec3 anchorPoint(Player player, FxFrame f, double yaw, boolean firstPerson) {

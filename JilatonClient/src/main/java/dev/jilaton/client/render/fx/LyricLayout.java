@@ -128,27 +128,6 @@ public final class LyricLayout {
         return Math.acos(Math.max(-1, Math.min(1, (slot.dx() * fx + slot.dz() * fz) / l)));
     }
 
-    /** Half-angle of the view cone around the crosshair that music text keeps clear of. */
-    public static final double CLEAR_CONE = Math.toRadians(11);
-    /** The cone while you are fighting: the target and its surroundings stay readable. */
-    public static final double COMBAT_CONE = Math.toRadians(24);
-    /** Angle over which text fades back in outside the cone. */
-    public static final double CLEAR_FEATHER = Math.toRadians(9);
-
-    /**
-     * Opacity factor that keeps music text out of the middle of the screen: 0 inside the clear cone around the
-     * view direction, easing to 1 just outside it. {@code (dx, dy, dz)} points from the camera to the text.
-     */
-    public static double centerClearance(double dx, double dy, double dz, double fx, double fy, double fz,
-                                         boolean combat) {
-        double l = Math.sqrt(dx * dx + dy * dy + dz * dz) * Math.sqrt(fx * fx + fy * fy + fz * fz);
-        if (l < 1e-9) return 0;
-        double angle = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dy * fy + dz * fz) / l)));
-        double t = (angle - (combat ? COMBAT_CONE : CLEAR_CONE)) / CLEAR_FEATHER;
-        t = Math.max(0, Math.min(1, t));
-        return t * t * (3 - 2 * t);
-    }
-
     /**
      * Horizontal direction rotated {@code degrees} around the vertical axis (positive turns the same way as the
      * arc's side angle), keeping the vertical component. Used to place trail lines beside the gaze.

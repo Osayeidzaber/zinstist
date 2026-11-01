@@ -133,9 +133,10 @@ unused `FxShapes.softRing`, pinned target card.
 
 - Target card chips now show COMBO / HITS / LEAD (`FightStats`, counted from hurt flashes the client saw).
 - Vertical health bar beside the target (`hud.target_side_bar`, on by default), right side; the card stays left.
-- Lyrics and music banner keep a clear cone around the crosshair (wider in a fight); World Trail spawns at the
-  side angle; first-person music cards moved lower-left. Polled sources run through `PlaybackClock`.
-- Not built: Clarity-style crystal visuals (glass crystals, player outline) and a smooth third-person "alt cam".
+- Lyrics are never hidden: they sit farther out (default distance 4.5 blocks, text grows with sqrt of distance)
+  and beside the gaze (default side angle 36°); World Trail spawns at the side angle. First-person music cards
+  moved lower-left. Polled sources run through `PlaybackClock`. The dev config had distance 1.5 / side -90.
+- Crystal & Anchor FX "Glass cubes" style, TargetESP "Outline target", and a Smooth Camera module (scene 36).
 
 ### Open
 
