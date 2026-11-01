@@ -1024,6 +1024,20 @@ public final class VisualVerifier {
         then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonPauseScreen()));
         shot(30, "51-pause");
         then(2, () -> client.setScreen(null));
+        then(2, () -> {
+            var list = new net.minecraft.client.multiplayer.ServerList(client);
+            list.load();
+            if (list.get("127.0.0.1") == null) {
+                list.add(new net.minecraft.client.multiplayer.ServerData("Verify server", "127.0.0.1",
+                        net.minecraft.client.multiplayer.ServerData.Type.OTHER), false);
+                list.save();
+            }
+            client.setScreen(new dev.jilaton.client.gui.JilatonServersScreen(null));
+        });
+        shot(30, "52-servers");
+        then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonWorldsScreen(null)));
+        shot(30, "53-worlds");
+        then(2, () -> client.setScreen(null));
 
         // Hand-pose port: linked mirrored hands, real held items, shared map, knife and ease-out.
         then(2, () -> {
@@ -1055,7 +1069,7 @@ public final class VisualVerifier {
             disable("cosmetic_knife");
             disable("swing_animations");
             command(client, "item replace entity @p weapon.offhand with minecraft:air");
-            command(client, "item replace entity @p weapon.mainhand with minecraft:filled_map");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:filled_map[minecraft:map_id=0]");
         });
         shot(20, "44c-hand-pose-shared-map");
         then(2, () -> disable("view_model"));
@@ -1099,7 +1113,8 @@ public final class VisualVerifier {
         shot(2, "45-auto-walk-restored");
         then(2, () -> {
             setting("auto_walk", "disable_on_input", true);
-            enable("auto_walk");
+            // This test expects the module to disable itself, so don't add it to the stay-enabled set.
+            JilatonClient.moduleManager().get("auto_walk").setEnabled(true);
             client.options.keyLeft.setDown(true);
         });
         then(3, () -> {
@@ -1167,6 +1182,10 @@ public final class VisualVerifier {
             var friends = (dev.jilaton.client.module.impl.FriendsModule) JilatonClient.moduleManager().get("friends");
             var names = dev.jilaton.client.module.impl.FriendManager.names();
             boolean wasEnabled = friends.enabled();
+            var bots = JilatonClient.moduleManager().get("anti_bot");
+            boolean botsEnabled = bots.enabled();
+            var assist = (dev.jilaton.client.module.impl.AimAssistModule) JilatonClient.moduleManager().get("aim_assist");
+            boolean assistEnabled = assist.enabled();
             var friend = new net.minecraft.client.player.RemotePlayer(client.level,
                     new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "VerifyFriend"));
             friend.setId(2_000_000_000);
@@ -1184,10 +1203,31 @@ public final class VisualVerifier {
                 boolean canceled = CombatTargetTracker.lastTarget() == null;
                 LOGGER.info("[JilatonVerify] friend-guard melee={} spear={} canceled-before-fx={}", melee, spear, canceled);
                 if (!canceled) throw new IllegalStateException("Friend attack reached normal attack effects");
+
+                // A visible, client-only target validates target selection and the real mouse-count port.
+                dev.jilaton.client.module.impl.FriendManager.remove("VerifyFriend");
+                bots.setEnabled(false); // The fixture intentionally has no server tab-list entry.
+                friend.setPos(client.player.getX() - .8, client.player.getY(), client.player.getZ() + 3);
+                assist.resetSettings();
+                setting("aim_assist", "mode", "Mouse assist");
+                setting("aim_assist", "weapons_only", false);
+                assist.setEnabled(true);
+                assist.tick(client);
+                var nudge = assist.nudge(client.player, 1, 0, .016);
+                var rotations = JilatonClient.moduleManager().rotationManager();
+                rotations.request("friends", 70, client.player.getYRot(), client.player.getXRot(), 4);
+                var yielded = assist.nudge(client.player, 1, 0, .016);
+                rotations.cancelAll();
+                LOGGER.info("[JilatonVerify] aim-assist mouse-yaw={} higher-priority-yield={}", nudge.yaw(), yielded.yaw() == 0);
+                if (!(nudge.yaw() > 0) || yielded.yaw() != 0)
+                    throw new IllegalStateException("AimAssist mouse target/correction arbitration failed");
             } finally {
                 friend.discard();
                 dev.jilaton.client.module.impl.FriendManager.replace(names);
                 friends.setEnabled(wasEnabled);
+                assist.setEnabled(assistEnabled);
+                assist.resetSettings();
+                bots.setEnabled(botsEnabled);
             }
         });
 

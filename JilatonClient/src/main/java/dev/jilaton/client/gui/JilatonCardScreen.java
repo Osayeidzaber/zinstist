@@ -2,6 +2,7 @@ package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.gui.design.Canvas;
+import dev.jilaton.client.gui.design.Kit;
 import dev.jilaton.client.gui.design.Ui;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -96,8 +97,8 @@ public abstract class JilatonCardScreen<T> extends Screen {
         int sx = canvas.screenX(RIGHT - SEARCH_W + 34), sy = canvas.screenY(TOP + 17) - 4;
         search = new EditBox(font, sx, sy, Math.max(40, canvas.screenX(RIGHT - 70) - sx), 10, Component.literal("Search"));
         search.setBordered(false);
-        search.setTextColor(Ui.TEXT);
-        search.setHint(Component.literal("Search").withColor(Ui.TEXT_3));
+        search.setTextColor(Kit.LABEL);
+        search.setHint(Component.literal("Search").withColor(Kit.LABEL_3));
         search.setValue(previous);
         search.setResponder(value -> {
             targetScroll = 0;
@@ -143,34 +144,25 @@ public abstract class JilatonCardScreen<T> extends Screen {
         int accent = Ui.accent();
         double mx = canvas.x(mouseX), my = canvas.y(mouseY);
 
-        graphics.fill(0, 0, width, height, Ui.BACKDROP);
+        dev.jilaton.client.gui.design.Backdrops.drawScreen(graphics, width, height, partialTick);
         canvas.begin(graphics);
-        Ui.glow(graphics, 1120, 80, 420, accent & 0xFFFFFF, 0.05);
+        dev.jilaton.client.gui.design.Backdrops.drawBoard(graphics);
 
-        // Header.
+        // Header: round glass back button, large title, sliding segmented control, search field.
         double p = entrance(0, now, reduced);
-        boolean backHover = Ui.inside(mx, my, LEFT, TOP, 36, 36);
-        Ui.card(graphics, LEFT, TOP, 36, 36, 10, Ui.alpha(Ui.RAISED, Ui.ease("list:back", backHover)), Ui.STROKE);
-        Ui.text(graphics, "‹", LEFT + 13, TOP + 8, 17, Ui.SOFT);
-        Ui.text(graphics, getTitle().getString(), LEFT + 52, TOP + 4, 26, JilatonType.Face.SEMIBOLD, Ui.alpha(Ui.TEXT, p));
+        double backHover = Kit.spring("list:back", Ui.inside(mx, my, LEFT, TOP, 36, 36));
+        Kit.glass(graphics, LEFT, TOP, 36, 36, 18, backHover);
+        Ui.textCentre(graphics, "\u2039", LEFT + 17, TOP + 6, 20, JilatonType.Face.MEDIUM, Kit.mix(Kit.LABEL_2, Kit.LABEL, backHover));
+        Kit.text(graphics, getTitle().getString(), LEFT + 52, TOP + 2, Kit.TITLE, JilatonType.Face.BOLD, Kit.a(Kit.LABEL, p));
         List<String> segs = segments();
         if (!segs.isEmpty()) {
-            float sx = LEFT + 68 + Ui.width(getTitle().getString(), 26, JilatonType.Face.SEMIBOLD);
-            Ui.card(graphics, sx, TOP + 2, segmentsWidth(segs), 32, 9, Ui.CARD, Ui.STROKE);
-            float cx = sx + 3;
-            for (int i = 0; i < segs.size(); i++) {
-                float w = Ui.width(segs.get(i), 12, JilatonType.Face.MEDIUM) + 28;
-                if (i == segment) Ui.round(graphics, cx, TOP + 5, w, 26, 7, Ui.RAISED);
-                Ui.text(graphics, segs.get(i), cx + 14, TOP + 12, 12, JilatonType.Face.MEDIUM, i == segment ? Ui.TEXT : Ui.TEXT_2);
-                cx += w;
-            }
+            Kit.segmented(graphics, "list:" + getClass().getSimpleName(), segs.toArray(new String[0]), segment,
+                    segmentX(), TOP + 2, segmentsWidth(segs), 32, mx, my);
         }
-        boolean searchFocus = search.isFocused();
-        Ui.card(graphics, RIGHT - SEARCH_W, TOP, SEARCH_W, 34, 9, Ui.CARD, searchFocus ? Ui.alpha(accent, 0.55) : Ui.STROKE);
-        Ui.outline(graphics, RIGHT - SEARCH_W + 13, TOP + 11, 10, 10, 5, Ui.TEXT_3);
-        Ui.rect(graphics, RIGHT - SEARCH_W + 22, TOP + 20, 3, 2, Ui.TEXT_3);
-        Ui.outline(graphics, RIGHT - 58, TOP + 8, 46, 18, 5, Ui.STROKE);
-        Ui.text(graphics, "Ctrl F", RIGHT - 52, TOP + 12, 10, JilatonType.Face.MONO, Ui.TEXT_3);
+        double searchFocus = Kit.spring("list:search", search.isFocused());
+        Kit.field(graphics, RIGHT - SEARCH_W, TOP, SEARCH_W, 34, searchFocus);
+        Kit.icon(graphics, "search", RIGHT - SEARCH_W + 19, TOP + 17, 14, Kit.LABEL_3);
+        Kit.tag(graphics, "Ctrl F", RIGHT - 12 - Kit.tagWidth("Ctrl F"), TOP + 7, Kit.SURFACE_3, Kit.LABEL_3);
 
         // Rows.
         targetScroll = Math.max(0, Math.min(maxScroll(), targetScroll));
@@ -188,34 +180,36 @@ public abstract class JilatonCardScreen<T> extends Screen {
             double[] h = hover.computeIfAbsent(item, ignored -> new double[1]);
             h[0] = Ui.approach(h[0], over ? 1 : 0, dt, 14, reduced);
             boolean isSelected = item == selected;
+            double sel = Kit.spring("list:sel:" + System.identityHashCode(item), isSelected);
             float rowY = y + rise;
-            int fill = isSelected ? Ui.mix(Ui.CARD, accent, 0.05) : Ui.mix(Ui.CARD, Ui.RAISED, h[0]);
-            Ui.round(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, Ui.alpha(fill, e));
-            if (isSelected) Ui.glowRing(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, accent, e);
-            else Ui.outline(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, 14, Ui.alpha(Ui.STROKE, e));
+            Ui.round(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, Kit.R_TILE,
+                    Kit.a(Kit.mix(Kit.mix(Kit.SURFACE, Kit.SURFACE_2, h[0]), Kit.SURFACE_3, sel), 0.86 * e));
+            dev.jilaton.client.gui.design.Paint.outline(graphics, LEFT, rowY, RIGHT - LEFT, ROW_H, Kit.R_TILE, 0,
+                    Kit.a(Kit.mix(Kit.HAIRLINE, Kit.accent(), 0.0), (0.6 + 0.4 * sel) * e));
+            if (sel > 0.01) Ui.round(graphics, LEFT + 4, rowY + 18, 3, (float) ((ROW_H - 36) * sel), 1.5F, Kit.a(Kit.accent(), sel * e));
             float contentW = RIGHT - LEFT - (isSelected ? 110 : 0);
             renderCard(graphics, item, LEFT, rowY, contentW, ROW_H, h[0], isSelected, e, now);
             if (isSelected) {
                 boolean active = rowActionActive(item);
                 boolean btnHover = active && Ui.inside(mx, my, RIGHT - 96, rowY + 20, 80, 36);
-                if (active) Ui.button(graphics, rowAction(), RIGHT - 96, rowY + 20, 80, 36, btnHover, true, accent);
-                else Ui.button(graphics, rowAction(), RIGHT - 96, rowY + 20, 80, 36, false, false, accent);
+                Kit.button(graphics, "list:row", rowAction(), RIGHT - 96, rowY + 20, 80, 36, active ? 0 : 2, btnHover, false);
             }
         }
         graphics.disableScissor();
         if (items.isEmpty()) {
-            Ui.textCentre(graphics, emptyMessage().getString(), 640, LIST_Y + 60, 13, JilatonType.Face.REGULAR, Ui.TEXT_2);
+            Ui.round(graphics, 640 - 22, LIST_Y + 40, 44, 44, 22, Kit.SURFACE_2);
+            Kit.icon(graphics, segments().isEmpty() ? "folder" : "globe", 640, LIST_Y + 62, 20, Kit.LABEL_3);
+            Ui.textCentre(graphics, emptyMessage().getString(), 640, LIST_Y + 104, Kit.CALLOUT, JilatonType.Face.REGULAR, Kit.LABEL_2);
         }
         int max = maxScroll();
         if (max > 0) {
             float thumb = Math.max(24, view * view / (view + max));
             float thumbY = (float) (LIST_Y + (view - thumb) * scroll / max);
-            Ui.round(graphics, RIGHT + 14, thumbY, 4, thumb, 2, Ui.FAINT);
+            Ui.round(graphics, RIGHT + 14, thumbY, 4, thumb, 2, Kit.a(Kit.LABEL, 0.22));
         }
 
         // Footer.
-        Ui.hline(graphics, LEFT, FOOTER_Y - 12, RIGHT - LEFT, Ui.STROKE);
-        Ui.text(graphics, subtitle(items.size()), LEFT, FOOTER_Y + 12, 12, Ui.TEXT_3);
+        Kit.text(graphics, subtitle(items.size()), LEFT, FOOTER_Y + 11, Kit.FOOTNOTE, JilatonType.Face.REGULAR, Kit.LABEL_3);
         float bx = RIGHT;
         for (int i = actions.size() - 1; i >= 0; i--) {
             Action action = actions.get(i);
@@ -223,10 +217,11 @@ public abstract class JilatonCardScreen<T> extends Screen {
             bx -= w;
             boolean enabled = action.enabled().getAsBoolean();
             boolean over = enabled && Ui.inside(mx, my, bx, FOOTER_Y, w, 36);
-            if (enabled) Ui.button(graphics, action.label(), bx, FOOTER_Y, w, 36, over, action.primary(), accent);
-            else {
-                Ui.outline(graphics, bx, FOOTER_Y, w, 36, 10, Ui.alpha(Ui.STROKE, 0.6));
-                Ui.textCentre(graphics, action.label(), bx + w / 2, FOOTER_Y + 12, 13, JilatonType.Face.MEDIUM, Ui.FAINT);
+            if (enabled) {
+                Kit.button(graphics, "list:act:" + action.label(), action.label(), bx, FOOTER_Y, w, 36, action.primary() ? 0 : 1, over, false);
+            } else {
+                Ui.round(graphics, bx, FOOTER_Y, w, 36, 18, Kit.a(Kit.SURFACE_2, 0.5));
+                Ui.textCentre(graphics, action.label(), bx + w / 2, FOOTER_Y + 12, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.LABEL_4);
             }
             bx -= 8;
         }
@@ -239,9 +234,13 @@ public abstract class JilatonCardScreen<T> extends Screen {
     }
 
     private static float segmentsWidth(List<String> segs) {
-        float w = 6;
-        for (String s : segs) w += Ui.width(s, 12, JilatonType.Face.MEDIUM) + 28;
-        return w;
+        float widest = 0;
+        for (String s : segs) widest = Math.max(widest, Ui.width(s, Kit.CALLOUT, JilatonType.Face.SEMIBOLD) + 36);
+        return widest * segs.size();
+    }
+
+    private float segmentX() {
+        return LEFT + 72 + Ui.width(getTitle().getString(), Kit.TITLE, JilatonType.Face.BOLD);
     }
 
     /** Row surface helpers for subclasses: a square icon, texture or monogram tile, in board coordinates. */
@@ -293,16 +292,12 @@ public abstract class JilatonCardScreen<T> extends Screen {
         search.setFocused(false);
         List<String> segs = segments();
         if (!segs.isEmpty()) {
-            float cx = LEFT + 71 + Ui.width(getTitle().getString(), 26, JilatonType.Face.SEMIBOLD);
-            for (int i = 0; i < segs.size(); i++) {
-                float w = Ui.width(segs.get(i), 12, JilatonType.Face.MEDIUM) + 28;
-                if (Ui.inside(mx, my, cx, TOP + 2, w, 32)) {
-                    segment = i;
-                    targetScroll = 0;
-                    refreshFilter();
-                    return true;
-                }
-                cx += w;
+            int hit = Kit.segmentAt(segs.size(), segmentX(), TOP + 2, segmentsWidth(segs), 32, mx, my);
+            if (hit >= 0) {
+                segment = hit;
+                targetScroll = 0;
+                refreshFilter();
+                return true;
             }
         }
         float bx = RIGHT;
