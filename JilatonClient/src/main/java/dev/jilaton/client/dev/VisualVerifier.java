@@ -1021,6 +1021,9 @@ public final class VisualVerifier {
         then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen()));
         shot(40, "50-home");
         then(2, () -> client.setScreen(null));
+        then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonPauseScreen()));
+        shot(30, "51-pause");
+        then(2, () -> client.setScreen(null));
 
         // Hand-pose port: linked mirrored hands, real held items, shared map, knife and ease-out.
         then(2, () -> {
@@ -1107,6 +1110,85 @@ public final class VisualVerifier {
             if (!yielded) throw new IllegalStateException("AutoWalk did not yield to manual input");
             JilatonClient.moduleManager().get("auto_walk").resetSettings();
             studio(client);
+        });
+
+        // AutoTool must select the real diamond pick, yield to a manual slot change, and restore on disable.
+        then(2, () -> {
+            studio(client);
+            client.player.setYRot(0);
+            client.player.setXRot(0);
+            command(client, "gamemode survival @p");
+            command(client, at("setblock", 0, 1, 3) + " minecraft:obsidian");
+            command(client, "item replace entity @p hotbar.0 with minecraft:stick");
+            command(client, "item replace entity @p hotbar.1 with minecraft:wooden_pickaxe");
+            command(client, "item replace entity @p hotbar.2 with minecraft:diamond_pickaxe");
+            command(client, "item replace entity @p hotbar.3 with minecraft:air");
+            JilatonClient.moduleManager().get("auto_tool").resetSettings();
+            setting("auto_tool", "drill_instabreak", false);
+        });
+        then(8, () -> {
+            client.player.getInventory().setSelectedSlot(0);
+            enable("auto_tool");
+            client.options.keyAttack.setDown(true);
+        });
+        then(8, () -> {
+            int slot = client.player.getInventory().getSelectedSlot();
+            LOGGER.info("[JilatonVerify] auto-tool selected={}", slot);
+            if (slot != 2) throw new IllegalStateException("AutoTool did not select the diamond pickaxe");
+            client.options.keyAttack.setDown(false);
+            client.player.getInventory().setSelectedSlot(3);
+        });
+        then(5, () -> {
+            int slot = client.player.getInventory().getSelectedSlot();
+            LOGGER.info("[JilatonVerify] auto-tool manual slot={}", slot);
+            if (slot != 3) throw new IllegalStateException("AutoTool overwrote a manual slot selection");
+            client.player.getInventory().setSelectedSlot(0);
+            client.options.keyAttack.setDown(true);
+        });
+        then(8, () -> {
+            disable("auto_tool");
+            client.options.keyAttack.setDown(false);
+            int slot = client.player.getInventory().getSelectedSlot();
+            LOGGER.info("[JilatonVerify] auto-tool disabled restored={}", slot);
+            if (slot != 0) throw new IllegalStateException("AutoTool did not restore on disable");
+        });
+        shot(2, "46-auto-tool-restored");
+        then(2, () -> {
+            command(client, "gamemode creative @p");
+            command(client, at("setblock", 0, 1, 3) + " minecraft:air");
+            JilatonClient.moduleManager().get("auto_tool").resetSettings();
+        });
+
+        // A client-only player fixture verifies cancellation before attack FX; no fake-player packet is sent.
+        then(2, () -> {
+            studio(client);
+            client.player.setYRot(0);
+            client.player.setXRot(0);
+            var friends = (dev.jilaton.client.module.impl.FriendsModule) JilatonClient.moduleManager().get("friends");
+            var names = dev.jilaton.client.module.impl.FriendManager.names();
+            boolean wasEnabled = friends.enabled();
+            var friend = new net.minecraft.client.player.RemotePlayer(client.level,
+                    new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "VerifyFriend"));
+            friend.setId(2_000_000_000);
+            friend.setPos(client.player.getX(), client.player.getY(), client.player.getZ() + 1.8);
+            client.level.addEntity(friend);
+            try {
+                friends.resetSettings();
+                friends.setEnabled(true);
+                dev.jilaton.client.module.impl.FriendManager.add("VerifyFriend");
+                boolean melee = friends.intercepts(client.player, friend);
+                boolean spear = friends.interceptsStab(client.player);
+                if (!melee || !spear) throw new IllegalStateException("Friend guard did not recognize its in-range fixture");
+                CombatTargetTracker.clear();
+                client.gameMode.attack(client.player, friend);
+                boolean canceled = CombatTargetTracker.lastTarget() == null;
+                LOGGER.info("[JilatonVerify] friend-guard melee={} spear={} canceled-before-fx={}", melee, spear, canceled);
+                if (!canceled) throw new IllegalStateException("Friend attack reached normal attack effects");
+            } finally {
+                friend.discard();
+                dev.jilaton.client.module.impl.FriendManager.replace(names);
+                friends.setEnabled(wasEnabled);
+            }
         });
 
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just

@@ -2,11 +2,11 @@ package dev.jilaton.client.gui;
 
 import dev.jilaton.client.JilatonClient;
 import dev.jilaton.client.gui.design.Canvas;
+import dev.jilaton.client.gui.design.Kit;
 import dev.jilaton.client.gui.design.Ui;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.music.MusicCenter;
 import dev.jilaton.client.music.NowPlaying;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -25,25 +25,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pause menu, built to the "Pause menu" design board (development/GUI_REDESIGN.md §9). The world stays visible
- * behind a left-to-right scrim; the left column holds the actions in main-menu style, the right column shows the
- * active modules, music and account. Every vanilla action stays reachable: the rarely used ones (feedback, bug
- * reports, player reporting, server links) through "More options", which opens vanilla's own pause menu.
+ * Pause menu on the {@link Kit} design system: the world stays visible behind Minecraft's GPU blur, with one
+ * centred sheet. A large Resume button, a two-column grid of destinations (client, music, options, progress,
+ * statistics, LAN), a status strip (active modules, now playing with play/pause) and the quiet actions — more
+ * options and disconnect — at the bottom. Esc resumes; arrows/Tab move focus; Enter activates.
  */
 public final class JilatonPauseScreen extends Screen {
-    /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
-    private final Font font = JilatonType.font();
     /** Set while "More options" opens vanilla's pause menu, so the redirect lets that one through. */
     public static boolean vanillaRequested;
-    private static final float LEFT = 112, NAV_Y = 196, ROW_H = 42, NAV_W = 380, RIGHT_X = 864, RIGHT_W = 320;
 
-    private record Row(String label, String key, int color, Runnable action) { }
+    private static final float SHEET_W = 520, X0 = (Canvas.W - SHEET_W) / 2;
+
+    private record Item(String key, String label, String detail, String icon, Runnable run) { }
+
+    private record Hit(String key, float x, float y, float w, float h, Runnable run) {
+        boolean inside(double mx, double my) {
+            return Ui.inside(mx, my, x, y, w, h);
+        }
+    }
 
     private final Canvas canvas = new Canvas();
-    private final List<Row> rows = new ArrayList<>();
-    private double[] hover = new double[0];
-    private int focused;
-    private long lastFrame;
+    private final List<Item> items = new ArrayList<>();
+    private final List<Hit> hits = new ArrayList<>();
+    private long openedAt;
+    private int focused = -1;
+    private String pressed;
 
     public JilatonPauseScreen() {
         super(Component.translatable("menu.game"));
@@ -52,187 +58,187 @@ public final class JilatonPauseScreen extends Screen {
     @Override
     protected void init() {
         canvas.fit(width, height);
-        rows.clear();
-        rows.add(new Row("Back to game", "", Ui.TEXT, this::onClose));
-        rows.add(new Row("Client", JilatonClient.clickGuiKeyName(), Ui.TEXT, () -> JilatonClient.openClickGui(this)));
-        rows.add(new Row("Music", JilatonClient.musicKeyName(), Ui.TEXT, () -> minecraft.setScreen(new MusicCenterScreen(this))));
+        items.clear();
+        items.add(new Item("client", "Client", JilatonClient.clickGuiKeyName(), "grid", () -> JilatonClient.openClickGui(this)));
+        items.add(new Item("music", "Music", JilatonClient.musicKeyName(), "music", () -> minecraft.setScreen(new MusicCenterScreen(this))));
+        items.add(new Item("options", "Options", "", "gear", () -> minecraft.setScreen(new OptionsScreen(this, minecraft.options))));
         if (minecraft.player != null) {
-            rows.add(new Row("Advancements", "", Ui.TEXT, () -> minecraft.setScreen(
+            items.add(new Item("advancements", "Advancements", "", "sparkle", () -> minecraft.setScreen(
                     new AdvancementsScreen(minecraft.player.connection.getAdvancements(), this))));
-            rows.add(new Row("Statistics", "", Ui.TEXT, () -> minecraft.setScreen(
+            items.add(new Item("stats", "Statistics", "", "person", () -> minecraft.setScreen(
                     new StatsScreen(this, minecraft.player.getStats()))));
         }
-        rows.add(new Row("Options", "", Ui.TEXT, () -> minecraft.setScreen(new OptionsScreen(this, minecraft.options))));
-        if (minecraft.hasSingleplayerServer() && minecraft.getSingleplayerServer() != null
-                && !minecraft.getSingleplayerServer().isPublished())
-            rows.add(new Row("Open to LAN", "", Ui.TEXT, () -> minecraft.setScreen(new ShareToLanScreen(this))));
-        rows.add(new Row("More options", "", Ui.TEXT_2, () -> {
-            vanillaRequested = true;
-            minecraft.setScreen(new PauseScreen(true));
-        }));
-        rows.add(new Row(CommonComponents.disconnectButtonLabel(minecraft.isLocalServer()).getString(), "", Ui.DANGER,
-                () -> minecraft.getReportingContext().draftReportHandled(minecraft, this,
-                        () -> minecraft.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE), true)));
-        hover = new double[rows.size()];
+        if (minecraft.hasSingleplayerServer() && !minecraft.getSingleplayerServer().isPublished()) {
+            items.add(new Item("lan", "Open to LAN", "", "globe", () -> minecraft.setScreen(new ShareToLanScreen(this))));
+        }
+        if (openedAt == 0) openedAt = System.nanoTime();
     }
 
-    private String place() {
-        if (minecraft.getSingleplayerServer() != null)
-            return minecraft.getSingleplayerServer().getWorldData().getLevelName();
-        var server = minecraft.getCurrentServer();
-        return server == null ? "Multiplayer" : server.name;
+    private void disconnect() {
+        minecraft.getReportingContext().draftReportHandled(minecraft, this,
+                () -> minecraft.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE), true);
     }
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // The world shows through; the scrim below is the only background.
+        // Real frosted glass: Minecraft's own blur pass over the live world, then a soft dim.
+        renderBlurredBackground(graphics);
+        graphics.fill(0, 0, width, height, 0x8A000000);
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        long now = System.nanoTime();
-        double dt = lastFrame == 0 ? 0 : Math.min(0.1, (now - lastFrame) / 1e9);
-        lastFrame = now;
-        boolean reduced = JilatonClient.clientConfig().reducedMotion();
-        int accent = Ui.accent();
         double mx = canvas.x(mouseX), my = canvas.y(mouseY);
-
-        graphics.fillGradient(0, 0, width, height, 0xEB08070A, 0xEB08070A);
+        hits.clear();
         canvas.begin(graphics);
-        // Lighter toward the right so the world reads there (92% → 55%).
-        for (int i = 0; i < 16; i++) {
-            float x = 640 + i * 40;
-            Ui.rect(graphics, x, -400, 40, 1520, Ui.alpha(0xFF08070A, -0.37 * i / 15.0 + 0.0));
-        }
 
-        Ui.spaced(graphics, place().toUpperCase(java.util.Locale.ROOT), LEFT, 120, 12, 1.4F, JilatonType.Face.MEDIUM, Ui.TEXT_2);
-        Ui.text(graphics, "Paused", LEFT, 140, 34, JilatonType.Face.BOLD, Ui.TEXT);
+        int rows = (items.size() + 1) / 2;
+        float sheetH = 294 + rows * 72;
+        float y0 = (Canvas.H - sheetH) / 2;
+        double in = Kit.enter(openedAt, 0);
+        y0 += (float) (14 * (1 - in));
+        Kit.shadow(graphics, X0, y0, SHEET_W, sheetH, Kit.R_PANEL, in);
+        Ui.round(graphics, X0, y0, SHEET_W, sheetH, Kit.R_PANEL, Kit.a(Kit.SURFACE, 0.86 * in));
+        dev.jilaton.client.gui.design.Paint.outline(graphics, X0, y0, SHEET_W, sheetH, Kit.R_PANEL, 0, Kit.a(0xFFFFFFFF, 0.08 * in));
 
-        int hovered = -1;
-        for (int i = 0; i < rows.size(); i++)
-            if (Ui.inside(mx, my, LEFT, NAV_Y + i * ROW_H, NAV_W, ROW_H - 4)) hovered = i;
-        for (int i = 0; i < rows.size(); i++) {
-            Row row = rows.get(i);
-            boolean on = i == hovered || (hovered < 0 && i == focused);
-            hover[i] = Ui.approach(hover[i], on ? 1 : 0, dt, 14, reduced);
-            float y = NAV_Y + i * ROW_H;
-            int color = row.color() == Ui.DANGER ? row.color() : Ui.mix(row.color(), accent, hover[i]);
-            Ui.text(graphics, row.label(), LEFT, y + 10, 17,
-                    hover[i] > 0.5 ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM, color);
-            if (!row.key().isEmpty())
-                Ui.textRight(graphics, row.key(), LEFT + NAV_W, y + 14, 11, JilatonType.Face.MONO, Ui.TEXT_3);
-            if (hover[i] > 0.01) {
-                int line = row.color() == Ui.DANGER ? Ui.DANGER : accent;
-                Ui.rect(graphics, LEFT, y + 33, (float) (110 * hover[i]), 1, line);
+        float x = X0 + 28, w = SHEET_W - 56, y = y0 + 28;
+        Kit.text(graphics, "Paused", x, y, Kit.TITLE, JilatonType.Face.BOLD, Kit.a(Kit.LABEL, in));
+        Ui.textRight(graphics, worldName(), x + w, y + 9, Kit.FOOTNOTE, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL_2, in));
+        y += 52;
+
+        // Resume.
+        hits.add(new Hit("resume", x, y, w, 50, this::onClose));
+        Kit.button(graphics, "pause:resume", "Back to game", x, y, w, 50, 0, active("resume", mx, my), "resume".equals(pressed));
+        y += 68;
+
+        // Destinations grid.
+        float cellW = (w - 12) / 2;
+        for (int i = 0; i < items.size(); i++) {
+            Item item = items.get(i);
+            float cx = x + (i % 2) * (cellW + 12), cy = y + (i / 2) * 72;
+            hits.add(new Hit(item.key(), cx, cy, cellW, 60, item.run()));
+            double hv = Kit.spring("pause:" + item.key(), active(item.key(), mx, my));
+            double pr = Kit.spring("pause:p:" + item.key(), item.key().equals(pressed));
+            float sink = (float) (1.2 * pr);
+            Ui.round(graphics, cx, cy + sink, cellW, 60, Kit.R_TILE, Kit.mix(Kit.SURFACE_2, Kit.SURFACE_3, hv));
+            Ui.round(graphics, cx + 14, cy + 14 + sink, 32, 32, 9, Kit.mix(Kit.SURFACE_3, Kit.accent(), 0.10 * hv));
+            Kit.icon(graphics, item.icon(), cx + 30, cy + 30 + sink, 17, Kit.mix(Kit.LABEL_2, Kit.LABEL, hv));
+            Kit.text(graphics, item.label(), cx + 58, cy + 22 + sink, Kit.HEADLINE, JilatonType.Face.SEMIBOLD, Kit.LABEL);
+            if (!item.detail().isEmpty()) {
+                float tw = Kit.tagWidth(item.detail());
+                Kit.tag(graphics, item.detail(), cx + cellW - tw - 14, cy + 20 + sink, Kit.SURFACE_3, Kit.LABEL_2);
             }
         }
+        y += rows * 72 + 4;
 
-        // Right column: active modules, music, account.
-        float y = 140;
-        List<ClientModule> active = JilatonClient.moduleManager().all().stream().filter(ClientModule::enabled).toList();
-        float chipsHeight = layoutChips(null, active, 0, 0);
-        float cardH = 50 + chipsHeight;
-        Ui.card(graphics, RIGHT_X, y, RIGHT_W, cardH, 14, Ui.alpha(Ui.PANEL, 0.82), Ui.STROKE);
-        Ui.spaced(graphics, "ACTIVE MODULES", RIGHT_X + 16, y + 16, 11, 1.1F, JilatonType.Face.MEDIUM, Ui.TEXT_3);
-        layoutChips(graphics, active, RIGHT_X + 16, y + 38);
-        y += cardH + 12;
-
+        // Status strip: modules on, now playing.
+        Ui.round(graphics, x, y, w, 54, Kit.R_TILE, Kit.a(Kit.SURFACE_2, 0.7));
+        int on = 0;
+        for (ClientModule m : JilatonClient.moduleManager().all()) if (m.enabled()) on++;
+        Ui.circle(graphics, x + 20, y + 27, 4, on > 0 ? Kit.GREEN : Kit.LABEL_3);
+        Kit.text(graphics, on + (on == 1 ? " module on" : " modules on"), x + 32, y + 20, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.LABEL);
         MusicCenter music = MusicCenter.get();
-        NowPlaying now2 = music.nowPlaying();
-        Ui.card(graphics, RIGHT_X, y, RIGHT_W, 68, 14, Ui.alpha(Ui.PANEL, 0.82), Ui.STROKE);
-        Ui.round(graphics, RIGHT_X + 12, y + 12, 44, 44, 8, Ui.RAISED);
-        Ui.textCentre(graphics, "♪", RIGHT_X + 34, y + 24, 18, JilatonType.Face.REGULAR, Ui.TEXT_2);
-        boolean off = music.source() == MusicCenter.Source.OFF;
-        Ui.text(graphics, Ui.fit(off ? "Music is off" : now2.hasTrack() ? now2.title() : "Nothing playing", 180, 13,
-                JilatonType.Face.SEMIBOLD), RIGHT_X + 68, y + 18, 13, JilatonType.Face.SEMIBOLD, Ui.TEXT);
-        Ui.text(graphics, Ui.fit(off ? "Pick a source in Music" : now2.source(), 180, 11, JilatonType.Face.REGULAR),
-                RIGHT_X + 68, y + 36, 11, Ui.TEXT_2);
-        if (!off) {
-            boolean playHover = Ui.inside(mx, my, RIGHT_X + RIGHT_W - 46, y + 17, 34, 34);
-            Ui.circle(graphics, RIGHT_X + RIGHT_W - 29, y + 34, 17, playHover ? Ui.mix(Ui.TEXT, accent, 0.2) : Ui.TEXT);
-            if (now2.playing()) {
-                Ui.rect(graphics, RIGHT_X + RIGHT_W - 34, y + 28, 3, 12, Ui.PANEL);
-                Ui.rect(graphics, RIGHT_X + RIGHT_W - 27, y + 28, 3, 12, Ui.PANEL);
+        NowPlaying np = music.nowPlaying();
+        if (music.source() != MusicCenter.Source.OFF && np.hasTrack()) {
+            float px = x + w - 40;
+            hits.add(new Hit("playpause", px, y + 11, 32, 32, music::togglePause));
+            double hv = Kit.spring("pause:pp", active("playpause", mx, my));
+            Ui.circle(graphics, px + 16, y + 27, 16, Kit.mix(Kit.SURFACE_3, Kit.LABEL, 0.15 + 0.15 * hv));
+            if (np.playing()) {
+                Ui.rect(graphics, px + 11, y + 21, 3.5F, 12, Kit.LABEL);
+                Ui.rect(graphics, px + 18, y + 21, 3.5F, 12, Kit.LABEL);
             } else {
-                for (int k = 0; k < 6; k++) Ui.rect(graphics, RIGHT_X + RIGHT_W - 32 + k, y + 28 + k, 1, 12 - 2 * k, Ui.PANEL);
+                Kit.icon(graphics, "play", px + 17, y + 27, 14, Kit.LABEL);
             }
+            String track = Ui.fit(np.title() + "  ·  " + np.artist(), w - 230, Kit.FOOTNOTE, JilatonType.Face.REGULAR);
+            Ui.textRight(graphics, track, px - 12, y + 21, Kit.FOOTNOTE, JilatonType.Face.REGULAR, Kit.LABEL_2);
+        } else {
+            Ui.textRight(graphics, "Nothing playing", x + w - 16, y + 21, Kit.FOOTNOTE, JilatonType.Face.REGULAR, Kit.LABEL_3);
         }
-        y += 80;
+        y += 74;
 
-        boolean accHover = Ui.inside(mx, my, RIGHT_X, y, RIGHT_W, 44);
-        Ui.card(graphics, RIGHT_X, y, RIGHT_W, 44, 14, Ui.alpha(Ui.mix(Ui.PANEL, Ui.RAISED, Ui.ease("pause:account", accHover)), 0.82), Ui.STROKE);
-        Ui.face(graphics, RIGHT_X + 10, y + 8, 28);
-        Ui.circle(graphics, RIGHT_X + 34, y + 34, 3.5F, Ui.ONLINE);
-        Ui.text(graphics, minecraft.getUser().getName(), RIGHT_X + 48, y + 16, 13, JilatonType.Face.MEDIUM, Ui.TEXT);
-        Ui.textRight(graphics, "Accounts", RIGHT_X + RIGHT_W - 16, y + 17, 12, JilatonType.Face.REGULAR, Ui.TEXT_2);
+        // Quiet actions.
+        hits.add(new Hit("more", x, y, 150, 40, () -> {
+            vanillaRequested = true;
+            minecraft.setScreen(new PauseScreen(true));
+        }));
+        Kit.button(graphics, "pause:more", "More options", x, y, 150, 40, 2, active("more", mx, my), false);
+        String leave = CommonComponents.disconnectButtonLabel(minecraft.isLocalServer()).getString();
+        float lw = Kit.width(leave, Kit.CALLOUT, JilatonType.Face.MEDIUM) + 40;
+        hits.add(new Hit("leave", x + w - lw, y, lw, 40, this::disconnect));
+        double lh = Kit.spring("pause:leave", active("leave", mx, my));
+        if (lh > 0.01) Ui.round(graphics, x + w - lw, y, lw, 40, 20, Kit.a(Kit.RED, 0.14 * lh));
+        Ui.textCentre(graphics, leave, x + w - lw / 2, y + 14, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.mix(Kit.a(Kit.RED, 0.85), Kit.RED, lh));
+
         canvas.end(graphics);
     }
 
-    /** Lays out (and draws, when {@code graphics} is non-null) the module chips; returns their total height. */
-    private float layoutChips(GuiGraphics graphics, List<ClientModule> modules, float x0, float y0) {
-        float x = 0, y = 0, max = RIGHT_W - 32;
-        if (modules.isEmpty()) {
-            if (graphics != null) Ui.text(graphics, "None enabled", x0, y0 + 4, 12, Ui.TEXT_2);
-            return 20;
-        }
-        for (ClientModule module : modules) {
-            float w = Ui.width(module.name(), 12, JilatonType.Face.REGULAR) + 20;
-            if (x > 0 && x + w > max) {
-                x = 0;
-                y += 32;
-            }
-            if (graphics != null) {
-                Ui.round(graphics, x0 + x, y0 + y, w, 26, 7, Ui.RAISED);
-                Ui.text(graphics, module.name(), x0 + x + 10, y0 + y + 8, 12, Ui.TEXT);
-            }
-            x += w + 6;
-        }
-        return y + 26;
+    private boolean active(String key, double mx, double my) {
+        if (focused >= 0 && focused < hits.size() && hits.get(focused).key().equals(key)) return true;
+        for (Hit h : hits) if (h.key().equals(key)) return h.inside(mx, my);
+        // Hits are registered as each control draws; a control reads its own bounds before registering.
+        return false;
+    }
+
+    private String worldName() {
+        if (minecraft.getSingleplayerServer() != null) return minecraft.getSingleplayerServer().getWorldData().getLevelName();
+        var server = minecraft.getCurrentServer();
+        return server != null ? server.name : "";
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (event.button() == 0) {
             double mx = canvas.x(event.x()), my = canvas.y(event.y());
-            for (int i = 0; i < rows.size(); i++) {
-                if (Ui.inside(mx, my, LEFT, NAV_Y + i * ROW_H, NAV_W, ROW_H - 4)) {
-                    rows.get(i).action().run();
+            for (Hit h : hits) {
+                if (h.inside(mx, my)) {
+                    pressed = h.key();
                     return true;
                 }
-            }
-            List<ClientModule> active = JilatonClient.moduleManager().all().stream().filter(ClientModule::enabled).toList();
-            float y = 140 + 50 + layoutChips(null, active, 0, 0) + 12;
-            if (MusicCenter.get().source() != MusicCenter.Source.OFF
-                    && Ui.inside(mx, my, RIGHT_X + RIGHT_W - 46, y + 17, 34, 34)) {
-                MusicCenter.get().togglePause();
-                return true;
-            }
-            if (Ui.inside(mx, my, RIGHT_X, y + 80, RIGHT_W, 44)) {
-                minecraft.setScreen(new AccountsScreen(this));
-                return true;
             }
         }
         return super.mouseClicked(event, doubleClick);
     }
 
     @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (pressed != null) {
+            String key = pressed;
+            pressed = null;
+            double mx = canvas.x(event.x()), my = canvas.y(event.y());
+            for (Hit h : hits) {
+                if (h.key().equals(key) && h.inside(mx, my)) {
+                    h.run().run();
+                    break;
+                }
+            }
+            return true;
+        }
+        return super.mouseReleased(event);
+    }
+
+    @Override
     public boolean keyPressed(KeyEvent event) {
         int key = event.key();
-        if (key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_TAB) {
-            focused = (focused + 1) % rows.size();
-            return true;
-        }
-        if (key == GLFW.GLFW_KEY_UP) {
-            focused = focused <= 0 ? rows.size() - 1 : focused - 1;
-            return true;
-        }
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
-            rows.get(focused).action().run();
-            return true;
+        if (!hits.isEmpty()) {
+            if (key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_RIGHT) {
+                focused = (focused + 1) % hits.size();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_LEFT) {
+                focused = focused <= 0 ? hits.size() - 1 : focused - 1;
+                return true;
+            }
+            if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) && focused >= 0 && focused < hits.size()) {
+                hits.get(focused).run().run();
+                return true;
+            }
         }
         return super.keyPressed(event);
     }
 
     @Override
-    public boolean isPauseScreen() { return true; }
+    public boolean isPauseScreen() {
+        return true;
+    }
 }
