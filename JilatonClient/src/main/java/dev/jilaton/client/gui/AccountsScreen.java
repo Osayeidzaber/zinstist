@@ -71,7 +71,7 @@ public final class AccountsScreen extends Screen {
         User user = minecraft.getUser();
         boolean ms = microsoft();
 
-        graphics.fill(0, 0, width, height, Ui.BACKDROP);
+        dev.jilaton.client.gui.design.Backdrops.drawScreen(graphics, width, height, partialTick);
         canvas.begin(graphics);
         Ui.glow(graphics, 1140, 160, 380, accent & 0xFFFFFF, 0.05);
 

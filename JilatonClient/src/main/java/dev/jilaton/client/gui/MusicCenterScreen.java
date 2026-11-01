@@ -117,7 +117,6 @@ public final class MusicCenterScreen extends Screen {
         int accent = Ui.accent();
         double mx = canvas.x(mouseX), my = canvas.y(mouseY);
         NowPlaying np = center().nowPlaying();
-        g.fill(0, 0, width, height, 0xF00A0A0A);
         canvas.begin(g);
         Ui.glow(g, LEFT + ART / 2, 334, 330, 0xFFFFFF, np.hasTrack() ? 0.07 : 0.035);
 
@@ -126,7 +125,7 @@ public final class MusicCenterScreen extends Screen {
         Ui.card(g, LEFT, TOP, 36, 36, 10, Ui.alpha(Ui.RAISED, Ui.ease("music:back", backHover)), Ui.STROKE);
         Ui.text(g, "\u2039", LEFT + 13, TOP + 8, 17, Ui.SOFT);
         boardHits.add(new Hit(Math.round(LEFT), Math.round(TOP), 36, 36, this::onClose));
-        Ui.text(g, "Music", LEFT + 52, TOP + 4, 26, JilatonType.Face.SEMIBOLD, Ui.TEXT);
+        Ui.text(g, "Music", LEFT + 52, TOP - 2, 32, JilatonType.Face.DISPLAY_HEAVY, Ui.TEXT);
         String[] tabs = new String[Tab.values().length];
         for (Tab each : Tab.values()) tabs[each.ordinal()] = each.label;
         segmented(g, tabs, tab.ordinal(), RIGHT, TOP + 2, true, mx, my, i -> {
@@ -381,7 +380,14 @@ public final class MusicCenterScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) { }
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        if (minecraft.level == null) {
+            dev.jilaton.client.gui.design.Backdrops.drawScreen(g, width, height, partialTick);
+        } else {
+            renderBlurredBackground(g);
+            g.fill(0, 0, width, height, 0xC4050505);
+        }
+    }
 
     private void renderLibrary(GuiGraphics g, int x, int y, int mx, int my) {
         LocalLibrary library = center().library();

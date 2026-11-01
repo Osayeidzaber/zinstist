@@ -231,7 +231,7 @@ public final class JilatonMainMenuScreen extends Screen {
         }
         g.disableScissor();
         double sub = Kit.enter(openedAt, 0.55);
-        String line = "client for people who notice the details.";
+        String line = "for people who notice the details.";
         int shown = (int) Math.round(line.length() * sub);
         float lx = cx + 24;
         Kit.text(g, "Minecraft client", lx, base + 44, 46, JilatonType.Face.SERIF_ITALIC, Kit.a(Kit.accentSoft(), sub));

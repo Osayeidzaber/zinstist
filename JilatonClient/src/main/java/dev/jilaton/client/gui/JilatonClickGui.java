@@ -840,10 +840,10 @@ public final class JilatonClickGui extends Screen {
         Ui.textRight(g, value, x + w, y + 6, 12, JilatonType.Face.MONO, Ui.TEXT);
     }
 
-    private static final float PRESET_ROW = 30;
+    private static final float PRESET_ROW = 25;
 
     private float presetsTop() {
-        return LIST_Y - 2 + 262;
+        return LIST_Y - 2 + 256;
     }
 
     /** Interface presets under the live preview, then a row that cycles the menu background. */
@@ -858,9 +858,9 @@ public final class JilatonClickGui extends Screen {
             double sel = dev.jilaton.client.gui.design.Kit.spring("cg:presets:" + preset.name(), on);
             Ui.round(g, x, y, 300, PRESET_ROW - 2, 5, Ui.alpha(0xFFFFFFFF, 0.03 + 0.04 * hv + 0.05 * sel));
             if (sel > 0.01) Ui.rect(g, x, y + 6, 2, (float) ((PRESET_ROW - 14) * sel), accent);
-            Ui.text(g, preset.name(), x + 12 + (float) (3 * hv), y + 8, 12, on ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM,
+            Ui.text(g, preset.name(), x + 12 + (float) (3 * hv), y + 6, 12, on ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM,
                     on ? Ui.TEXT : Ui.mix(Ui.TEXT_2, Ui.TEXT, hv));
-            Ui.textRight(g, Ui.fit(preset.blurb(), 180, 10, JilatonType.Face.REGULAR), x + 290, y + 9, 10,
+            Ui.textRight(g, Ui.fit(preset.blurb(), 180, 10, JilatonType.Face.REGULAR), x + 290, y + 7, 10,
                     JilatonType.Face.REGULAR, Ui.TEXT_3);
             y += PRESET_ROW;
         }
