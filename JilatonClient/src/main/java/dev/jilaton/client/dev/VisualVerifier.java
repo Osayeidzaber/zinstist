@@ -866,6 +866,7 @@ public final class VisualVerifier {
             command(client, at("setblock", -2, 0, 6) + " minecraft:barrel");
             command(client, at("setblock", 0, 0, 8) + " minecraft:white_shulker_box");
             command(client, at("setblock", 3, 0, 9) + " minecraft:ender_chest");
+            command(client, at("setblock", -3, 0, 9) + " minecraft:diamond_ore");
             enable("breadcrumbs");
             enable("fullbright");
         });
@@ -874,13 +875,17 @@ public final class VisualVerifier {
             then(2, () -> command(client, "tp @a " + (studioX + (k % 2 == 0 ? 0.6 : -0.6)) + " " + studioY + " "
                     + (studioZ - 0.5 * (k + 1)) + " 0 25"));
         }
-        then(5, () -> enable("storage_esp"));
+        then(5, () -> {
+            enable("storage_esp");
+            enable("block_esp");
+        });
         shot(25, "39-storage-breadcrumbs");
         then(2, () -> {
             disable("storage_esp");
+            disable("block_esp");
             disable("breadcrumbs");
             disable("fullbright");
-            for (int[] o : new int[][]{{2, 0, 5}, {-2, 0, 6}, {0, 0, 8}, {3, 0, 9}}) {
+            for (int[] o : new int[][]{{2, 0, 5}, {-2, 0, 6}, {0, 0, 8}, {3, 0, 9}, {-3, 0, 9}}) {
                 command(client, at("setblock", o[0], o[1], o[2]) + " minecraft:air");
             }
             studio(client);
