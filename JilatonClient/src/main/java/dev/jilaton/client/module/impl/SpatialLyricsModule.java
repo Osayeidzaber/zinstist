@@ -73,6 +73,12 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
     private final NumberSetting linger = addSetting(new NumberSetting("linger", "Linger (trail & sky, s)", 3, 40, 1, 14));
     private final NumberSetting depth = addSetting(new NumberSetting("depth", "3D depth layers", 0, 6, 1, 0));
     private final LyricTrail trail = new LyricTrail();
+    /** Font widths of BMP characters below U+3000, filled on first use; stored +1 so 0 means unknown. */
+    private final int[] glyphWidths = new int[0x3000];
+    /** Line fitting asks for every character's width every frame; this answers without a String per call. */
+    private final IntUnaryOperator advance = this::glyphWidth;
+    /** Runs for one sky line; the raster consumes them immediately, so one list serves every line. */
+    private final List<TextRaster.Run> skyRuns = new ArrayList<>();
     private final LyricSky sky = new LyricSky();
     private long lastTrailNanos;
 
@@ -92,6 +98,8 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
 
     @Override
     protected void onDisable(Minecraft client) {
+        // A resource reload can swap the font while the module is off; widths are re-measured on next use.
+        java.util.Arrays.fill(glyphWidths, 0);
         resetStack();
         FxParticles.get().clearOwner(OWNER);
     }
@@ -207,7 +215,6 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
         double maxSlot = Math.max(before, after);
         double baseAlpha = opacity.value() * f.intensity;
         int alignValue = switch (align.value()) { case "Left" -> -1; case "Right" -> 1; default -> 0; };
-        IntUnaryOperator advance = codePoint -> f.client.font.width(String.valueOf((char) codePoint));
         for (int slot = -before - 1; slot <= after + 1; slot++) {
             int lineIndex = index + slot;
             String text;
@@ -275,7 +282,6 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             trail.clear();
             lastIndex = Integer.MIN_VALUE;
         }
-        IntUnaryOperator advance = codePoint -> f.client.font.width(String.valueOf((char) codePoint));
         if (index != lastIndex) {
             lastIndex = index;
             changedAt = f.now;
@@ -372,7 +378,6 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             trail.clear();
             lastIndex = Integer.MIN_VALUE;
         }
-        IntUnaryOperator advance = codePoint -> f.client.font.width(String.valueOf((char) codePoint));
         if (index != lastIndex) {
             lastIndex = index;
             changedAt = f.now;
@@ -394,7 +399,8 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
                     * (isActive ? 1 : dim.value());
             if (alpha < 0.02) continue;
             double appear = f.reducedMotion ? 1 : LyricSky.appear(e, f.now);
-            List<TextRaster.Run> runs = new ArrayList<>();
+            List<TextRaster.Run> runs = skyRuns;
+            runs.clear();
             if (isActive) {
                 boolean timed = active != null && active.timedWords() && active.text().equals(e.text);
                 shineRaster(e.text, timed ? active : null, timed ? Lyrics.wordsSung(active, position) : 0, rgb, runs);
@@ -408,6 +414,16 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             int tone = (int) Math.round(Math.max(0, Math.min(1, alpha)) * 255);
             f.sky().add(new FxFrame.SkyQuad(image.id(), corners, QUAD_UVS, tone << 24 | tone << 16 | tone << 8 | tone));
         }
+    }
+
+    private int glyphWidth(int codePoint) {
+        net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
+        if (codePoint < 0 || codePoint >= glyphWidths.length) return font.width(String.valueOf((char) codePoint));
+        int cached = glyphWidths[codePoint];
+        if (cached != 0) return cached - 1;
+        int width = font.width(String.valueOf((char) codePoint));
+        glyphWidths[codePoint] = width + 1;
+        return width;
     }
 
     /** Opaque runs for sky text: colours are baked into the raster, brightness comes from the quad. */
