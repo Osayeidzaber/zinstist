@@ -55,12 +55,14 @@ public abstract class VelocityPacketMixin {
         velocity.onAcceptedVelocityPacket();
 
         Vec3 current = client.player.getDeltaMovement();
+        // Sample the randomised horizontal scale once per packet so X and Z keep the same factor.
+        double horizontalScale = velocity.horizontalScale() * 100.0;
         return new Vec3(
-                VelocityPolicy.applyAxis(movement.x, current.x, velocity.horizontalScale() * 100.0,
+                VelocityPolicy.applyAxis(movement.x, current.x, horizontalScale,
                         velocity.motionHorizontalScale() * 100.0),
                 VelocityPolicy.applyAxis(movement.y, current.y, velocity.verticalScale() * 100.0,
                         velocity.motionVerticalScale() * 100.0),
-                VelocityPolicy.applyAxis(movement.z, current.z, velocity.horizontalScale() * 100.0,
+                VelocityPolicy.applyAxis(movement.z, current.z, horizontalScale,
                         velocity.motionHorizontalScale() * 100.0)
         );
     }

@@ -24,6 +24,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public final class VelocityModule extends ClientModule {
     private final NumberSetting horizontal;
+    private final NumberSetting horizontalRandomMin;
+    private final NumberSetting horizontalRandomMax;
     private final NumberSetting vertical;
     private final NumberSetting motionHorizontal;
     private final NumberSetting motionVertical;
@@ -55,6 +57,10 @@ public final class VelocityModule extends ClientModule {
     public VelocityModule() {
         super("velocity", "Velocity", "Modifies knockback with Modify, Strafe, or Reversal; JumpReset is optional.", ModuleCategory.COMBAT);
         horizontal = addSetting(new NumberSetting("horizontal", "Modify horizontal", -100.0, 100.0, 5.0, 0.0));
+        horizontalRandomMin = addSetting(new NumberSetting("horizontal_random_min", "Random horizontal min",
+                -100.0, 100.0, 5.0, 0.0));
+        horizontalRandomMax = addSetting(new NumberSetting("horizontal_random_max", "Random horizontal max",
+                -100.0, 100.0, 5.0, 0.0));
         vertical = addSetting(new NumberSetting("vertical", "Modify vertical", -100.0, 100.0, 5.0, 0.0));
         motionHorizontal = addSetting(new NumberSetting("motion_horizontal", "Modify motion horizontal", 0.0, 100.0, 5.0, 0.0));
         motionVertical = addSetting(new NumberSetting("motion_vertical", "Modify motion vertical", 0.0, 100.0, 5.0, 0.0));
@@ -80,7 +86,17 @@ public final class VelocityModule extends ClientModule {
         reverseOnlyMoving = addSetting(new BooleanSetting("reverse_only_moving", "Reverse only while moving", false));
     }
 
+    /**
+     * Fixed horizontal scale, or one sample from the configured range when the two bounds differ.
+     * The range arithmetic is original Jilaton code (see {@link VelocityRange}); a min/max pair set
+     * equal leaves the fixed setting in charge, so existing configurations keep their behaviour.
+     */
     public double horizontalScale() {
+        double minimum = horizontalRandomMin.value();
+        double maximum = horizontalRandomMax.value();
+        if (VelocityRange.isRandom(minimum, maximum)) {
+            return VelocityRange.sample(minimum, maximum, ThreadLocalRandom.current().nextDouble()) / 100.0;
+        }
         return horizontal.value() / 100.0;
     }
 

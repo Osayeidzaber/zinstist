@@ -122,7 +122,7 @@ class ModuleManagerTest {
 
         assertTrue(velocity instanceof VelocityModule);
         assertEquals(ModuleCategory.COMBAT, velocity.category());
-        assertEquals(21, velocity.settings().size());
+        assertEquals(23, velocity.settings().size());
         assertFalse(velocity.settings().stream().filter(setting -> setting.id().equals("strafe_only_facing"))
                 .map(BooleanSetting.class::cast).findFirst().orElseThrow().value());
         assertEquals(3.5, velocity.settings().stream().filter(setting -> setting.id().equals("strafe_facing_range"))
