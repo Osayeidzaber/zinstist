@@ -77,7 +77,9 @@ public final class LyricLayout {
             default -> {
                 // Curved Arc: lines follow a gentle arc that rises toward its ends.
                 double angle = viewYaw + side + k * spread;
-                yield around(angle, radius, p.height() + k * k * 0.06 - k * 0.12);
+                // At least one text line (≈0.3 blocks) between neighbours, after the ends-rise term, so the next
+                // line never prints over the active one at the default spread.
+                yield around(angle, radius, p.height() + k * k * 0.06 - k * 0.36);
             }
         };
     }

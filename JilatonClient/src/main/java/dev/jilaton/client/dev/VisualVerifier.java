@@ -778,6 +778,52 @@ public final class VisualVerifier {
             client.options.hideGui = false;
             client.options.setCameraType(CameraType.FIRST_PERSON);
         });
+        // Lyrics offline: online/Spotify lyrics cannot resolve here, but user-provided synced lyrics can. A
+        // silent WAV plus an .lrc of placeholder lines (written by the harness, no third-party text) is played
+        // through the Local files source and shown in three placements.
+        then(1, () -> studio(client));
+        then(5, () -> {
+            client.options.hideGui = false;
+            client.setScreen(null);
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            command(client, "time set 13000");
+            client.player.setYRot(0);
+            client.player.setXRot(-4);
+            java.nio.file.Path folder = client.gameDirectory.toPath().resolve("verify-music");
+            try {
+                writeVerifyTrack(folder);
+            } catch (IOException failure) {
+                LOGGER.error("[JilatonVerify] could not write the verify track: {}", failure.getMessage());
+                return;
+            }
+            setting("music_center", "source", "Local files");
+            setting("music_center", "folder", folder.toString());
+            dev.jilaton.client.music.MusicCenter center = dev.jilaton.client.music.MusicCenter.get();
+            center.setFolder(folder);
+            center.rescan();
+            center.player().setQueue(center.library().all(), 0);
+            setting("spatial_lyrics", "third_person_only", false);
+            setting("spatial_lyrics", "mode", "Curved Arc");
+            enable("spatial_lyrics");
+        });
+        then(80, () -> logMusic());
+        shot(10, "35-lyrics-local-arc");
+        then(2, () -> setting("spatial_lyrics", "mode", "World Trail"));
+        then(80, () -> logMusic());
+        shot(10, "35b-lyrics-local-trail");
+        then(2, () -> {
+            setting("spatial_lyrics", "mode", "Sky Lyrics");
+            client.player.setXRot(-35);
+        });
+        then(80, () -> logMusic());
+        shot(10, "35c-lyrics-local-sky");
+        then(3, () -> {
+            disable("spatial_lyrics");
+            dev.jilaton.client.music.MusicCenter.get().player().stop();
+            setting("music_center", "source", "Off");
+            client.player.setXRot(0);
+        });
+
         then(5, () -> {
             // Alternate the markers so every run checks a value the previous run (a real restart) wrote.
             ClientConfig config = JilatonClient.clientConfig();
@@ -916,6 +962,23 @@ public final class VisualVerifier {
         return out;
     }
 
+    /** A 30 s silent 8 kHz mono WAV and a synced .lrc beside it: one new line every 3 seconds. */
+    private static void writeVerifyTrack(java.nio.file.Path folder) throws IOException {
+        java.nio.file.Files.createDirectories(folder);
+        int rate = 8000, seconds = 30, samples = rate * seconds;
+        java.nio.ByteBuffer wav = java.nio.ByteBuffer.allocate(44 + samples * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        wav.put("RIFF".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(36 + samples * 2)
+                .put("WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(16).putShort((short) 1)
+                .putShort((short) 1).putInt(rate).putInt(rate * 2).putShort((short) 2).putShort((short) 16)
+                .put("data".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(samples * 2);
+        java.nio.file.Files.write(folder.resolve("Jilaton Verify - Test Pattern.wav"), wav.array());
+        StringBuilder lrc = new StringBuilder("[ti:Test Pattern]\n[ar:Jilaton Verify]\n");
+        for (int line = 0; line < 10; line++) {
+            lrc.append(String.format(java.util.Locale.ROOT, "[00:%02d.00]Verify line %d of ten\n", line * 3, line + 1));
+        }
+        java.nio.file.Files.writeString(folder.resolve("Jilaton Verify - Test Pattern.lrc"), lrc);
+    }
+
     /** Sends a real click through the screen at a point given in the 1280x720 board space. */
     private static void clickAt(Screen screen, double boardX, double boardY) {
         double scale = Math.min(screen.width / Canvas.W, screen.height / Canvas.H);
@@ -961,7 +1024,7 @@ public final class VisualVerifier {
         return name.startsWith("10-") || name.startsWith("27") || name.startsWith("31") || name.startsWith("11-") || name.startsWith("12-")
                 || name.startsWith("14-") || name.startsWith("15-") || name.startsWith("16-")
                 || name.startsWith("17-") || name.startsWith("18-") || name.startsWith("19-")
-                || name.startsWith("20-") || name.startsWith("33");
+                || name.startsWith("20-") || name.startsWith("33") || name.startsWith("35");
     }
 
     private void logDisabled() {

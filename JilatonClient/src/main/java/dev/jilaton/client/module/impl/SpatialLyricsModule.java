@@ -347,8 +347,13 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
 
     /** Raster em of the sky text: large enough that a sky line reads crisply at {@link LyricSky#RADIUS}. */
     private static final float SKY_TEXT_EM = 40;
-    /** World blocks per raster pixel; a full line spans roughly a quarter of the sky's width. */
-    private static final double SKY_UNITS_PER_TEXT_PIXEL = 0.018;
+    /**
+     * World blocks per raster pixel. At {@link #SKY_TEXT_EM} the face averages ≈12 px per character, so a short
+     * 20-character line (≈240 px) spans ≈12 blocks, about 10° at {@link LyricSky#RADIUS}, and a 60-character line
+     * about a quarter of the view. The earlier 0.018 drew that short line at ≈70 px of a 1080p screen in runtime
+     * scene 35c, too small to read.
+     */
+    private static final double SKY_UNITS_PER_TEXT_PIXEL = 0.05;
     /** The sky has room for long lines, so it fits wider than a world-space slot before ellipsising. */
     static final int SKY_MAX_LINE_PIXELS = 360;
     private static final float[] QUAD_UVS = {0, 1, 1, 1, 1, 0, 0, 0};
