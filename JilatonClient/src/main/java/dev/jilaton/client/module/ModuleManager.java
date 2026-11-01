@@ -34,6 +34,7 @@ import dev.jilaton.client.module.impl.KillAuraModule;
 import dev.jilaton.client.module.impl.KeepSprintModule;
 import dev.jilaton.client.module.impl.LongJumpModule;
 import dev.jilaton.client.module.impl.NoBobModule;
+import dev.jilaton.client.module.impl.SmoothCameraModule;
 import dev.jilaton.client.module.impl.NoJumpDelayModule;
 import dev.jilaton.client.module.impl.NoFallModule;
 import dev.jilaton.client.module.impl.NoMissCooldownModule;
@@ -129,6 +130,7 @@ public final class ModuleManager {
         register(new FullbrightModule());
         register(new SwingAnimationsModule());
         register(new NoBobModule());
+        register(new SmoothCameraModule());
         register(new dev.jilaton.client.module.impl.ZoomModule());
         register(new dev.jilaton.client.module.impl.FreecamModule());
         register(new dev.jilaton.client.module.impl.FreeLookModule());

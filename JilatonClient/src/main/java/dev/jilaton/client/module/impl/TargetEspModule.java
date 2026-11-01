@@ -36,6 +36,7 @@ public final class TargetEspModule extends ClientModule {
     private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "F2F2F2"));
     private final BooleanSetting hitFlash = addSetting(new BooleanSetting("hit_flash", "Hit flash", true));
     private final TextSetting flashColor = addSetting(EffectPalette.hexSetting("flash_color", "Flash RGB hex", "FFFFFF"));
+    private final BooleanSetting outline = addSetting(new BooleanSetting("outline", "Outline target", true));
     private final NumberSetting scale = addSetting(new NumberSetting("scale", "Scale", 0.6, 1.8, 0.1, 1.0));
     private final NumberSetting speed = addSetting(new NumberSetting("speed", "Speed", 0.2, 2.5, 0.1, 1.0));
     private final NumberSetting opacity = addSetting(new NumberSetting("opacity", "Opacity", 0.2, 1.0, 0.05, 1.0));
@@ -58,6 +59,19 @@ public final class TargetEspModule extends ClientModule {
         super("target_esp", "TargetESP", "Animated 3D combat target marker: minimal, orbital, helix, ground aura, cyber target, cinematic or custom.",
                 ModuleCategory.RENDER);
     }
+
+    /**
+     * Outline colour for {@code entity} when it is the shown target, else null. Uses the game's own glow outline,
+     * so it is a visual-only selection and follows the body exactly.
+     */
+    public Integer outlineColor(net.minecraft.world.entity.Entity entity, int accent) {
+        if (!enabled() || !outline.value() || current.entity == null || current.entity != entity
+                || current.presence <= 0) return null;
+        return EffectPalette.resolve(colorMode.value(), accent, color.value());
+    }
+
+    /** The entity currently marked, for diagnostics. */
+    public LivingEntity shownTarget() { return current.entity; }
 
     public int customMask() {
         int mask = 0;

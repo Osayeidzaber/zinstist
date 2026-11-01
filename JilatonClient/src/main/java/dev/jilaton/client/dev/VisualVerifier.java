@@ -753,6 +753,46 @@ public final class VisualVerifier {
             command(client, "kill @e[type=minecraft:zombie]");
         });
 
+        // Crystal PvP look from the reference clip: glass-cube crystals, outlined target, smooth third-person camera.
+        then(2, () -> {
+            client.player.setYRot(0);
+            client.player.setXRot(10);
+            summonAhead(client, "zombie", 3.5);
+            command(client, "execute as @a at @s rotated 0 0 run summon end_crystal ^1.6 ^ ^3 {ShowBottom:0b}");
+            enable("explosive_highlights");
+            enable("target_esp");
+            setting("target_esp", "source", "Last hit");
+            setting("target_esp", "memory", 15.0);
+            enable("smooth_camera");
+            client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        });
+        // Wait out the previous scene's death animation so the recorded target is the living zombie.
+        then(30, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
+        });
+        then(10, () -> {
+            var cam = client.gameRenderer.getMainCamera().position();
+            LivingEntity zombie = nearestZombie(client);
+            var esp = (dev.jilaton.client.module.impl.TargetEspModule) dev.jilaton.client.JilatonClient.moduleManager().get("target_esp");
+            LOGGER.info("[JilatonVerify] target esp enabled={} shown={} tracked={} zombie={}", esp.enabled(), esp.shownTarget(),
+                    CombatTargetTracker.lastHit(15, System.nanoTime()), zombie);
+            LOGGER.info("[JilatonVerify] target outline color={} appearsGlowing={}",
+                    zombie == null ? "no zombie" : dev.jilaton.client.render.EntityGlowSupport.color(zombie),
+                    zombie != null && client.shouldEntityAppearGlowing(zombie));
+            LOGGER.info("[JilatonVerify] smooth camera distance={} (setting 5)",
+                    String.format(java.util.Locale.ROOT, "%.2f", cam.distanceTo(client.player.getEyePosition())));
+        });
+        shot(2, "36-crystal-pvp");
+        then(3, () -> {
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            disable("smooth_camera");
+            disable("explosive_highlights");
+            disable("target_esp");
+            command(client, "kill @e[type=minecraft:zombie]");
+            command(client, "kill @e[type=minecraft:end_crystal]");
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {

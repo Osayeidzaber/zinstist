@@ -33,7 +33,7 @@ public final class ExplosiveHighlightsModule extends ClientModule implements FxE
     private static final int OWNER = FxParticles.ownerId("explosive_highlights");
     private final BooleanSetting crystals = addSetting(new BooleanSetting("crystals", "End crystals", true));
     private final BooleanSetting anchors = addSetting(new BooleanSetting("anchors", "Charged respawn anchors", true));
-    private final ChoiceSetting style = addSetting(new ChoiceSetting("style", "Style", List.of("Swoosh", "Halo", "Core only"), "Swoosh"));
+    private final ChoiceSetting style = addSetting(new ChoiceSetting("style", "Style", List.of("Glass cubes", "Swoosh", "Halo", "Core only"), "Glass cubes"));
     private final NumberSetting range = addSetting(new NumberSetting("range", "Range", 4, 32, 1, 16));
     private final NumberSetting speed = addSetting(new NumberSetting("speed", "Rotation speed", 0.2, 3, 0.05, 1));
     private final BooleanSetting sparkles = addSetting(new BooleanSetting("sparkles", "Rising sparkles", true));
@@ -110,6 +110,14 @@ public final class ExplosiveHighlightsModule extends ClientModule implements FxE
                     double nx = Math.sin(tilt) * Math.cos(k * 2.1 + seed), nz = Math.sin(tilt) * Math.sin(k * 2.1 + seed);
                     FxShapes.tiltedRing(f, x, y, z, nx, Math.cos(tilt), nz, radius * (1 + k * 0.18),
                             time * (2.2 + k * 0.6) * (k % 2 == 0 ? 1 : -1), 0.42, 0xFFFFFF, a, 2.2F, false);
+                }
+            }
+            case "Glass cubes" -> {
+                // Three nested frosted cubes tumbling on different axes, the outer one slowest.
+                for (int k = 0; k < 3; k++) {
+                    double spin = time * (0.9 - k * 0.2) * (k % 2 == 0 ? 1 : -1) + seed;
+                    FxShapes.glassCube(f, x, y, z, radius * (0.42 + k * 0.17), spin, 0.6 + spin * 0.7 + k, spin * 0.4 + k * 1.3,
+                            k == 0 ? 0xFFFFFF : rgb, a * (1 - k * 0.2), false);
                 }
             }
             case "Halo" -> {

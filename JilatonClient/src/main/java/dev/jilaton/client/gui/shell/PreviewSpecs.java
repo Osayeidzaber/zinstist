@@ -64,6 +64,7 @@ public final class PreviewSpecs {
             Map.entry("view_model", PreviewSpec.Motif.HAND),
             Map.entry("freecam", PreviewSpec.Motif.CAMERA),
             Map.entry("free_look", PreviewSpec.Motif.CAMERA),
+            Map.entry("smooth_camera", PreviewSpec.Motif.CAMERA),
             Map.entry("pearl_trajectory", PreviewSpec.Motif.PEARL),
             Map.entry("explosive_highlights", PreviewSpec.Motif.CORE),
             Map.entry("wings", PreviewSpec.Motif.WINGS),
@@ -120,6 +121,7 @@ public final class PreviewSpecs {
             case "view_model" -> hand(module, accent);
             case "freecam" -> freecam(module, accent);
             case "free_look" -> freeLook(module, accent);
+            case "smooth_camera" -> smoothCamera(module, accent);
             case "pearl_trajectory" -> pearl(module, accent);
             case "explosive_highlights" -> core(module, accent);
             case "wings" -> wings(module, accent);
@@ -726,6 +728,17 @@ public final class PreviewSpecs {
                 front ? 1 : 0.3,
                 flag(module, "limit_pitch", true) ? 1 : 0.6,
                 detail);
+    }
+
+    private static PreviewSpec smoothCamera(ClientModule module, int accent) {
+        return new PreviewSpec(PreviewSpec.Motif.CAMERA, 1, accent, 0xFFFFFF, accent,
+                1 - unit(num(module, "smoothing", 0.55), 0, 1) * 0.8,
+                0.5,
+                0.5,
+                unit(num(module, "distance", 5), 2, 10),
+                0.3,
+                1,
+                PreviewSpec.CAMERA_HOLD);
     }
 
     private static PreviewSpec pearl(ClientModule module, int accent) {

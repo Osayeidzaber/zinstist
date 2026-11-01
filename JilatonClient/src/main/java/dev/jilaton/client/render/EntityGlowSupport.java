@@ -25,6 +25,10 @@ public final class EntityGlowSupport {
                 && (esp.options().throughWalls() || client.player.hasLineOfSight(entity))) {
             return esp.options().color(living, accent, camera, seconds);
         }
+        if (JilatonClient.moduleManager().get("target_esp") instanceof dev.jilaton.client.module.impl.TargetEspModule targetEsp) {
+            Integer outline = targetEsp.outlineColor(entity, accent);
+            if (outline != null) return outline;
+        }
         if (JilatonClient.moduleManager().get("item_esp") instanceof ItemEspModule items && items.enabled() && items.glow()
                 && items.targets().contains(entity) && items.matches(entity, client, camera)
                 && (items.throughWalls() || client.player.hasLineOfSight(entity))) return items.color(accent, seconds);

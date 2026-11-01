@@ -200,6 +200,49 @@ public final class FxShapes {
         }
     }
 
+    /** Cube edges as index pairs into {@link #cubeCorners}. */
+    static final int[][] CUBE_EDGES = {{0, 1}, {1, 3}, {3, 2}, {2, 0}, {4, 5}, {5, 7}, {7, 6}, {6, 4},
+            {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+    /** Cube faces as corner quads, wound consistently. */
+    static final int[][] CUBE_FACES = {{0, 1, 3, 2}, {4, 6, 7, 5}, {0, 4, 5, 1}, {2, 3, 7, 6}, {0, 2, 6, 4},
+            {1, 5, 7, 3}};
+
+    /**
+     * Corners of a cube of half-edge {@code half} rotated by yaw (Y), then pitch (X), then roll (Z); index bits are
+     * x, y, z sign. Returned as 8 x 3 offsets from the centre.
+     */
+    static double[][] cubeCorners(double half, double yaw, double pitch, double roll) {
+        double cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+        double cr = Math.cos(roll), sr = Math.sin(roll);
+        double[][] out = new double[8][3];
+        for (int i = 0; i < 8; i++) {
+            double x = (i & 1) == 0 ? -half : half, y = (i & 2) == 0 ? -half : half, z = (i & 4) == 0 ? -half : half;
+            double x1 = x * cr - y * sr, y1 = x * sr + y * cr;
+            double y2 = y1 * cp - z * sp, z2 = y1 * sp + z * cp;
+            out[i][0] = x1 * cy + z2 * sy;
+            out[i][1] = y2;
+            out[i][2] = -x1 * sy + z2 * cy;
+        }
+        return out;
+    }
+
+    /** Frosted glass cube: faint faces with glowing edges, like the crystals in crystal-PvP clients. */
+    public static void glassCube(FxFrame f, double x, double y, double z, double half, double yaw, double pitch,
+                                 double roll, int rgb, double alpha, boolean walls) {
+        if (alpha <= 0.004) return;
+        double cx = x - f.camX, cy = y - f.camY, cz = z - f.camZ;
+        double[][] c = cubeCorners(half, yaw, pitch, roll);
+        int face = argb(rgb, alpha * 0.10);
+        for (int[] q : CUBE_FACES)
+            f.batch.quad(cx + c[q[0]][0], cy + c[q[0]][1], cz + c[q[0]][2], cx + c[q[1]][0], cy + c[q[1]][1], cz + c[q[1]][2],
+                    cx + c[q[2]][0], cy + c[q[2]][1], cz + c[q[2]][2], cx + c[q[3]][0], cy + c[q[3]][1], cz + c[q[3]][2],
+                    face, face, face, face, walls);
+        int edge = argb(rgb, alpha * 0.85);
+        for (int[] e : CUBE_EDGES)
+            f.batch.glowLine(cx + c[e[0]][0], cy + c[e[0]][1], cz + c[e[0]][2],
+                    cx + c[e[1]][0], cy + c[e[1]][1], cz + c[e[1]][2], edge, 1.6F, walls);
+    }
+
     /**
      * Flat irregular splash on a horizontal surface. The outline is a deterministic function of {@code seed}
      * so a splat keeps its shape for its whole life. {@code spread} animates 0 → 1 as the ink lands.

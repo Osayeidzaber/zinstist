@@ -37,6 +37,7 @@
     "ZoomFovMixin",
     "ZoomMouseMixin",
     "FreeLookCameraMixin",
+    "SmoothCameraMixin",
     "ViewModelMixin",
     "CustomCrosshairMixin",
     "GameRendererFovAccess",
