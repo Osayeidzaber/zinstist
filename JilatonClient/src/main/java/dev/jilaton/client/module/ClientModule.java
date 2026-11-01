@@ -67,6 +67,11 @@ public abstract class ClientModule {
         return category;
     }
 
+    /** Puts every setting back to its default; the enabled state and key binding are kept. */
+    public final void resetSettings() {
+        for (Setting setting : settings()) setting.reset();
+    }
+
     public List<Setting> settings() {
         return settingsView;
     }

@@ -272,6 +272,40 @@ public final class ClientConfig {
         return true;
     }
 
+    /** The current configuration as shareable text (the same format a profile file uses). */
+    public String exportText(ModuleManager modules) {
+        java.io.StringWriter out = new java.io.StringWriter();
+        try {
+            snapshot(modules).store(out, "Jilaton profile");
+        } catch (IOException impossible) {
+            throw new java.io.UncheckedIOException(impossible);
+        }
+        return out.toString();
+    }
+
+    /**
+     * Saves exported text as profile {@code name}. Returns false when the text is not a Jilaton export (no
+     * module keys), so a random clipboard never overwrites a profile.
+     */
+    public boolean importText(String name, String text) throws IOException {
+        Properties values = new Properties();
+        try (java.io.StringReader reader = new java.io.StringReader(text == null ? "" : text)) {
+            values.load(reader);
+        } catch (IllegalArgumentException malformed) {
+            return false;
+        }
+        boolean jilaton = false;
+        for (String key : values.stringPropertyNames()) {
+            if (key.startsWith("module.")) {
+                jilaton = true;
+                break;
+            }
+        }
+        if (!jilaton) return false;
+        write(profilePath(name), values);
+        return true;
+    }
+
     public boolean deleteProfile(String name) throws IOException {
         return Files.deleteIfExists(profilePath(name));
     }
@@ -559,7 +593,7 @@ public final class ClientConfig {
         return profilesDirectory.resolve(name + PROFILE_EXTENSION);
     }
 
-    private static boolean isValidProfileName(String name) {
+    public static boolean isValidProfileName(String name) {
         return name != null && name.matches(PROFILE_NAME_PATTERN);
     }
 

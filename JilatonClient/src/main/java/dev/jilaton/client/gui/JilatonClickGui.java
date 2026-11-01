@@ -74,6 +74,8 @@ public final class JilatonClickGui extends Screen {
     private EditBox profileName;
     private String selectedProfile;
     private List<String> profiles = List.of();
+    /** One-line result of the last config action (export, import, reset), shown under the profile field. */
+    private String configStatus = "";
     private String restoredQuery = "";
     /** Active slider drag: the setting and its track in board coordinates. */
     private NumberSetting dragging;
@@ -535,6 +537,10 @@ public final class JilatonClickGui extends Screen {
         boolean closeOver = Ui.inside(mx, my, r - 28, PY + 18, 28, 28);
         Ui.card(g, r - 28, PY + 18, 28, 28, 7, Ui.alpha(Ui.RAISED, Ui.ease("cg:close", closeOver)), Ui.STROKE);
         Ui.textCentre(g, "×", r - 14, PY + 23, 14, JilatonType.Face.REGULAR, Ui.TEXT_2);
+        boolean changed = module.settings().stream().anyMatch(s -> !s.isDefault());
+        boolean resetOver = changed && Ui.inside(mx, my, r - 92, PY + 18, 58, 28);
+        Ui.card(g, r - 92, PY + 18, 58, 28, 7, Ui.alpha(Ui.RAISED, Ui.ease("cg:reset", resetOver)), Ui.STROKE);
+        Ui.textCentre(g, "Reset", r - 63, PY + 26, 11, JilatonType.Face.MEDIUM, changed ? Ui.TEXT_2 : Ui.FAINT);
         // Description, two lines at most.
         String[] lines = wrap(module.description(), DRAWER - 36, 11, 2);
         for (int i = 0; i < lines.length; i++) Ui.text(g, lines[i], x, PY + 52 + i * 15, 11, Ui.TEXT_2);
@@ -677,6 +683,9 @@ public final class JilatonClickGui extends Screen {
         boolean has = selectedProfile != null;
         actionButton(g, "Load", bx + 80, LIST_Y + 2, has, mx, my, accent);
         actionButton(g, "Delete", bx + 160, LIST_Y + 2, has, mx, my, accent);
+        actionButton(g, "Export", bx + 240, LIST_Y + 2, true, mx, my, accent);
+        actionButton(g, "Import", bx + 320, LIST_Y + 2, true, mx, my, accent);
+        if (!configStatus.isEmpty()) Ui.text(g, configStatus, MAIN_X, LIST_Y + 46, 11, Ui.TEXT_3);
         float y = LIST_Y + 60;
         if (profiles.isEmpty()) Ui.text(g, "No profiles yet. Name one above and press Save.", MAIN_X, y + 8, 13, Ui.TEXT_2);
         for (String profile : profiles) {
@@ -949,6 +958,11 @@ public final class JilatonClickGui extends Screen {
             remember();
             return true;
         }
+        if (Ui.inside(mx, my, r - 92, PY + 18, 58, 28)) {
+            module.resetSettings();
+            config.save(modules);
+            return true;
+        }
         if (button != 0) return true;
         float ky = PY + 90;
         String key = keyName(module);
@@ -1028,6 +1042,25 @@ public final class JilatonClickGui extends Screen {
             }
             if (selectedProfile != null && Ui.inside(mx, my, bx + 80, LIST_Y + 2, 72, 36)) {
                 if (config.loadProfile(selectedProfile, modules)) config.save(modules);
+                return true;
+            }
+            if (Ui.inside(mx, my, bx + 240, LIST_Y + 2, 72, 36)) {
+                minecraft.keyboardHandler.setClipboard(config.exportText(modules));
+                configStatus = "Current settings copied to the clipboard";
+                return true;
+            }
+            if (Ui.inside(mx, my, bx + 320, LIST_Y + 2, 72, 36)) {
+                String name = profileName.getValue().strip();
+                if (name.isEmpty()) name = "imported";
+                if (!ClientConfig.isValidProfileName(name)) {
+                    configStatus = "Profile names use letters, digits, - and _";
+                } else if (config.importText(name, minecraft.keyboardHandler.getClipboard())) {
+                    selectedProfile = name;
+                    refreshProfiles();
+                    configStatus = "Imported as \"" + name + "\"; press Load to apply it";
+                } else {
+                    configStatus = "The clipboard does not hold a Jilaton export";
+                }
                 return true;
             }
             if (selectedProfile != null && Ui.inside(mx, my, bx + 160, LIST_Y + 2, 72, 36)) {

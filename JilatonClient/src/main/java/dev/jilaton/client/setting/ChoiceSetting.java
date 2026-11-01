@@ -8,6 +8,7 @@ public final class ChoiceSetting implements Setting {
     private final String label;
     private volatile List<String> choices;
     private String value;
+    private String initial;
     private boolean deferUnknown;
     /** A saved value that is not offered yet (e.g. a custom model not scanned at load time). */
     private String pending;
@@ -17,6 +18,17 @@ public final class ChoiceSetting implements Setting {
         this.label = Objects.requireNonNull(label, "label");
         this.choices = validated(choices);
         setValue(defaultValue);
+        this.initial = this.value;
+    }
+
+    @Override
+    public void reset() {
+        setValue(initial);
+    }
+
+    @Override
+    public boolean isDefault() {
+        return Objects.equals(value, initial);
     }
 
     /**

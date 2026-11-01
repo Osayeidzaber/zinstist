@@ -4,4 +4,10 @@ public sealed interface Setting permits BooleanSetting, NumberSetting, ChoiceSet
     String id();
 
     String label();
+
+    /** Puts the value back to the one the setting was created with. */
+    void reset();
+
+    /** True while the value equals the one the setting was created with. */
+    boolean isDefault();
 }

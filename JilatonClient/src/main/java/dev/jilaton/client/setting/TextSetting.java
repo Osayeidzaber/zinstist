@@ -10,6 +10,7 @@ public final class TextSetting implements Setting {
     private final int maximumLength;
     private final UnaryOperator<String> validator;
     private String value;
+    private String initial;
 
     public TextSetting(String id, String label, int maximumLength, String defaultValue, UnaryOperator<String> validator) {
         this.id = Objects.requireNonNull(id);
@@ -18,6 +19,17 @@ public final class TextSetting implements Setting {
         this.maximumLength = maximumLength;
         this.validator = Objects.requireNonNull(validator);
         setValue(defaultValue);
+        this.initial = this.value;
+    }
+
+    @Override
+    public void reset() {
+        setValue(initial);
+    }
+
+    @Override
+    public boolean isDefault() {
+        return Objects.equals(value, initial);
     }
 
     @Override public String id() { return id; }

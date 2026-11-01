@@ -7,6 +7,7 @@ public final class NumberSetting implements Setting {
     private final double maximum;
     private final double step;
     private double value;
+    private double initial;
 
     public NumberSetting(String id, String label, double minimum, double maximum, double step, double defaultValue) {
         if (minimum > maximum || step <= 0.0) {
@@ -18,6 +19,17 @@ public final class NumberSetting implements Setting {
         this.maximum = maximum;
         this.step = step;
         setValue(defaultValue);
+        this.initial = this.value;
+    }
+
+    @Override
+    public void reset() {
+        setValue(initial);
+    }
+
+    @Override
+    public boolean isDefault() {
+        return value == initial;
     }
 
     @Override
