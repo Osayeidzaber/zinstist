@@ -175,8 +175,10 @@ public final class ClickGuiScreen extends Screen {
         config.setGuiEnabledOnly(enabledOnly);
         config.setGuiSearchQuery(search == null ? restoredQuery : search.getValue());
         config.setGuiSelectedProfile(selectedProfile == null ? "" : selectedProfile);
-        config.setGuiScroll(targetScroll);
+        // Only the module list has a persisted offset: the configs and theme pages reuse `targetScroll` for their
+        // own scrolling, so writing it from there would reopen the module list at the wrong place.
         if (page == Page.MODULES) {
+            config.setGuiScroll(targetScroll);
             config.setCategoryScroll(selectedCategory, targetScroll);
         }
     }
@@ -1456,6 +1458,7 @@ public final class ClickGuiScreen extends Screen {
                 boolean same = page == Page.MODULES && selectedCategory.equals(CATEGORIES[index]);
                 if (page == Page.MODULES) {
                     config.setCategoryScroll(selectedCategory, targetScroll);
+                    config.setGuiScroll(targetScroll);
                 }
                 openPage(Page.MODULES);
                 selectedCategory = CATEGORIES[index];
@@ -1479,6 +1482,7 @@ public final class ClickGuiScreen extends Screen {
             if (inside(mouseX, mouseY, x, layout.generalY(index), width, rowHeight)) {
                 if (page == Page.MODULES) {
                     config.setCategoryScroll(selectedCategory, targetScroll);
+                    config.setGuiScroll(targetScroll);
                 }
                 openPage(index == 0 ? Page.SETTINGS : index == 1 ? Page.CONFIGS : Page.THEME);
                 syncStateToConfig();
@@ -1562,44 +1566,53 @@ public final class ClickGuiScreen extends Screen {
         int y = top + card.y() - (int) Math.round(scroll);
         int width = card.width();
         boolean visual = module.category() == ModuleCategory.RENDER;
-        int toggleX = x + width - 14 - 36;
         if (button == 1) {
             bindingModuleId = module.id();
             setFocused(null);
             return true;
         }
         if (button != 0) return true;
-        if (inside(mouseX, mouseY, toggleX, visual ? y + 12 : y + 22, 36, 20)) {
+        if (cardSwitchHit(mouseX, mouseY, x, y, width, visual)) {
             module.toggle();
             config.save(modules);
             return true;
         }
-        if (visual) {
-            if (inside(mouseX, mouseY, x + width - 32, y + 40, 22, 20)) {
-                drag = DragKind.REORDER;
-                dragModule = module;
-                return true;
-            }
-            selectedId = module.id();
-            expandedId = module.id().equals(expandedId) ? null : module.id();
-            syncStateToConfig();
-            return true;
-        }
-        int gearX = toggleX - 20;
-        if (inside(mouseX, mouseY, gearX - 20, y + 22, 18, 20)) {
+        if (cardGripHit(mouseX, mouseY, x, y, width, visual)) {
             drag = DragKind.REORDER;
             dragModule = module;
             return true;
         }
-        if (inside(mouseX, mouseY, gearX, y + 8, 20, 20)) {
+        if (!visual && cardGearHit(mouseX, mouseY, x, y, width)) {
             expandedId = module.id().equals(expandedId) ? null : module.id();
             syncStateToConfig();
             return true;
         }
+        // Anywhere else on the card opens (or closes) its settings; it never changes the module state.
         selectedId = module.id();
         expandedId = module.id().equals(expandedId) ? null : module.id();
         syncStateToConfig();
         return true;
+    }
+
+    /**
+     * The 36x20 switch at the card's right edge: the only part of a module card that toggles the module.
+     * Visual cards draw it 10 px higher, above the preview.
+     */
+    static boolean cardSwitchHit(double mouseX, double mouseY, int x, int y, int width, boolean visual) {
+        return inside(mouseX, mouseY, x + width - 14 - 36, visual ? y + 12 : y + 22, 36, 20);
+    }
+
+    /** The grip beside the switch (left gutter on visual cards): press it to drag the card, never to toggle it. */
+    static boolean cardGripHit(double mouseX, double mouseY, int x, int y, int width, boolean visual) {
+        if (visual) return inside(mouseX, mouseY, x + width - 32, y + 40, 22, 20);
+        int gearX = x + width - 14 - 36 - 20;
+        return inside(mouseX, mouseY, gearX - 18, y + 8, 16, 18);
+    }
+
+    /** The gear that opens the module's settings without selecting the card. */
+    static boolean cardGearHit(double mouseX, double mouseY, int x, int y, int width) {
+        int gearX = x + width - 14 - 36 - 20;
+        return inside(mouseX, mouseY, gearX, y + 8, 20, 20);
     }
 
     /** Visuals card index under the pointer, for grip reordering. */
