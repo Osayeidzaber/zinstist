@@ -283,3 +283,14 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 | `worktree-agent-general-purpose-74df511a` | `3084354` | Superseded: idea ported as `356d346`; its lambda/`Phase` scan was not taken. Safe to delete |
 
 All other agent branches are merged into `jilaton/2026-10-31-work`.
+
+### 2026-11-01 Finisher (module `finisher`, Render)
+- On a confirmed defeat (server death event id 3, or the last-hit target visibly dying) of something you hit
+  within 4 s, a built-in 3D character materialises beside the body (behind it when closer than 4.5 blocks),
+  performs Ground slam / Rising uppercut / Spin kick / Random, and dissolves. One trigger per entity (6 s gate).
+- Ground-snapped stand spot that eases after a sliding corpse; never steps past the body; first and third person.
+- 12 kill effects + None/Random (`render/finisher/KillEffects`): lightning, soul rise, blood burst, shatter, firework,
+  tornado, black hole, hearts, totem, frost, ender rift, confetti. Client-only particles and sounds.
+- Crowd (0–4): other characters run in from 5.5 blocks, stop at 2.4 and cheer. `CharacterCache.exact` keeps a
+  stand-in model from being drawn while one is baking; the cache now holds 12 models (was 4).
+- Camera shake via `SmoothCameraMixin`, which respects reduced motion. Harness scene 38. Tests: `FinisherChoreographyTest`, `AllCharactersBuildTest`.

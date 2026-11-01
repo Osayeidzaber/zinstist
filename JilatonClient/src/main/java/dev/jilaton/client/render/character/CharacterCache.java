@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 @Environment(EnvType.CLIENT)
 final class CharacterCache {
    private static final Logger LOGGER = LoggerFactory.getLogger("Jilaton Characters");
-   private static final int KEEP = 4;
+   private static final int KEEP = 12;
    private static final ForkJoinPool POOL = new ForkJoinPool(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() - 2)), pool -> {
       ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
       thread.setName("Jilaton Character Builder " + thread.getPoolIndex());
@@ -89,6 +89,22 @@ final class CharacterCache {
       entry.worn = new WornCharacter(model, entry.texture);
       shown = entry;
       return entry.worn;
+   }
+
+   /** Like {@link #ready} but never substitutes another character while this one is still baking. */
+   static WornCharacter exact(CharacterDesign design, Detail detail) {
+      CharacterCache.Entry entry = ENTRIES.get(design.id() + "/" + detail.name());
+      if (entry == null) {
+         prepare(design, detail);
+         return null;
+      }
+      if (entry.failed || entry.model == null && entry.worn == null) {
+         return null;
+      }
+      CharacterCache.Entry before = shown;
+      WornCharacter worn = ready(design, detail);
+      shown = before;
+      return worn;
    }
 
    private static WornCharacter previous() {

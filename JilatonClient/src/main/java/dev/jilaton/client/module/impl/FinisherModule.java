@@ -11,6 +11,7 @@ import dev.jilaton.client.render.finisher.FinisherChoreography;
 import dev.jilaton.client.render.finisher.FinisherChoreography.Variant;
 import dev.jilaton.client.render.finisher.FinisherGate;
 import dev.jilaton.client.render.finisher.FinisherPlacement;
+import dev.jilaton.client.render.finisher.KillEffects;
 import dev.jilaton.client.render.fx.FxEmitter;
 import dev.jilaton.client.render.fx.FxFrame;
 import dev.jilaton.client.render.fx.FxShapes;
@@ -54,6 +55,9 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     private final ChoiceSetting move = addSetting(new ChoiceSetting("move", "Finishing move", FinisherChoreography.LABELS, "Ground slam"));
     private final ChoiceSetting character = addSetting(new ChoiceSetting("character", "Character",
             FinisherFigure.characters(), FinisherFigure.characters().get(0)));
+    private final BooleanSetting showCharacter = addSetting(new BooleanSetting("show_character", "3D character", true));
+    private final ChoiceSetting killEffect = addSetting(new ChoiceSetting("kill_effect", "Kill effect", KillEffects.LABELS, "Random"));
+    private final NumberSetting crowd = addSetting(new NumberSetting("crowd", "Crowd (others join in)", 0, 4, 1, 2));
     private final ChoiceSetting targets = addSetting(new ChoiceSetting("targets", "Targets",
             List.of("Players and mobs", "Players", "Hostile mobs"), "Players and mobs"));
     private final NumberSetting speed = addSetting(new NumberSetting("speed", "Speed", 0.6, 1.6, 0.05, 1.0));
@@ -65,6 +69,8 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     private final NumberSetting shakeStrength = addSetting(new NumberSetting("shake_strength", "Shake strength", 0, 1, 0.05, 0.45));
 
     private final List<Finisher> active = new ArrayList<>();
+    private final List<Running> effects = new ArrayList<>();
+    private final float[] crowdPose = new float[FinisherChoreography.SPIN + 1];
     private final FinisherGate gate = new FinisherGate();
     private final float[] pose = new float[FinisherChoreography.SPIN + 1];
     private ClientLevel boundLevel;
@@ -110,6 +116,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     @Override
     protected void onDisable(Minecraft client) {
         active.clear();
+        effects.clear();
         gate.clear();
         shake = 0;
     }
@@ -124,6 +131,16 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         if (!character.value().equals(prepared)) {
             prepared = character.value();
             FinisherFigure.prepare(prepared);
+            // Bake the whole roster in the background so crowd members show their own model, not a stand-in.
+            for (String name : FinisherFigure.characters()) FinisherFigure.prepare(name);
+        }
+        if (client.level != null) {
+            float v = sounds.value() ? (float) volume.value() : 0F;
+            for (int i = effects.size() - 1; i >= 0; i--) {
+                Running e = effects.get(i);
+                KillEffects.tick(client.level, e.effect, e.x, e.y, e.z, e.age, v);
+                if (++e.age >= e.effect.ticks) effects.remove(i);
+            }
         }
         // Fallback for servers that don't send the death event: the target you were hitting visibly dying.
         LivingEntity last = CombatTargetTracker.lastTarget();
@@ -140,8 +157,19 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         if (since < 0 || since > ATTACK_WINDOW_SECONDS * 1e9) return;
         if (!gate.admit(entity.getId(), now)) return;
         if (player.distanceToSqr(entity) > MAX_DISTANCE_SQR) return;
+        if (!showCharacter.value()) {
+            startEffect(entity.getX(), entity.getY(), entity.getZ());
+            return;
+        }
         if (active.size() >= MAX_ACTIVE) active.remove(0);
         active.add(start(client.level, player, entity, now));
+    }
+
+    private void startEffect(double x, double y, double z) {
+        KillEffects.Effect effect = KillEffects.pick(killEffect.value());
+        if (effect == null) return;
+        if (effects.size() >= 8) effects.remove(0);
+        effects.add(new Running(effect, x, y, z, System.nanoTime()));
     }
 
     private boolean eligible(LivingEntity entity) {
@@ -158,6 +186,12 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
                 ? Variant.values()[ThreadLocalRandom.current().nextInt(Variant.values().length)]
                 : Variant.byLabel(move.value());
         Finisher f = new Finisher(entity, variant, now);
+        f.crowdAngle = ThreadLocalRandom.current().nextDouble(Math.PI * 2);
+        f.crowdSeed = ThreadLocalRandom.current().nextInt(64);
+        int members = (int) Math.round(crowd.value());
+        List<String> names = FinisherFigure.characters();
+        for (int i = 0; i < members; i++) FinisherFigure.prepare(names.get((f.crowdSeed + i + 1) % names.size()));
+        for (int i = 0; i < members; i++) FinisherFigure.prepare(names.get((f.crowdSeed + i + 2) % names.size()));
         f.corpseX = entity.getX();
         f.corpseY = entity.getY();
         f.corpseZ = entity.getZ();
@@ -247,6 +281,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
             FinisherFigure.draw(stack, context.consumers(), character.value(),
                     px - camera.x, py - camera.y, pz - camera.z, yaw, pose,
                     FinisherChoreography.scale(f.variant, t), alpha, light);
+            drawCrowd(stack, context, client.level, camera, f, t);
             if (!f.landed && t >= f.variant.impact) {
                 f.landed = true;
                 impact(client.level, f, px, pz);
@@ -255,6 +290,32 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
                     * Math.max(0, 1 - Math.sqrt(client.player == null ? 0 : client.player.distanceToSqr(px, py, pz)) / 24));
         }
         shake = cameraShake.value() && !JilatonClient.clientConfig().reducedMotion() ? peak * 0.11 * shakeStrength.value() : 0;
+    }
+
+    /** Other characters walk in from around the body, stop in a ring and cheer the finish. */
+    private void drawCrowd(PoseStack stack, WorldRenderContext context, ClientLevel level, Vec3 camera, Finisher f, float t) {
+        int count = (int) Math.round(crowd.value());
+        if (count <= 0) return;
+        List<String> names = FinisherFigure.characters();
+        float alpha = FinisherChoreography.alpha(f.variant, t);
+        for (int i = 0; i < count; i++) {
+            double angle = f.crowdAngle + (i + 0.5) * Math.PI * 2 / count;
+            float local = t - i * 0.12F;
+            if (local <= 0) continue;
+            FinisherChoreography.crowd(local, i * 1.7F, crowdPose);
+            double r = crowdPose[FinisherChoreography.FORWARD];
+            double x = f.corpseX + Math.cos(angle) * r, z = f.corpseZ + Math.sin(angle) * r;
+            double ground = groundAt(level, x, f.corpseY, z);
+            if (Double.isNaN(ground)) continue;
+            double y = ground + crowdPose[FinisherChoreography.RISE];
+            float yaw = (float) Math.toDegrees(Math.atan2(-(f.corpseX - x), f.corpseZ - z));
+            String name = names.get((f.crowdSeed + i + 1) % names.size());
+            if (name.equals(character.value())) name = names.get((f.crowdSeed + i + 2) % names.size());
+            int light = LevelRenderer.getLightColor(level, BlockPos.containing(x, y + 0.5, z));
+            float in = Math.min(1F, local / FinisherChoreography.APPEAR);
+            FinisherFigure.draw(stack, context.consumers(), name, x - camera.x, y - camera.y, z - camera.z, yaw,
+                    crowdPose, 0.92F, Math.min(alpha, in), light);
+        }
     }
 
     /** Keeps the stand spot tied to the body while it is still there (death knockback slides it), eased. */
@@ -281,6 +342,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         f.impactX = f.corpseX;
         f.impactY = f.y;
         f.impactZ = f.corpseZ;
+        startEffect(f.impactX, f.impactY, f.impactZ);
         float v = (float) volume.value();
         if (sounds.value() && v > 0) {
             switch (f.variant) {
@@ -331,6 +393,10 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     /** Ground shockwave rings and radial cracks after the hit, plus a faint ring where the character appears. */
     @Override
     public void emit(FxFrame f) {
+        for (Running e : effects) {
+            float t = (float) Math.min(1, (f.now - e.started) / (e.effect.ticks * 5e7));
+            KillEffects.draw(f, e.effect, e.x, e.y, e.z, t, e.started);
+        }
         if (active.isEmpty() || !shockwave.value()) return;
         for (Finisher fin : active) {
             if (f.distanceSqr(fin.x, fin.y, fin.z) > MAX_DISTANCE_SQR) continue;
@@ -370,10 +436,27 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         double impactX, impactY, impactZ;
         long impactAt, lastNanos;
         boolean landed;
+        double crowdAngle;
+        int crowdSeed;
 
         Finisher(LivingEntity entity, Variant variant, long started) {
             this.entity = entity;
             this.variant = variant;
+            this.started = started;
+        }
+    }
+
+    private static final class Running {
+        final KillEffects.Effect effect;
+        final double x, y, z;
+        final long started;
+        int age;
+
+        Running(KillEffects.Effect effect, double x, double y, double z, long started) {
+            this.effect = effect;
+            this.x = x;
+            this.y = y;
+            this.z = z;
             this.started = started;
         }
     }

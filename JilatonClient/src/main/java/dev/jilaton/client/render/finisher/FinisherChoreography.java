@@ -151,6 +151,36 @@ public final class FinisherChoreography {
         return k * k;
     }
 
+    /** Seconds a crowd member takes to walk in from {@link #CROWD_FROM} to {@link #CROWD_TO} blocks. */
+    public static final float CROWD_WALK = 1.1F;
+    public static final float CROWD_FROM = 5.5F;
+    public static final float CROWD_TO = 2.4F;
+
+    /**
+     * Pose for a crowd member at {@code t}: walks in with a swinging stride, slows to a stop, then cheers with
+     * both arms up and small hops. {@code phase} offsets each member so they are not in lockstep. Writes the
+     * distance from the body into {@link #FORWARD} (blocks) and the hop into {@link #RISE}.
+     */
+    public static float[] crowd(float t, float phase, float[] out) {
+        java.util.Arrays.fill(out, 0, WIDTH, 0F);
+        float walk = clamp01(t / CROWD_WALK);
+        float eased = 1F - (1F - walk) * (1F - walk);
+        out[FORWARD] = CROWD_FROM + (CROWD_TO - CROWD_FROM) * eased;
+        float stride = 1F - smoother((t - CROWD_WALK * 0.75F) / 0.3F);
+        float swing = (float) Math.sin(t * 11F + phase) * 0.9F * stride;
+        float cheer = smoother((t - CROWD_WALK) / 0.25F);
+        float bounce = (float) Math.abs(Math.sin((t - CROWD_WALK) * 7.5F + phase));
+        out[2 * 3] = -swing * (1 - cheer) - 2.85F * cheer + 0.25F * bounce * cheer;
+        out[3 * 3] = swing * (1 - cheer) - 2.85F * cheer + 0.25F * (1 - bounce) * cheer;
+        out[2 * 3 + 2] = 0.1F + 0.25F * cheer;
+        out[3 * 3 + 2] = -0.1F - 0.25F * cheer;
+        out[4 * 3] = swing * 1.1F;
+        out[5 * 3] = -swing * 1.1F;
+        out[0] = -0.25F * cheer;
+        out[RISE] = cheer * bounce * 0.22F;
+        return out;
+    }
+
     static float smoother(float t) {
         float k = clamp01(t);
         return k * k * k * (k * (k * 6F - 15F) + 10F);

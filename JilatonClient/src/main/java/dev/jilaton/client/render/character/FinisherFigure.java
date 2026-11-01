@@ -42,7 +42,7 @@ public final class FinisherFigure {
      */
     public static boolean draw(PoseStack stack, MultiBufferSource buffers, String name, double x, double y, double z,
                                float yaw, float[] angles, float scale, float alpha, int light) {
-        WornCharacter worn = CharacterCache.ready(CharacterCatalog.byName(name), Detail.MEDIUM);
+        WornCharacter worn = CharacterCache.exact(CharacterCatalog.byName(name), Detail.MEDIUM);
         if (worn == null || alpha <= 0.01F) return false;
         CharacterModel model = worn.model;
         int a = Math.round(Math.min(1F, alpha) * 255F);

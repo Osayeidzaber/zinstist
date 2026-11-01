@@ -826,6 +826,8 @@ public final class VisualVerifier {
             client.player.setXRot(15);
             enable("finisher");
             setting("finisher", "move", "Ground slam");
+            setting("finisher", "kill_effect", "Lightning");
+            setting("finisher", "crowd", 3.0);
             enable("fullbright");
             summonAhead(client, "zombie", 3.5);
         });
@@ -839,6 +841,7 @@ public final class VisualVerifier {
         then(30, () -> {
             client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
             setting("finisher", "move", "Spin kick");
+            setting("finisher", "kill_effect", "Black hole");
             summonAhead(client, "zombie", 3.5);
         });
         then(30, () -> {
@@ -847,6 +850,7 @@ public final class VisualVerifier {
             command(client, "kill @e[type=minecraft:zombie]");
         });
         shot(19, "38-finisher-spin");
+        shot(10, "38-finisher-crowd");
         then(40, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
             disable("finisher");

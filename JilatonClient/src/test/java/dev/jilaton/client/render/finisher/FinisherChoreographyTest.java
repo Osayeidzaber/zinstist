@@ -96,4 +96,27 @@ class FinisherChoreographyTest {
         assertArrayEquals(new double[]{0, 1}, new double[]{sides[4], sides[5]}, 1e-9);
         assertTrue(sides[0] * sides[2] < 0, "two candidate sides are mirrored");
     }
+
+    @Test
+    void crowdWalksInStopsAndCheersWithoutJumps() {
+        float[] prev = FinisherChoreography.crowd(0, 0, new float[WIDTH]);
+        assertEquals(FinisherChoreography.CROWD_FROM, prev[FinisherChoreography.FORWARD], 1e-4);
+        for (float t = 1F / 240F; t < 3F; t += 1F / 240F) {
+            float[] now = FinisherChoreography.crowd(t, 0, new float[WIDTH]);
+            for (int j = 0; j < WIDTH; j++) assertTrue(Math.abs(now[j] - prev[j]) < 0.12F, "crowd channel " + j + " at " + t);
+            assertTrue(now[FinisherChoreography.RISE] >= 0F);
+            prev = now;
+        }
+        float[] cheering = FinisherChoreography.crowd(2F, 0, new float[WIDTH]);
+        assertEquals(FinisherChoreography.CROWD_TO, cheering[FinisherChoreography.FORWARD], 1e-4);
+        assertTrue(cheering[2 * 3] < -2.3F && cheering[3 * 3] < -2.3F, "both arms up");
+    }
+
+    @Test
+    void killEffectLabelsCoverEveryEffect() {
+        assertEquals(KillEffects.Effect.values().length + 2, KillEffects.LABELS.size());
+        for (KillEffects.Effect e : KillEffects.Effect.values()) assertEquals(e, KillEffects.pick(e.label));
+        assertEquals(null, KillEffects.pick("None"));
+        assertTrue(KillEffects.pick("Random") != null);
+    }
 }
