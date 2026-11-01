@@ -24,7 +24,7 @@ All "INTEGRATED" items below are merged into `e6c5179` and covered by the 200-su
 | P1-6 | Media bridge must be opt-in and bounded (privacy) | Agent 4 | INTEGRATED — `MediaBridgePolicy`, `desktopMediaBridge` default false |
 | P1-7 | Spotify token file hardening (privileges, no value logging, delete on disconnect) | Agent 4 | INTEGRATED — `SpotifyTokenPolicy` + tests |
 | P1-8 | Pharaoh helmet hiding: harness scene must equip a helmet | Agent 1 (with Master) | INTEGRATED — scene 30 already equips an iron helmet ([VisualVerifier.java:646](file:///C:/Users/zaber/Desktop/zinstist/JilatonClient/src/main/java/dev/jilaton/client/dev/VisualVerifier.java#L646)); runtime-verified by `verify-30`/`30b` (hidden on, restored off). Recorded gap was stale |
-| P1-9 | ClickGUI toggle-only, persistence, status label, blur/opacity | Agent 4 | PARTIAL — blur/opacity runtime-verified; persistence still pending |
+| P1-9 | ClickGUI toggle-only, persistence, status label, blur/opacity | Agent 4 | PARTIAL — persistence is already wired (both GUIs read it in the constructor and write in `remember()`/`syncStateToConfig()` + `config.save(modules)`; card reorder writes `setModuleOrder`/`setVisualOrder`), but it is source-reviewed only, never restart-tested. Status label already reads `1/6 SW ON` with a "SW = switches on" legend (`CardMetric.java:36`, `JilatonClickGui.java:412`). Blur/opacity runtime-verified. Click-to-open-settings is unverified |
 | P1-10 | Sky Lyrics / spatial lyrics runtime check (blocked offline) | Agent 4 | BLOCKED — no lyrics lookup offline |
 | P1-11 | Radiance renders as a translucent rectangular column | Agent 2 | PARTIAL — feathered two-layer rewrite (`e9e58ec`) removed the rectangle in `verify-23-radiance.png`, but no radial glow is visible; geometry may not be drawing at all |
 | P1-12 | Target card chip row overlaps the vanilla hotbar | Agent 4 | ACTIVE — `verify-19`/`verify-20` show `FALL/ARMOR/ABSORB` on the hotbar. `HudRenderer.java:635` uses a fixed `guiHeight - 76` default that ignores the chip-row height added at line 624 |
@@ -67,8 +67,9 @@ All "INTEGRATED" items below are merged into `e6c5179` and covered by the 200-su
 1. Master: commit the harness scene 28 edit and these records (no push without user permission).
 2. Agent 2: trace one attack frame end-to-end (emit → wave list → render pass → quad submission) for
    the shockwave, then determine whether the Radiance ellipses draw at all.
-3. Agent 4: fix P1-12 target-card/hotbar overlap; then P1-9 ClickGUI persistence once the Master lands
-   the `ClientConfig` schema addition.
+3. Agent 4: fix P1-12 target-card/hotbar overlap; then P1-9's remaining acceptance — restart round trip
+   for page/category/module/expanded/scroll/order and a card-body click that opens settings. No config
+   schema work is needed; the persistence fields and their save calls already exist.
 4. Next integrated head: rerun the combined gate and the harness; refresh status/backlog with new hashes.
 
 ## Known non-goals

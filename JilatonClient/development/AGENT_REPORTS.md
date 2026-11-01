@@ -130,11 +130,18 @@ P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla ho
 
 ### Blockers
 - Lyrics unresolved offline (`lines=0`), so spatial/Sky Lyrics remain source-reviewed only.
-- P1-9 ClickGUI persistence needs a Master-owned `ClientConfig` schema addition before the lane can start.
+- P1-9 was recorded as needing a Master-owned config schema. That is stale: `ClientConfig` already
+  holds every ClickGUI field (`ui.last_page`, `last_category`, `selected_module`, `expanded_module`,
+  `enabled_only`, `search_query`, `selected_profile`, `scroll`, `scroll.<category>`, `module_order`,
+  `visual_order`) and both GUIs already read it in their constructors and write it in
+  `remember()`/`syncStateToConfig()` before `config.save(modules)` (card reorder included). What is
+  missing is evidence, not a schema: nothing has restart-tested the round trip.
 
 ### Next
-Fix P1-12 (default Y must account for the chip-row height at `HudRenderer.java:634-635`); then P3-6 HUD
-drag/scale persistence and P3-7 music HUD polish; P1-9 once the config schema lands.
+Fix P1-12 (default Y must account for the chip-row height at `HudRenderer.java:634-635`); then P1-9's
+remaining acceptance — a restart round trip for category/module/expanded/scroll/order, the card-body
+click opening settings instead of toggling, and the `1/6 ON` status label; then P3-6 drag/scale
+persistence and P3-7 music HUD polish.
 
 ## Agent 5 — Visual reference intelligence
 
