@@ -127,8 +127,10 @@ public final class TerrainWave {
      * Emits the glowing block tops of one wavefront: every cell whose centre falls inside the band gets a
      * camera-relative top face at {@code surface + 0.03}, plus a bright outline on the leading edge. Cells
      * behind the camera are culled before the height lookup, the caller's {@code corners} buffer is reused
-     * for every block, and nothing is emitted once {@code budget} cells have been spent. Returns the number
-     * of block tops emitted. Kept free of Minecraft types so the whole scan is unit-testable.
+     * for every block, and nothing is emitted once {@code budget} cells have been spent. A band with more
+     * candidates than its budget is thinned by a uniform stride over the whole arc instead of being cut off
+     * mid-scan, which would leave a one-sided partial wave. Returns the number of block tops emitted. Kept
+     * free of Minecraft types so the whole scan is unit-testable.
      */
     public static int emitBand(EffectBatch batch, HeightSampler sampler,
                                double impactX, double impactZ,
@@ -139,7 +141,20 @@ public final class TerrainWave {
         int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
         int cx = (int) Math.floor(impactX), cz = (int) Math.floor(impactZ);
         int span = (int) Math.ceil(radius + LEADING_EDGE) + 1;
-        int used = 0;
+        int stride = 1;
+        if (bandAreaBound(radius, thickness) > budget) {
+            int candidates = 0;
+            for (int dx = -span; dx <= span; dx++) {
+                for (int dz = -span; dz <= span; dz++) {
+                    double ox = cx + dx + 0.5 - impactX, oz = cz + dz + 0.5 - impactZ;
+                    double distance = Math.sqrt(ox * ox + oz * oz);
+                    if (selectsCell(ox, oz, distance, radius, thickness, forwardX, forwardZ)
+                            && frontGlow(distance, radius, thickness) * alpha >= 0.02) candidates++;
+                }
+            }
+            stride = sampleStride(candidates, budget);
+        }
+        int used = 0, candidate = 0;
         for (int dx = -span; dx <= span && used < budget; dx++) {
             for (int dz = -span; dz <= span && used < budget; dz++) {
                 int bx = cx + dx, bz = cz + dz;
@@ -148,6 +163,7 @@ public final class TerrainWave {
                 if (!selectsCell(ox, oz, distance, radius, thickness, forwardX, forwardZ)) continue;
                 double glow = frontGlow(distance, radius, thickness) * alpha;
                 if (glow < 0.02) continue;
+                if (candidate++ % stride != 0) continue;
                 double ground = sampler == null ? Double.NaN : sampler.surfaceY(bx + 0.5, bz + 0.5);
                 if (!Double.isFinite(ground)) continue;
                 used++;
@@ -171,5 +187,21 @@ public final class TerrainWave {
             }
         }
         return used;
+    }
+
+    /** Every {@code n}-th candidate keeps a band of {@code candidates} cells within {@code budget}. */
+    static int sampleStride(int candidates, int budget) {
+        if (budget <= 0 || candidates <= budget) return 1;
+        return (int) (((long) candidates + budget - 1) / budget);
+    }
+
+    /**
+     * Upper bound on the cells a band can select (whole annulus, half a cell diagonal of slack each side), so
+     * the counting pass only runs for bands that could actually exceed their budget.
+     */
+    static double bandAreaBound(double radius, double thickness) {
+        double outer = radius + LEADING_EDGE + 0.71;
+        double inner = Math.max(0, radius - Math.max(0.5, thickness) - 0.71);
+        return Math.PI * (outer * outer - inner * inner);
     }
 }

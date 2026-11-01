@@ -155,4 +155,39 @@ class TerrainWaveTest {
                 "a column without ground emits nothing");
         assertTrue(unknown.isEmpty());
     }
+
+    @Test
+    void anOverBudgetWaveIsThinnedAcrossItsWholeArcNotCut() {
+        // Three live waves at the maximum settings (radius 64, thickness 8) share 1400 cells; each needs far more.
+        double alpha = 0.9 * TerrainWave.alpha(0.9);
+        EffectBatch full = new EffectBatch();
+        int needed = TerrainWave.emitBand(full, (x, z) -> 140.0, 0, 0, 0, 143.3, 0,
+                64, 8, alpha, 0xF2F2F2, 0, 1, Integer.MAX_VALUE, new double[12]);
+        int budget = TerrainWave.MAX_BLOCKS_PER_FRAME / 3;
+        assertTrue(needed > budget, "the case must actually be over budget, needed " + needed);
+
+        EffectBatch thinned = new EffectBatch();
+        int emitted = TerrainWave.emitBand(thinned, (x, z) -> 140.0, 0, 0, 0, 143.3, 0,
+                64, 8, alpha, 0xF2F2F2, 0, 1, budget, new double[12]);
+        assertTrue(emitted <= budget && emitted >= budget / 2, "emitted " + emitted + " of " + budget);
+        // The visible arc runs from -x through +z to +x; a truncated scan starves the +x end. Every sector must
+        // keep at least half of its fair (budget / needed) share of the full-density cells.
+        int[] all = sectors(full), kept = sectors(thinned);
+        double share = (double) budget / needed;
+        for (int s = 0; s < all.length; s++) {
+            assertTrue(kept[s] >= 0.5 * share * all[s], "sector " + s + " starved: kept "
+                    + java.util.Arrays.toString(kept) + " of " + java.util.Arrays.toString(all));
+        }
+    }
+
+    /** Block tops per 30-degree sector of the half-plane in front of a camera looking along +z. */
+    private static int[] sectors(EffectBatch batch) {
+        int[] counts = new int[6];
+        for (EffectBatch.Quad quad : batch.quads()) {
+            double angle = Math.atan2(quad.az(), quad.ax());
+            if (angle < 0) continue;
+            counts[Math.min(5, (int) (angle / (Math.PI / 6)))]++;
+        }
+        return counts;
+    }
 }
