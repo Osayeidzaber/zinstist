@@ -3,91 +3,102 @@
 Canonical status record. Detailed history lives in Git. Ownership and architecture live in
 `ORCHESTRATION.md`; the module inventory lives in `IMPLEMENTATION_INVENTORY.md`.
 
-Last updated: 2026-11-01 (Master, branch `jilaton/2026-10-31-work`)
+Last updated: 2026-11-01 06:05 (Master, branch `jilaton/2026-10-31-work`)
 
 ## Repository state
 
-- HEAD: `d0f9e37` — "Integrate lane 4: media bridge opt-in, music privacy, screenshot reveal"
-  (branch is 8 commits ahead of `origin/jilaton/2026-10-31-work`; nothing pushed).
-- Integration commits: `27c8c61` (lane 1), `b7627c7` (lane 2), `0bbfe12` (lane 3),
-  `d0f9e37` (lane 4). Lane commits: `2a2ca43`, `b902c7b`, `56b5700`, `ecbc1b2`.
+- HEAD: `e6c5179` — "Integrate lane 3: wing fan and companion handedness".
+  History below it: `e9e58ec` (lane 2), `956cfa5` (lane 1), `24e9ce9` (lane 4), `5d47db9` (handover).
+- Branch is **10 commits ahead of `origin/jilaton/2026-10-31-work`**; nothing pushed since the
+  device switch. Push needs explicit user permission.
 - `main` (`f11bfff`) is old and must not be merged.
-- Working tree: only this file, `BACKLOG.md` and `.qoder/` are untracked; no source edits pending.
+- Working tree: one modified source file, `dev/VisualVerifier.java` (Master-owned harness scene 28:
+  `world_wave_radius` 44 → 21, `shot(12)` → `shot(4)`), plus untracked `.qoder/`.
 - Lane worktrees under `.qoder/worktrees/agent-general-purpose-*` are retained at their lane
   commits; all four lane branches are fully merged into HEAD.
-- Environment: Windows 10 x64 (the brief's macOS assumption does not apply), Temurin 21,
-  Gradle 9.8.2 wrapper, Fabric Loader 0.20.1 / Fabric API 0.141.6 / Loom 1.14.10, Java 21.
+- Environment: Windows 10 x64, Temurin 21, Gradle 9.8.2 wrapper, Fabric Loader 0.20.1 /
+  Fabric API 0.141.6 / Loom 1.14.10, Minecraft 1.21.11.
 
 ## Verification levels
 
 `SOURCE_REVIEWED` → `BUILD_VERIFIED` → `AUTOMATED_TESTED` → `RUNTIME_VERIFIED`.
-A green unit test never proves a mixin applies; a `BUILD SUCCESSFUL` never proves runtime behaviour.
+A green unit test never proves a mixin applies; `BUILD SUCCESSFUL` never proves runtime behaviour.
 
-## Gates on the integrated tree (`d0f9e37`)
+## Gates on the integrated tree
 
-- Automated gate: **195 suites / 905 tests / 0 failures / 0 errors / 0 skipped**
-  (isolated lane `m`, recounted from the JUnit XML on 2026-11-01).
-- Artifacts: `jilaton-client-0.1.0.jar` SHA-256
-  `e6e54efb2a3ea3bc9d5844801eef79024d865c00af80e5861c9ef2148b25fd9f`;
-  sources jar `2440d660b7e49b2ccd6a78ca1cc3b2252c31d371f8ae34c706601904963e9d1b`.
-  These hashes are the only answers that carry the counts above.
-- Runtime harness: `runVisualVerify` on `d0f9e37` → `BUILD SUCCESSFUL in 3m 27s`, exit 0,
-  log `C:/tmp/jilaton-arch/verify-run-20261101.log`, auto-quit after 32 scenes.
-  **96 screenshots regenerated** in `run-verify/screenshots/` (120 files total incl. older run).
-- Boot log: **no `InvalidMixinException`, no failed injection, no `BootstrapMethodError`,
-  no `NoSuchMethodError`, no `ClassCastException`**. `LightTextureFullbrightMixin` applied live.
+- Automated gate on `e6c5179` (isolated build dir `o`): **200 suites / 935 tests / 0 failures /
+  0 errors / 0 skipped**, recounted from `.isolated-build-o/root/test-results/test/TEST-*.xml`.
+  Every XML shares mtime 2026-11-01 05:52:08, i.e. one build, postdating the lane merges.
+  Log: `C:/tmp/jilaton-arch/integration-merged.log`.
+- Artifact built from `e6c5179` **plus the uncommitted `VisualVerifier` scene edit**:
+  `.isolated-build-o/root/libs/jilaton-client-0.1.0.jar` (9,772,837 bytes),
+  SHA-256 `fcf899862bf6e2864534300ba27f1b97e385c30f3933e31fbd6579d1534266c1`, built 05:59
+  (`C:/tmp/jilaton-arch/jar-merged.log`). No sources jar was produced.
+  Because the harness scene edit is in this jar, the hash belongs to that state — not to bare `e6c5179`.
+- Runtime harness: `runVisualVerify` on the same tree → `BUILD SUCCESSFUL in 3m 59s`, exit 0,
+  32 scenes, **96 screenshots regenerated** (124 files total in `run-verify/screenshots/`),
+  log `C:/tmp/jilaton-arch/harness-merged.log`, auto-quit.
+- Boot log: no `InvalidMixinException`, no failed injection, no `BootstrapMethodError`,
+  no `NoSuchMethodError`, no `ClassCastException`, no `ERROR` line. Fullbright mixin applied live.
 
 ## Runtime verdicts on the integrated build (this run)
 
 | Area | Verdict | Evidence |
 |---|---|---|
-| Fullbright | **RUNTIME_VERIFIED** | `verify-26-fullbright-off.png` near-black vs `26b-on` clearly lit night plaza; log shows `options.gamma()` unchanged. |
-| Screenshot Copy | **RUNTIME_VERIFIED** | Log `[System] [CHAT] Copied screenshot` at 05:15:22 (scene 31). |
-| FreeLook + KillAura | **BROKEN** | Exactly one ERROR: `module free_look disabled itself while it was being tested` (05:15:28). Telemetry: `bodyYaw`/`headYaw` driven to −90° while `cameraYaw` stayed −12°, then self-disable. |
-| HUD right column (JA-009) | **BROKEN** | `verify-20-hud-full.png`: `Music Center`, `Music Visuals`, `Teams` text overlaps the `POTION EFFECTS / Resistance 256` panel. |
-| Terrain shockwave | **NOT VISIBLE** | `verify-28b-terrain-wave-wide.png`: flat plaza, no wavefront in any frame of the attack sequence. |
-| Radiance | **BROKEN** | `verify-23-radiance.png`: tall translucent rectangular column around the player, not a radial glow. |
-| Pharaoh helmet hiding | **RUNTIME_VERIFIED** | Scene 30 equips `minecraft:iron_helmet` ([VisualVerifier.java:646](file:///C:/Users/zaber/Desktop/zinstist/JilatonClient/src/main/java/dev/jilaton/client/dev/VisualVerifier.java#L646)); `verify-30-pharaoh-helmet-on.png` hides the helmet under the Nemes headdress, `verify-30b-pharaoh-helmet-off.png` shows it restored. The earlier "never equips a helmet" record was stale. |
-| Spatial / Sky Lyrics | **BLOCKED** | No lyrics resolved offline (`lines=0`, lookup failed). |
-| Ambience sky tint | **OBSERVED, UNTESTED** | `verify-29-ambience-sky.png` warm sky; precedence vs CustomSky still to be regression-tested. |
-| ClickGUI, block outline, afterglow, CustomSky galaxy | Baseline-verified at `69cf5df`; scenes recaptured here but not individually re-inspected | `verify-14/15/16/17/18*`, `21`, `24`, `07*`. |
+| HUD right column (JA-009) | **RUNTIME_VERIFIED FIXED** | In `verify-19-hud-minimal.png` and `verify-20-hud-full.png` the module list ends ≈y205 and `POTION EFFECTS / Resistance 256` starts ≈y232 — clean gap, no overlap. |
+| FreeLook + KillAura | **RUNTIME_VERIFIED FIXED** (harness scope) | `verify-32-freelook-killaura.png` is a coherent third-person view. Log: `enabled free_look -> true`, 24 `aura-freelook` ticks, `bodyYaw` −24 → −90, `cameraYaw=0.0` throughout, **no** self-disable ERROR. Caveat: the harness drives body yaw, so camera-only behaviour is not yet asserted. |
+| Target card chips | **NEW DEFECT — overlaps vanilla hotbar** | `verify-19`/`verify-20`: the `FALL / ARMOR / ABSORB` chip strip sits on the hotbar. Source: `HudRenderer.java:635` fixed default `guiHeight - 76` ignores the chip-row height added by `HudDesign.baseTargetCard(chips, heldVisible)` at line 624. |
+| Terrain shockwave | **STILL NOT VISIBLE** | `verify-28-terrain-wave.png` and `verify-28b-terrain-wave-wide.png` show an empty plaza with only brown impact debris; no wavefront, even with radius 21 and the earlier capture. |
+| Radiance | **PARTIAL** | `verify-23-radiance.png`: the tall translucent rectangular column is gone, but no clear radial glow is discernible around the player. |
+| Fullbright | **RUNTIME_VERIFIED** | `verify-26-fullbright-off.png` near-black vs `26b-on` clearly lit; log shows `options.gamma()` unchanged. |
+| Screenshot Copy | **RUNTIME_VERIFIED** | Log `[System] [CHAT] Copied screenshot` (scene 31). |
+| Pharaoh helmet hiding | **RUNTIME_VERIFIED** | Scene 30 equips `minecraft:iron_helmet` ([VisualVerifier.java:646](file:///C:/Users/zaber/Desktop/zinstist/JilatonClient/src/main/java/dev/jilaton/client/dev/VisualVerifier.java#L646)); `verify-30` hides it under the Nemes headdress, `30b` restores it. |
+| Spatial / Sky Lyrics | **BLOCKED** | No lyrics resolved offline (`lines=0`). |
+| Ambience sky tint | **OBSERVED, UNTESTED** | `verify-29-ambience-sky.png` warm sky; precedence vs CustomSky still untested. |
+| ClickGUI, block outline, afterglow, CustomSky galaxy | Baseline-verified at `69cf5df`; recaptured here but not individually re-inspected | `verify-14/15/16/17/18*`, `21`, `24`, `07*`. |
 
 ## Open defects (priority order)
 
-1. **P1 — FreeLook self-disables mid-scene.** Root cause undiagnosed; needs systematic debugging
-   (state save/restore around `Player#setYRot`, camera yaw vs body yaw ownership). Owner: Agent 1.
-2. **P1 — HUD right column overlaps Potion Effects (JA-009).** Layout collision in the full HUD
-   preset. Owner: Agent 4.
-3. **P2 — Terrain shockwave invisible at runtime.** `TerrainWave` is source-reviewed and its bounds
-   test passes, but no geometry reaches the frame. Check trigger, lifetime and render pass.
-   Owner: Agent 2.
-4. **P3 — Radiance renders as a translucent rectangular column.** Owner: Agent 2 unless the
-   geometry proves to be owned by the character renderer, then Agent 3.
+1. **P1 — Target card chip row overlaps the hotbar.** Default Y is fixed at `guiHeight - 76` and does
+   not grow with `HudDesign.baseTargetCard`'s chip row. Owner: **Agent 4**
+   (`gui/HudRenderer.java`, `gui/HudDesign.java`). Not yet a shipped-bug declaration — owner must confirm.
+2. **P2 — Terrain shockwave still invisible at runtime.** Lifetime culling is fixed
+   (`TerrainWave.impactLife` ≥ 1.6 s) and the front-band selection is tested, yet no geometry reaches
+   the frame. Next step is a render-pass trace for one attack frame, not another budget change.
+   Owner: **Agent 2**.
+3. **P3 — Radiance has no visible radial glow.** The six-face shell artefact is gone; whether the two
+   feathered ellipse layers draw at all is unresolved. Owner: **Agent 2**.
+4. **P1 — ClickGUI persistence** (toggle-only, last category/module, expanded state, scroll). Owner:
+   **Agent 4**; needs a Master-owned `ClientConfig` schema addition first.
 5. **Environment limitation — lyrics unverified offline.** Owner: Agent 4, blocked.
 6. **P5 — hot-path allocations.** `HitEffectsModule` per-block `TerrainWave.blockTop` allocation and
-   the 1400-cell grid vs 240/frame cap; `SpatialLyricsModule` per-frame allocations.
-   Owners: Agent 2 and Agent 4 respectively; must not regress the visual fixes.
+   the 1400-cell grid vs 240/frame cap; `SpatialLyricsModule` per-frame allocations. Owners: Agent 2
+   and Agent 4; must not regress the visual fixes.
 
 ## Lane state
 
 | Lane | Worktree branch | State |
 |---|---|---|
-| Agent 1 modules/mixins | `worktree-agent-general-purpose-d8fe6c58` (`2a2ca43`) | **INTEGRATED** in `27c8c61`; Fullbright runtime-proven, FreeLook still broken. |
-| Agent 2 world FX | `worktree-agent-general-purpose-122e9e8e` (`b902c7b`) | **INTEGRATED** in `b7627c7`; sky insets and budgets in, shockwave not visible. |
-| Agent 3 models | `worktree-agent-general-purpose-4da0c1e7` (`56b5700`) | **INTEGRATED** in `0bbfe12`; GLB selection, cache stamping, local rotation. |
-| Agent 4 GUI/HUD/music | `worktree-agent-general-purpose-5ab277c3` (`ecbc1b2`) | **INTEGRATED** in `d0f9e37`; media bridge opt-in, screenshot reveal. |
+| Agent 1 modules/mixins | `worktree-agent-general-purpose-389712d8` (`ec77a80`) | **INTEGRATED** in `956cfa5`; hold-key edge policy in, FreeLook no longer self-disables at runtime. |
+| Agent 2 world FX | `worktree-agent-general-purpose-15d1682f` (`d008267`) | **INTEGRATED** in `e9e58ec`; lifetime + feathered aura in; shockwave and glow still unproven. |
+| Agent 3 models | `worktree-agent-general-purpose-9a155ccd` (`61aa076`) | **INTEGRATED** in `e6c5179`; wing/companion handedness fixed, `Transform.mirrorX`. |
+| Agent 4 GUI/HUD/music | `worktree-agent-general-purpose-60ae4d60` (`f1cd094`) | **INTEGRATED** in `24e9ce9`; HUD column stacking runtime-verified; target-card overlap found. |
 | Agent 5 visual reference | — | Idle by design; no user references queued. |
+
+No lane agent is currently running. The task list holds only the Master's open item (harness + gate).
 
 ## Open risks
 
 - Shared build cache: every gate must use the isolated init script and the shared lock
   (`C:/tmp/jilaton-arch/.build.lock`). Concurrent builds clobber the Loom cache.
-- Counts and hashes above describe one tree state (`d0f9e37`) only; any later edit invalidates them.
+- Counts and hashes above describe one tree state only (`e6c5179` + the harness edit); any later edit
+  invalidates them. The harness edit is not yet committed.
 - The `run-verify` world is a 163 MB copy of the user's save; the original is untouched.
 - New or changed mixins need a live boot log every time, not just a green compile.
 - Cross-owner edits: only the owning lane may touch `ClientConfig`, mixins and shared HUD code.
 
 ## Next milestone
 
-Fix P1 (FreeLook state, HUD overlap) on fresh lane branches, rerun the combined gate and the
-harness on the merged tree, then address the shockwave and Radiance rendering defects.
+Commit the harness scene edit and these records; then hand Agent 2 the shockwave render-pass trace and
+Agent 4 the target-card overlap plus ClickGUI persistence (after the Master-owned config schema), and
+rerun the gate and harness on the next integrated head.

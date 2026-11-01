@@ -2,22 +2,22 @@
 
 One line per item. Status: TODO / ACTIVE / PARTIAL / INTEGRATED / BLOCKED.
 Ownership boundaries are defined in `ORCHESTRATION.md`; only the owner edits the files.
-All "INTEGRATED" items below are merged into `d0f9e37` and covered by the 195-suite gate.
+All "INTEGRATED" items below are merged into `e6c5179` and covered by the 200-suite / 935-test gate.
 
 ## P0 — Stability
 
 | ID | Item | Owner | Status |
 |---|---|---|---|
 | P0-1 | Protect lane work; isolate builds, game dirs, logs | Master | INTEGRATED — lanes merged, isolated build dirs used throughout |
-| P0-2 | Combined gate on the integrated tree | Master | INTEGRATED — 195 suites / 905 tests / 0 failures on `d0f9e37` |
+| P0-2 | Combined gate on the integrated tree | Master | INTEGRATED — 200 suites / 935 tests / 0 failures / 0 errors / 0 skipped on `e6c5179`; jar SHA-256 `fcf89986…66c1` |
 | P0-3 | Boot-prove `LightTextureFullbrightMixin` (`remap = false`, `require = 1`) | Agent 1 | INTEGRATED — no mixin errors in the 2026-11-01 run; Fullbright runtime-proven |
 
 ## P1 — Broken functionality
 
 | ID | Item | Owner | Status |
 |---|---|---|---|
-| P1-1 | FreeLook self-disables during the KillAura/FreeLook scene | Agent 1 | ACTIVE — telemetry: body/head yaw → −90°, camera yaw pinned at −12°, then self-disable at scene end |
-| P1-2 | HUD right column overlaps Potion Effects (JA-009) | Agent 4 | ACTIVE — `verify-20-hud-full.png` reproduces on the integrated build |
+| P1-1 | FreeLook self-disables during the KillAura/FreeLook scene | Agent 1 | INTEGRATED — edge-based hold policy (`956cfa5`); `verify-32` has no self-disable ERROR and FreeLook stays on for all 24 ticks. Camera-only behaviour still unasserted (harness drives body yaw) |
+| P1-2 | HUD right column overlaps Potion Effects (JA-009) | Agent 4 | INTEGRATED — `verify-19`/`verify-20` show a clean gap between the module list and POTION EFFECTS |
 | P1-3 | Fullbright mapping warning / silent miss | Agent 1 | INTEGRATED — runtime-verified (off/on comparison) |
 | P1-4 | Custom GLB selection chain (JA-003) plus `.gltf` rejection message | Agent 3 | INTEGRATED — `CharacterCatalog.refresh`, cache stamping, regression tests |
 | P1-5 | Model frame handedness: `Transform.spin` for local rotations | Agent 3 | INTEGRATED — `Transform.localRotation/spin` + `TransformMathTest` |
@@ -26,7 +26,8 @@ All "INTEGRATED" items below are merged into `d0f9e37` and covered by the 195-su
 | P1-8 | Pharaoh helmet hiding: harness scene must equip a helmet | Agent 1 (with Master) | INTEGRATED — scene 30 already equips an iron helmet ([VisualVerifier.java:646](file:///C:/Users/zaber/Desktop/zinstist/JilatonClient/src/main/java/dev/jilaton/client/dev/VisualVerifier.java#L646)); runtime-verified by `verify-30`/`30b` (hidden on, restored off). Recorded gap was stale |
 | P1-9 | ClickGUI toggle-only, persistence, status label, blur/opacity | Agent 4 | PARTIAL — blur/opacity runtime-verified; persistence still pending |
 | P1-10 | Sky Lyrics / spatial lyrics runtime check (blocked offline) | Agent 4 | BLOCKED — no lyrics lookup offline |
-| P1-11 | Radiance renders as a translucent rectangular column | Agent 2 (to Agent 3 if character geometry) | ACTIVE — `verify-23-radiance.png` reproduces on the integrated build |
+| P1-11 | Radiance renders as a translucent rectangular column | Agent 2 | PARTIAL — feathered two-layer rewrite (`e9e58ec`) removed the rectangle in `verify-23-radiance.png`, but no radial glow is visible; geometry may not be drawing at all |
+| P1-12 | Target card chip row overlaps the vanilla hotbar | Agent 4 | ACTIVE — `verify-19`/`verify-20` show `FALL/ARMOR/ABSORB` on the hotbar. `HudRenderer.java:635` uses a fixed `guiHeight - 76` default that ignores the chip-row height added at line 624 |
 
 ## P2 — Reference integration
 
@@ -48,7 +49,7 @@ All "INTEGRATED" items below are merged into `d0f9e37` and covered by the 195-su
 | P3-6 | HUD scaling, drag persistence, Target HUD scaling | Agent 4 | TODO |
 | P3-7 | Music HUD artwork/title, first-person info, lyric smoothing | Agent 4 | TODO |
 | P3-8 | Cosmetic column over legs; model attachment review | Agent 3 | TODO |
-| P3-9 | Terrain shockwave must actually render a wavefront | Agent 2 | ACTIVE — `verify-28b-terrain-wave-wide.png` shows no geometry |
+| P3-9 | Terrain shockwave must actually render a wavefront | Agent 2 | ACTIVE — lifetime and front-band fixes are integrated (`e9e58ec`), yet `verify-28`/`28b` at radius 21 still show no geometry. Next step is a render-pass trace, not another budget change |
 
 ## P4/P5 — Features, performance, release
 
@@ -63,11 +64,12 @@ All "INTEGRATED" items below are merged into `d0f9e37` and covered by the 195-su
 
 ## Integration queue
 
-1. Agent 1: FreeLook hold-key revocation root cause; fix + scene 32 harness adjustment (Master owns `VisualVerifier`).
-2. Agent 4: HUD right-column layout collision (JA-009).
-3. Agent 2: terrain shockwave trigger/lifetime/render-pass; Radiance geometry.
-4. Agent 3: ViewModel / SwingAnimation transform coordination.
-5. Combined gate + harness rerun; status and backlog refresh with new hashes.
+1. Master: commit the harness scene 28 edit and these records (no push without user permission).
+2. Agent 2: trace one attack frame end-to-end (emit → wave list → render pass → quad submission) for
+   the shockwave, then determine whether the Radiance ellipses draw at all.
+3. Agent 4: fix P1-12 target-card/hotbar overlap; then P1-9 ClickGUI persistence once the Master lands
+   the `ClientConfig` schema addition.
+4. Next integrated head: rerun the combined gate and the harness; refresh status/backlog with new hashes.
 
 ## Known non-goals
 

@@ -1,124 +1,140 @@
 # Jilaton — Agent Progress
 
 Compact per-agent records. History lives in Git; status in `PROJECT_STATUS.md`; work queue in
-`BACKLOG.md`. All four lanes are merged into `d0f9e37`; no agent is running right now.
+`BACKLOG.md`. All four lanes are merged into `e6c5179`; no agent is running right now.
 
 ## Agent 1 — Core modules, mixins, source integration
 
 ### Active Task
-P1-1 — FreeLook self-disables during the KillAura/FreeLook scene (diagnosis, not patched).
+None. P1-1 is integrated and runtime-verified within harness scope; P2-1/P2-3 remain the next queue item.
 
 ### Completed
 - P0-3 — `LightTextureFullbrightMixin` corrected (`remap = false`, `require = 1`); boot-proven.
+- P1-1 — hold-key revocation root cause found and fixed: `ModuleManager` revoked hold modules every
+  tick the physical key was up, before FreeLook's own tick. `HoldKeyAction` is now a pure edge decision
+  (`unfocused → disable`, `press → enable`, `release → disable`, `no edge → unchanged`).
+  `HoldKeyPolicyTest` covers all five cases and fails 2/5 with the old rule restored.
 - P1-3 — Fullbright fixed and runtime-verified against the baseline defect.
 - P2-2 — `ReachMath` protocol caps; AutoClicker `delayAfterBlockBreak` guard preserves the
   first-click sentinel semantics (`Long.MIN_VALUE`).
-- FreeLook state-loss fix landed (state saved/restored across enable/disable) but the module
-  still self-disables mid-scene, so the defect is not closed.
 - Registry/persistence audit tests added (P2-3 partial).
 
 ### Changed Files
 - `mixin/LightTextureFullbrightMixin.java`, `mixin/PlayerReachMixin.java`
-- `module/impl/ReachMath.java`, `module/impl/FreeLookModule.java`, `module/impl/AutoClickerModule.java`
-- `module/impl/AutoClickerPolicy.java`, `module/impl/ReachMathTest.java`, audit test classes
+- `module/impl/HoldKeyAction.java`, `FreeLookModule.java`, `ModuleManager.java`,
+  `ReachMath.java`, `AutoClickerModule.java`, `AutoClickerPolicy.java`, `HoldKeyPolicyTest.java`
 
 ### Verification
-- Automated: lane gate green before merge; merged gate 195 suites / 905 tests / 0 failures.
-- Runtime: Fullbright `verify-26` vs `26b` proves off/on difference.
-- Runtime: FreeLook ERROR reproduced on the integrated build with body/head yaw telemetry.
+- Automated: lane gate 196/910 green; merged gate 200 suites / 935 tests / 0 failures on `e6c5179`.
+- Runtime: `verify-32-freelook-killaura.png` — FreeLook stays enabled for all 24 telemetry ticks,
+  `bodyYaw` driven −24 → −90 while `cameraYaw=0.0`, and **no** `module free_look disabled itself` ERROR.
 
 ### Blockers
-- FreeLook root cause unknown. Evidence: `bodyYaw`/`headYaw` follow the aura to −90° while
-  `cameraYaw` stays −12°, then the module disables itself at scene end. Reproduce and diagnose
-  before changing code.
+- None for P1-1. Residual: the harness drives body yaw, so FreeLook's camera-only behaviour is still
+  unasserted; a first-person capture would settle it. Intentional consequence of the fix: a hold module
+  that disables itself stays off until the key is released and pressed again.
 
 ### Next
-P1-1 diagnosis; then P1-8 harness scene that equips a helmet; then P2-1/P2-3 module sweep.
+P2-1 reference inventory sweep, then P2-3 module registry/lifecycle completeness review.
 
 ## Agent 2 — World rendering and visual effects
 
 ### Active Task
-P3-9 — terrain shockwave does not render; P1-11 Radiance rectangular column.
+P3-9 — shockwave renders no geometry at runtime; P1-11 Radiance shows no radial glow. Diagnosis only,
+no lane branch open.
 
 ### Completed
-- P3-1 — sky UV insets derived from real texture sizes (JA-018) + `SkyInsetVerificationTest`.
-- Lyric fade/`LyricStates` and world-FX budget work (`WorldFxBoundsTest`).
-- `FxParticles`/`FxShapes`/`FxFrame`/`TerrainWave` source-reviewed and gated.
+- P3-8 wave lifetime: `TerrainWave.impactLife(life) = max(life*1.2, 1.6 s)` so a wave survives its whole
+  sweep; one reused `double[12]` buffer; per-wave `blockBudget(liveWaves)` keeping ≤1400 quads/frame;
+  front-band selection extracted to `TerrainWave.selectsCell(...)`.
+- P1-11 geometry: replaced the six-face AABB shell with two feathered camera-facing elliptical layers
+  (`FxShapes.softEllipse`, `auraFeather`, `auraExtents`); `softDot` now delegates to `softEllipse`.
+- P3-1 — sky UV insets from real texture sizes (JA-018) + `SkyInsetVerificationTest` (earlier lane).
+- Ledger tests: `WaveLifetimeTest`, `WorldFxBoundsTest`, `RadianceAuraTest`.
 
 ### Changed Files
-- `render/fx/FxFrame.java`, `FxParticles.java`, `FxShapes.java`, `LyricSky.java`,
-  `LyricStates.java`, `LyricTrail.java`, `SkyPackTextures.java`, `TerrainWave.java`
-- `SkyInsetVerificationTest.java`, `SkyLyricsFadeTest.java`, `WorldFxBoundsTest.java`
+- `render/fx/TerrainWave.java`, `FxShapes.java`, `HitEffectsModule.java`, `RadianceModule.java`
+- Lane-side test classes `WaveLifetimeTest`, `RadianceAuraTest`
 
 ### Verification
-- Automated: merged gate green.
-- Runtime: sky scenes recaptured; `verify-28b-terrain-wave-wide.png` shows no wavefront;
-  `verify-23-radiance.png` shows the translucent column.
+- Automated: lane gate 196/912 green; merged gate 200/935 on `e6c5179`.
+- Runtime: `verify-28` and `verify-28b` (radius 21, capture moved to `shot(4)`) still show an empty plaza
+  with only brown impact debris — **no wavefront**. `verify-23-radiance.png` no longer shows the
+  translucent rectangle, but no radial glow is discernible either.
 
 ### Blockers
-- Shockwave: unknown whether the trigger, lifetime or render pass fails; must trace one attack
-  frame end-to-end. `<verify-28>` was captured third-person on a flat plaza.
+- Both defects now look like "the effect does not reach the frame at all" rather than wrong parameters.
+  The lifetime and budget hypotheses are already excluded by the lane work, so the next step is a
+  render-pass trace (module tick → wave list → render hook → quad submission) for one attack frame.
 
 ### Next
-Diagnose shockwave then Radiance geometry; then P3-2 TargetESP link and P3-4 Ambience precedence.
+Trace one attack frame end-to-end; then confirm whether the Radiance ellipses are submitted at all;
+then P3-2 TargetESP link and P3-4 Ambience precedence.
 
 ## Agent 3 — 3D models and character animation
 
 ### Active Task
-None running; P3-5 / P3-8 remain open.
+None running. P3-5 (ViewModel/SwingAnimation coordination) and P3-8 attachment review remain open.
 
 ### Completed
-- P1-4 — custom GLB selection chain (JA-003), `.gltf` rejection message, cache stamping
-  (`BAKE_VERSION 3`, `cacheId(name,size,mtime)`), `CharacterCatalog.refresh(Path)`.
+- P3-5 audit — no double-transform defect: the mapped 1.21.11 `ItemInHandRenderer` has exactly one
+  push/pop pair in `renderArmWithItem` and the ViewModel hook is injected right after the push.
+- P3-5 fixes — wing fan no longer mirrors across the spine; companion parts share one handedness
+  (`CompanionMotion.bankedFrame/ringFrame/shardFrame`, `WingMotion.featherFrame`,
+  `FEATHER_SWEEP_BACK = -0.16`); added `Transform.mirrorX()`, `lookAlong`, `spin`.
+- P1-4 — custom GLB selection chain (JA-003), `.gltf` rejection message, cache stamping.
 - P1-5 — `Transform.localRotation`/`spin`; `BodyAnchor`/`KnifeThirdPerson` handedness fix.
-- Five regression test classes added (selection, cache lifecycle, transform math).
 
 ### Changed Files
 - `render/character/CharacterCatalog.java`, `CustomCharacters.java`, `CharacterCache.java`
-- `render/model/Transform.java`, `BodyAnchor.java`, `KnifeThirdPerson.java`
-- `CharacterModule.java`; `GlbSelectionRegressionTest`, `CharacterCacheLifecycleTest`,
-  `TransformMathTest`
+- `render/model/Transform.java`, `BodyAnchor.java`, `KnifeThirdPerson.java`, `CompanionMotion.java`,
+  `WingMotion.java`
+- `FirstPersonTransformCoordinationTest` (5), `EffectFrameOrientationTest` (6)
 
 ### Verification
-- Automated: merged gate green.
-- Runtime: cosmetic scenes recaptured; model insertion itself not re-judged in this phase.
+- Automated: lane gate 197/917 green; merged gate 200/935 on `e6c5179`.
+- Runtime: cosmetic scenes recaptured in this run; not re-judged individually.
 
 ### Blockers
-- Out-of-lane `.rotate` call sites remain (`WingsModule:117`, `CompanionModule:125/130/140`, and
-  `CompanionModule:131` `compose(Transform.rotation(...))`); ownership review before edits.
+- Documented product gaps, not fixed: `FirstPersonHandsAndItemsMixin` only replaces `swingArm`, so the
+  empty-hand inline swing never gets a SwingAnimations style; `KnifeViewmodelMixin` HEAD-cancels
+  `renderArmWithItem`, bypassing ViewModel and swing styles.
 
 ### Next
-P3-5 ViewModel/SwingAnimation transform coordination; then P3-8 attachment review.
+P3-5 remainder (the two bypassing mixins), then P3-8 cosmetic attachment review.
 
 ## Agent 4 — GUI, HUD and music
 
 ### Active Task
-P1-2 — HUD right column overlaps the Potion Effects panel (JA-009).
+P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla hotbar.
 
 ### Completed
+- P1-2 (JA-009) — HUD right column: module list → potion effects → CPS form one column, bottom-right
+  chain stacked upward from `guiHeight - 8`; `HudColumnStackTest` pins `effects.top == modules.bottom + 6`.
 - P1-6 — media bridge opt-in (`MediaBridgePolicy`, `desktopMediaBridge` default false).
 - P1-7 — Spotify token hardening (`SpotifyTokenPolicy`, no value logging, delete on disconnect).
-- Screenshot Copy verified at runtime; `ScreenshotReveal` added for the Open path.
-- `MusicCenter`/`MusicCenterScreen` lyric smoothing work; blur/opacity verified earlier.
+- Screenshot Copy runtime-verified; `ScreenshotReveal` added for the Open path.
 
 ### Changed Files
+- `gui/HudRenderer.java`, `gui/HudDesign.java`, `gui/HudPreset.java`
 - `music/MediaBridgePolicy.java`, `MediaSessionSource.java`, `SpotifyTokenPolicy.java`,
   `SpotifyConnect.java`, `OnlineLyrics.java`, `MusicCenter.java`, `MusicCenterScreen.java`
 - `config/ClientConfig.java`, `JilatonClient.java`, `screenshot/ScreenshotReveal.java`
-- six privacy/screenshot test classes
+- `HudColumnStackTest`, rewritten `MusicHudOverlapTest`, privacy/screenshot test classes
 
 ### Verification
-- Automated: merged gate green.
-- Runtime: `[CHAT] Copied screenshot` in scene 31; `verify-20-hud-full.png` reproduces JA-009.
+- Automated: merged gate 200/935 on `e6c5179`.
+- Runtime: `verify-19-hud-minimal.png` and `verify-20-hud-full.png` show the module list ending ≈y205
+  and `POTION EFFECTS` starting ≈y232 — P1-2 fixed. The same frames also show the chip row sitting on
+  the hotbar (P1-12). Log has `[CHAT] Copied screenshot` for scene 31.
 
 ### Blockers
-- Lyrics still unresolved offline (`lines=0`), so spatial/Sky Lyrics remain source-reviewed only.
-- Follow-ups: `MusicCenterModule` `online_lyrics` should default false; `ScreenshotClickMixin`
-  OPEN_ID branch needs pairing with `ScreenshotChatActions.handleOpen` + `ScreenshotReveal.reveal`;
-  `attachConfig` wiring needs a note in the config owner's record.
+- Lyrics unresolved offline (`lines=0`), so spatial/Sky Lyrics remain source-reviewed only.
+- P1-9 ClickGUI persistence needs a Master-owned `ClientConfig` schema addition before the lane can start.
 
 ### Next
-Fix the HUD column layout, then ClickGUI persistence (P1-9) and music HUD polish (P3-7).
+Fix P1-12 (default Y must account for the chip-row height at `HudRenderer.java:634-635`); then P3-6 HUD
+drag/scale persistence and P3-7 music HUD polish; P1-9 once the config schema lands.
 
 ## Agent 5 — Visual reference intelligence
 

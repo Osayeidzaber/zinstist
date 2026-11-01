@@ -590,7 +590,7 @@ public final class VisualVerifier {
             setting("hit_effects", "preset", "Custom");
             setting("hit_effects", "trigger", "Attack attempts");
             setting("hit_effects", "style_world_wave", true);
-            setting("hit_effects", "world_wave_radius", 44.0);
+            setting("hit_effects", "world_wave_radius", 21.0);
             setting("hit_effects", "style_sparks", false);
             setting("hit_effects", "style_ripple", false);
             enable("hit_effects");
@@ -605,7 +605,7 @@ public final class VisualVerifier {
             client.player.swing(InteractionHand.MAIN_HAND);
         });
         shot(6, "28-terrain-wave");
-        shot(12, "28b-terrain-wave-wide");
+        shot(4, "28b-terrain-wave-wide");
         then(3, () -> {
             disable("hit_effects");
             command(client, "kill @e[type=minecraft:zombie]");
