@@ -4,7 +4,7 @@ Central source of truth for the next developer or agent. Written at the end of t
 session, after consolidating every lane into one branch. Detailed history lives in Git; the older
 `JilatonClient/development/*.md` files are kept as history and are **not** the current state.
 
-Last updated: 2026-11-01 06:55 (branch `jilaton/2026-10-31-work`, pre-handover head `6c552eb`)
+Last updated: 2026-11-01 07:05 (branch `jilaton/2026-10-31-work`, head after this session's commits; see `git log`)
 
 ---
 
@@ -51,7 +51,24 @@ A green unit test never proves a mixin applies; `BUILD SUCCESSFUL` never proves 
 | Pharaoh helmet hiding | Fixed | Scene 30 hides `minecraft:iron_helmet` under the Nemes headdress and restores it |
 | Boot health | Clean | Boot log has no `InvalidMixinException`, failed injection, `BootstrapMethodError`, `NoSuchMethodError`, `ClassCastException`, or `ERROR` line |
 
-### Implemented and covered by tests, not yet re-verified at runtime
+### Runtime-verified on the consolidated head `8f6aa87` (2026-11-01 session)
+
+| Area | Evidence |
+|---|---|
+| Terrain shockwave (§D1 old) | `verify-28-terrain-wave.png` → `28b`: bright white front band, clearly further out in 28b |
+| Radiance halo refinement (§D2 old) | `verify-23-radiance.png`: thin lavender halo hugging player and zombie silhouettes, no box edges, nothing through the wall block |
+| Boot health | Harness exit 0, 96 fresh screenshots, 0 mixin/linkage/`ERROR` lines in `C:/tmp/jilaton-arch/harness-8f6aa87.log` |
+
+### Integrated this session (automated-tested, not exercised by the harness)
+
+- **ClickGUI persistence + click targets** (from `5781eb6`, `d6c314d`): module-list scroll is persisted only
+  from the modules page; grip hitbox now covers the drawn grip (was 10 px too low); only the switch toggles.
+  Not clicked through in a live client — the harness does not drive mouse input.
+- **Terrain wave budget** (idea from `3084354`, `356d346`): an over-budget band is thinned by a uniform
+  stride over the whole arc instead of truncated (max settings + 3 hits previously drew only one third of
+  the arc). Bands that fit, including scene 28, skip the counting pass and render exactly as before.
+
+### Implemented and covered by tests (history)
 
 - **Terrain shockwave legibility.** The wave *was* being submitted; at the captured age its alpha was
   0.38 and the leading edge ~1.2 px at a grazing angle, so it read as a pale band. `TerrainWave.alpha`
@@ -96,13 +113,15 @@ view-model and first-person hand stages, ambience sky tint (observed, precedence
 
 ### High priority
 
-1. **Verify the shockwave at runtime.** Scene 28/28b showed no wavefront at `bbc1f53`; the legibility
+*Items 1, 2, 3 and 7 below were completed on 2026-11-01 (see §B); kept for wording history.*
+
+1. ~~**Verify the shockwave at runtime.**~~ Done. Scene 28/28b showed no wavefront at `bbc1f53`; the legibility
    fix landed afterwards. Run the harness and judge scene 28 against: a bright, high-contrast front
    sweeping outward to the configured radius across the captured frames.
    Files: `render/fx/TerrainWave.java`, `module/impl/HitEffectsModule.java`. Owner: Agent 2.
-2. **Re-verify Radiance after the halo refinement.** Scene 23 acceptance: a visible lavender halo
+2. ~~**Re-verify Radiance after the halo refinement.**~~ Done. Scene 23 acceptance: a visible lavender halo
    *around* the silhouette, no box edges, no through-wall glow. Owner: Agent 2.
-3. **ClickGUI persistence — finish and verify.** Branch `worktree-agent-general-purpose-1d16dd80`
+3. ~~**ClickGUI persistence — finish and verify.**~~ Integrated; live click-through still unverified. Branch `worktree-agent-general-purpose-1d16dd80`
    (`5781eb6`) holds unverified tests `ClickGuiPersistenceRoundTripTest` and `ClickGuiClickTargetTest`
    plus a `ClickGuiScreen` change. Needed: run the suite, confirm card-body click opens settings while
    only the toggle flips state, and that category/module/expanded/scroll survive a restart round trip.
@@ -115,7 +134,7 @@ view-model and first-person hand stages, ambience sky tint (observed, precedence
    path would add an unverified server interaction — do not add it without live inventory testing.
 5. **Spatial / Sky Lyrics.** Blocked offline; needs authorized lyrics metadata.
 6. **Ambience vs CustomSky precedence** is untested.
-7. **Terrain wave budget guard.** Branch `worktree-agent-general-purpose-74df511a` (`3084354`) holds
+7. ~~**Terrain wave budget guard.**~~ Integrated as stride thinning. Branch `worktree-agent-general-purpose-74df511a` (`3084354`) holds
    an unverified `TerrainWaveBudgetTest` plus edits to `TerrainWave`/`HitEffectsModule`. Review before
    merging; it overlaps task 1.
 
@@ -132,12 +151,8 @@ view-model and first-person hand stages, ambience sky tint (observed, precedence
 ## E. Known issues and technical debt
 
 **Confirmed**
-- Scene 28/28b at `bbc1f53`: shockwave not visible. Root cause diagnosed and fixed afterwards; the fix
-  is automated-tested but not runtime-verified.
-- No jar was rebuilt for the consolidated head. The dev jar at
-  `.isolated-build-o/root/devlibs/jilaton-client-0.1.0-dev.jar` (9,751,053 bytes, SHA-256
-  `5c221769…02bc9`) is the `486c138` artifact; the remapped `root/libs` jar is even older. Do not quote
-  either as the current head.
+- Jars in `.isolated-build-o/root/` were rebuilt from `8f6aa87` (dev 9,757,808 B, SHA-256 `1127263e…ce88c`;
+  remapped 9,780,679 B, `9692e662…ce4ca`). They predate `d6c314d`/`356d346` — rebuild before quoting.
 - Lyrics cannot be verified offline.
 - `run-verify/` is a 163 MB copy of the user's world; `run-verify/screenshots` also retains stale files —
   always prove freshness with `find -newermt`, not existence.
@@ -224,7 +239,9 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
   regenerated by that run.
 - Pre-merge head `bbc1f53`: 206 / 958 / 0 / 0 / 0.
 - Harness on `bbc1f53`: exit 0, `BUILD SUCCESSFUL in 3m 35s`, clean boot, screenshots at 06:33.
-- **Not tested:** the runtime harness has not run on `6c552eb`; no jar was built for it.
+- `8f6aa87`: 207 / 965 / 0 / 0 / 0 (forced rerun); harness exit 0, `BUILD SUCCESSFUL in 3m 35s`.
+- After `356d346`: **209 / 976 / 0 / 0 / 0**. Harness not re-run (changes are GUI input and an over-budget
+  path the scenes do not reach).
 
 ---
 
@@ -232,10 +249,9 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 
 1. **Read first:** this file, then `git log --oneline -25`, then `JilatonClient/development/BACKLOG.md`
    for item wording. Do not re-derive state from the older `development/*.md` status files.
-2. **First action:** run the gate (command in §G) and the harness on the current head to re-establish
-   baseline. Judge scenes 23 and 28 before changing effect code.
-3. **Priorities:** §D items 1–3. Verify before extending: the shockwave and Radiance fixes are untested
-   at runtime, and the ClickGUI persistence work is an unverified branch.
+2. **First action:** run the gate (command in §G); run the harness if you touch rendering.
+3. **Priorities:** §D 4 (AutoArmor, needs live inventory testing), 6 (Ambience/CustomSky precedence), then
+   P5 allocations (§D 8 — note `SpatialLyricsModule`). Lyrics (§D 5) stay blocked.
 4. **Do not rewrite:** `EffectBatch`/`FxFrame`/`FxShapes` API, the module contract, `ClientConfig`
    persistence format, or the `HotbarSlotRestore`/hold-key rules — all were deliberately consolidated.
 5. **Preserve:** `dev/VisualVerifier` is the only runtime oracle; keep its scene numbering stable.
@@ -250,7 +266,7 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 
 | Branch | Head | Contents |
 |---|---|---|
-| `worktree-agent-general-purpose-1d16dd80` | `5781eb6` | ClickGUI persistence round-trip + click-target tests, `ClickGuiScreen` change (unverified) |
-| `worktree-agent-general-purpose-74df511a` | `3084354` | `TerrainWaveBudgetTest`, terrain-wave/HitEffects edits (unverified, overlaps §D1) |
+| `worktree-agent-general-purpose-1d16dd80` | `5781eb6` | Fully integrated as `d6c314d`; safe to delete |
+| `worktree-agent-general-purpose-74df511a` | `3084354` | Superseded: idea ported as `356d346`; its lambda/`Phase` scan was not taken. Safe to delete |
 
 All other agent branches are merged into `jilaton/2026-10-31-work`.
