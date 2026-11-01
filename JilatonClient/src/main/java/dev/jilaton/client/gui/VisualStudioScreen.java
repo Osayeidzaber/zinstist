@@ -28,7 +28,7 @@ import java.util.Locale;
 public final class VisualStudioScreen extends Screen {
     /** Inter instead of the vanilla pixel font for everything this screen draws ({@link JilatonType}). */
     private final Font font = JilatonType.font();
-    private static final int CARD = 0xFF111112;
+    private static final int CARD = 0xFF0E0E0E;
     private static final int HAIRLINE = 0xFF232323;
 
     private final Screen parent;
@@ -151,7 +151,7 @@ public final class VisualStudioScreen extends Screen {
 
     private void renderPreview(GuiGraphics graphics, double vis) {
         JilatonUi.shadow(graphics, previewX, previewY, previewW, previewH, 8, vis);
-        JilatonUi.fillRounded(graphics, previewX, previewY, previewW, previewH, 8, JilatonUi.alpha(0xFF05060A, vis));
+        JilatonUi.fillRounded(graphics, previewX, previewY, previewW, previewH, 4, JilatonUi.alpha(0xFF050505, vis));
         int x0 = previewX + 1, y0 = previewY + 1, x1 = previewX + previewW - 1, y1 = previewY + previewH - 1;
         graphics.enableScissor(x0, y0, x1, y1);
         SkyThemes.Theme theme = currentTheme();
@@ -159,7 +159,7 @@ public final class VisualStudioScreen extends Screen {
         paintSky(graphics, theme, x0, y0, x1, y1, horizon, vis);
         paintScene(graphics, theme, x0, y0, x1, y1, horizon, vis);
         graphics.disableScissor();
-        JilatonUi.strokeRounded(graphics, previewX, previewY, previewW, previewH, 8, JilatonUi.alpha(HAIRLINE, vis));
+        JilatonUi.strokeRounded(graphics, previewX, previewY, previewW, previewH, 4, JilatonUi.alpha(HAIRLINE, vis));
 
         String badge = "LIVE PREVIEW";
         int bw = font.width(badge) + 14;
@@ -193,7 +193,7 @@ public final class VisualStudioScreen extends Screen {
         for (int i = 0; i < cellX.length; i++) {
             int cx = cellX[i], cy = cellY[i];
             boolean over = hovered(mouseX, mouseY, cx, cy, cellW, cellH);
-            JilatonUi.fillRounded(graphics, cx, cy, cellW, cellH, 5, JilatonUi.alpha(over ? 0xFF171718 : CARD, vis));
+            JilatonUi.fillRounded(graphics, cx, cy, cellW, cellH, 3, JilatonUi.alpha(over ? 0xFF181818 : CARD, vis));
             JilatonUi.strokeRounded(graphics, cx, cy, cellW, cellH, 5, JilatonUi.alpha(HAIRLINE, vis));
             graphics.drawString(font, labels[i].toUpperCase(Locale.ROOT), cx + 9, cy + 4, JilatonUi.alpha(JilatonUi.TEXT_4, vis), false);
             String value = cellValue(i);
@@ -241,7 +241,7 @@ public final class VisualStudioScreen extends Screen {
 
     private void toggleRow(GuiGraphics graphics, String label, boolean on, int x, int y, int w, int mouseX, int mouseY, double vis) {
         boolean over = hovered(mouseX, mouseY, x, y, w, toggleH);
-        JilatonUi.fillRounded(graphics, x, y, w, toggleH, 5, JilatonUi.alpha(over ? 0xFF171718 : CARD, vis));
+        JilatonUi.fillRounded(graphics, x, y, w, toggleH, 3, JilatonUi.alpha(over ? 0xFF181818 : CARD, vis));
         JilatonUi.strokeRounded(graphics, x, y, w, toggleH, 5, JilatonUi.alpha(HAIRLINE, vis));
         graphics.drawString(font, label, x + 9, y + (toggleH - 8) / 2, JilatonUi.alpha(JilatonUi.TEXT, vis), false);
         int tx = x + w - 42, ty = y + (toggleH - 12) / 2;
