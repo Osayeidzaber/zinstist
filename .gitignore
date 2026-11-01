@@ -25,6 +25,9 @@ out/
 *.tar.gz
 !JilatonClient/gradle/wrapper/gradle-wrapper.jar
 
+# Agent worktrees and session state; never part of the deliverable
+/.qoder/
+
 # Editor and operating system files
 .idea/
 .vscode/

@@ -3,19 +3,26 @@
 Canonical status record. Detailed history lives in Git. Ownership and architecture live in
 `ORCHESTRATION.md`; the module inventory lives in `IMPLEMENTATION_INVENTORY.md`.
 
-Last updated: 2026-11-01 06:05 (Master, branch `jilaton/2026-10-31-work`)
+Last updated: 2026-11-01 00:05 (Master, branch `jilaton/2026-10-31-work`)
 
 ## Repository state
 
-- HEAD: `e6c5179` — "Integrate lane 3: wing fan and companion handedness".
-  History below it: `e9e58ec` (lane 2), `956cfa5` (lane 1), `24e9ce9` (lane 4), `5d47db9` (handover).
-- Branch is **10 commits ahead of `origin/jilaton/2026-10-31-work`**; nothing pushed since the
+- HEAD: `1923d54` — "Correct P1-9: ClickGUI persistence already exists in source".
+  Source-bearing history below it: `d8aef97` (gate record — **this commit contains the harness scene
+  edit that was uncommitted at gate time**), `e6c5179` (lane 3), `e9e58ec` (lane 2), `956cfa5` (lane 1),
+  `24e9ce9` (lane 4).
+- **`git diff --stat e6c5179..HEAD` touches only Markdown plus `dev/VisualVerifier.java`, and that Java
+  diff is exactly the scene-28 edit (`world_wave_radius` 44 → 21, `shot(12)` → `shot(4)`) that the gate
+  ran against.** So the gated source *content* and HEAD's source content are identical; the counts and jar
+  hash below remain valid for HEAD. Any further source edit invalidates them.
+- Branch is **12 commits ahead of `origin/jilaton/2026-10-31-work`** (`5d47db9`); nothing pushed since the
   device switch. Push needs explicit user permission.
 - `main` (`f11bfff`) is old and must not be merged.
-- Working tree: one modified source file, `dev/VisualVerifier.java` (Master-owned harness scene 28:
-  `world_wave_radius` 44 → 21, `shot(12)` → `shot(4)`), plus untracked `.qoder/`.
+- Working tree: clean apart from this file. `.qoder/` (agent worktrees, session state) is now listed in
+  `.gitignore` and must never be committed — a broad `git add -A` would otherwise swallow other lanes'
+  in-progress checkouts.
 - Lane worktrees under `.qoder/worktrees/agent-general-purpose-*` are retained at their lane
-  commits; all four lane branches are fully merged into HEAD.
+  commits; all four previously integrated lane branches are fully merged into HEAD.
 - Environment: Windows 10 x64, Temurin 21, Gradle 9.8.2 wrapper, Fabric Loader 0.20.1 /
   Fabric API 0.141.6 / Loom 1.14.10, Minecraft 1.21.11.
 
