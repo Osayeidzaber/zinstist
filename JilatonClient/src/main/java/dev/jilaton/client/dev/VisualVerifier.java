@@ -2,6 +2,7 @@ package dev.jilaton.client.dev;
 
 import com.mojang.logging.LogUtils;
 import dev.jilaton.client.JilatonClient;
+import dev.jilaton.client.config.ClientConfig;
 import dev.jilaton.client.gui.design.Canvas;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
@@ -138,6 +139,10 @@ public final class VisualVerifier {
             musicScript(client);
             return;
         }
+        // ClickGUI restart round trip: what the previous run wrote at its end must be what this boot loaded.
+        ClientConfig bootConfig = JilatonClient.clientConfig();
+        String bootCategory = bootConfig.guiCategory(), bootExpanded = bootConfig.guiExpandedModule();
+        LOGGER.info("[JilatonVerify] gui-restore loaded category={} expanded={}", bootCategory, bootExpanded);
         then(0, () -> {
             for (ClientModule module : JilatonClient.moduleManager().all()) if (VISUALS.contains(module.id())) module.setEnabled(false);
             if (JilatonClient.moduleManager().get("hud") instanceof HudModule hud) hudPresetBefore = hud.preset();
@@ -772,6 +777,16 @@ public final class VisualVerifier {
             preset(hudPresetBefore);
             client.options.hideGui = false;
             client.options.setCameraType(CameraType.FIRST_PERSON);
+        });
+        then(5, () -> {
+            // Alternate the markers so every run checks a value the previous run (a real restart) wrote.
+            ClientConfig config = JilatonClient.clientConfig();
+            String category = "Movement".equals(bootCategory) ? "Combat" : "Movement";
+            String expanded = "auto_clicker".equals(bootExpanded) ? "aim_assist" : "auto_clicker";
+            config.setGuiCategory(category);
+            config.setGuiExpandedModule(expanded);
+            config.save(JilatonClient.moduleManager());
+            LOGGER.info("[JilatonVerify] gui-restore wrote category={} expanded={}", category, expanded);
         });
         then(5, () -> report());
         then(10, client::stop);
