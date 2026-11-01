@@ -1,11 +1,17 @@
 package dev.jilaton.client.render.fx;
 
+import dev.jilaton.client.render.EffectBatch;
+
 /**
  * Geometry and budget rules for the world-scale terrain shockwave. Radius grows fast then eases out, and
  * the number of angular samples is derived from radius but hard-capped so a 50-block wave never scans the
  * world unbounded. Behind-camera samples are culled before any block lookup happens.
  */
 public final class TerrainWave {
+    /** Walkable surface height of a world column, or NaN when the column has no usable ground. */
+    public interface HeightSampler {
+        double surfaceY(double x, double z);
+    }
     public static final int MAX_SAMPLES = 160;
     /** Frame-wide angular-sample budget shared by every live wave; a full wave leaves 80 for the next one. */
     public static final int MAX_SAMPLES_PER_FRAME = 240;
@@ -55,9 +61,14 @@ public final class TerrainWave {
         return maxRadius * (1 - Math.pow(1 - u, 2.4));
     }
 
+    /**
+     * Opacity of the front over its life. A wide wave is only at half of its radius by mid life, which is
+     * where a capture usually lands, so the front keeps most of its opacity until it is nearly done and then
+     * fades quickly; an exponential-looking decay read as a faint flat band rather than a shockwave.
+     */
     public static double alpha(double progress) {
         double u = Math.max(0, Math.min(1, progress));
-        return Math.pow(1 - u, 1.4);
+        return 1 - u * u;
     }
 
     /** Angular samples: one per ~0.55 blocks of circumference at close range, capped. */
@@ -110,5 +121,55 @@ public final class TerrainWave {
         if (d > 0) return d > 1.2 ? 0 : Math.pow(1 - d / 1.2, 2);
         double u = -d / t;
         return u >= 1 ? 0 : Math.pow(1 - u, 1.6);
+    }
+
+    /**
+     * Emits the glowing block tops of one wavefront: every cell whose centre falls inside the band gets a
+     * camera-relative top face at {@code surface + 0.03}, plus a bright outline on the leading edge. Cells
+     * behind the camera are culled before the height lookup, the caller's {@code corners} buffer is reused
+     * for every block, and nothing is emitted once {@code budget} cells have been spent. Returns the number
+     * of block tops emitted. Kept free of Minecraft types so the whole scan is unit-testable.
+     */
+    public static int emitBand(EffectBatch batch, HeightSampler sampler,
+                               double impactX, double impactZ,
+                               double camX, double camY, double camZ,
+                               double radius, double thickness, double alpha, int rgb,
+                               double forwardX, double forwardZ, int budget, double[] corners) {
+        if (batch == null || budget <= 0 || radius < 0.5 || alpha < 0.01) return 0;
+        int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
+        int cx = (int) Math.floor(impactX), cz = (int) Math.floor(impactZ);
+        int span = (int) Math.ceil(radius + LEADING_EDGE) + 1;
+        int used = 0;
+        for (int dx = -span; dx <= span && used < budget; dx++) {
+            for (int dz = -span; dz <= span && used < budget; dz++) {
+                int bx = cx + dx, bz = cz + dz;
+                double ox = bx + 0.5 - impactX, oz = bz + 0.5 - impactZ;
+                double distance = Math.sqrt(ox * ox + oz * oz);
+                if (!selectsCell(ox, oz, distance, radius, thickness, forwardX, forwardZ)) continue;
+                double glow = frontGlow(distance, radius, thickness) * alpha;
+                if (glow < 0.02) continue;
+                double ground = sampler == null ? Double.NaN : sampler.surfaceY(bx + 0.5, bz + 0.5);
+                if (!Double.isFinite(ground)) continue;
+                used++;
+                blockTop(bx + 0.5, bz + 0.5, ground, corners);
+                int fill = FxShapes.argb(EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.25 * glow), Math.min(1, 0.85 * glow));
+                // blockTop winds clockwise seen from above; reversed so the face points up and survives culling.
+                batch.quad(corners[0] - camX, corners[1] - camY, corners[2] - camZ,
+                        corners[9] - camX, corners[10] - camY, corners[11] - camZ,
+                        corners[6] - camX, corners[7] - camY, corners[8] - camZ,
+                        corners[3] - camX, corners[4] - camY, corners[5] - camZ, fill, fill, fill, fill, false);
+                if (glow / alpha > 0.35) {
+                    int edge = FxShapes.argb(bright, glow);
+                    for (int e = 0; e < 4; e++) {
+                        int p = e * 3, q = ((e + 1) % 4) * 3;
+                        // Lines keep their screen thickness at the grazing angles a ground wave is seen at,
+                        // so the leading edge stays readable even when the top faces are heavily foreshortened.
+                        batch.glowLine(corners[p] - camX, corners[p + 1] - camY, corners[p + 2] - camZ,
+                                corners[q] - camX, corners[q + 1] - camY, corners[q + 2] - camZ, edge, 2.0F, false);
+                    }
+                }
+            }
+        }
+        return used;
     }
 }
