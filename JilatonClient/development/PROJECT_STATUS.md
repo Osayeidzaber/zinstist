@@ -1,5 +1,9 @@
 # Jilaton — Project Status
 
+> **Superseded (2026-11-01).** The current state, gate counts and open work are in
+> [`../../HANDOVER.md`](../../HANDOVER.md). Everything below describes head `486c138` and predates the
+> Radiance and terrain-wave fixes; read it as history, not as the current tree.
+
 Canonical status record. Detailed history lives in Git. Ownership and architecture live in
 `ORCHESTRATION.md`; the module inventory lives in `IMPLEMENTATION_INVENTORY.md`.
 
