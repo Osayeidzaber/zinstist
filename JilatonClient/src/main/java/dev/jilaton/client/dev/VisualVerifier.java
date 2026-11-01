@@ -1020,6 +1020,45 @@ public final class VisualVerifier {
             studio(client);
         });
 
+        // ChestCleaner, Notifier and Trajectories.
+        then(2, () -> {
+            studio(client);
+            command(client, at("setblock", 0, 0, 2) + " minecraft:chest{Items:[{Slot:0b,id:\"minecraft:rotten_flesh\",count:4},"
+                    + "{Slot:1b,id:\"minecraft:diamond\",count:2}]}");
+            enable("chest_cleaner");
+            enable("notifier");
+        });
+        then(10, () -> {
+            net.minecraft.core.BlockPos chest = net.minecraft.core.BlockPos.containing(studioX, studioY, studioZ + 2);
+            client.gameMode.useItemOn(client.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(chest),
+                            net.minecraft.core.Direction.UP, chest, false));
+        });
+        then(30, () -> {
+            var menu = client.player.containerMenu;
+            LOGGER.info("[JilatonVerify] cleaner slot0={} slot1={}", menu.getSlot(0).getItem(), menu.getSlot(1).getItem());
+            client.player.closeContainer();
+            disable("chest_cleaner");
+            command(client, "effect clear @p");
+            command(client, "damage @p 15");
+        });
+        then(10, () -> {
+            var notices = JilatonClient.moduleManager().notifications().current(System.nanoTime());
+            LOGGER.info("[JilatonVerify] notifier notices={}", notices.stream().map(n -> n.text()).toList());
+            command(client, "effect give @p minecraft:instant_health 1 5");
+            disable("notifier");
+            command(client, at("setblock", 0, 0, 2) + " minecraft:air");
+            studio(client);
+            client.player.setXRot(-20);
+            command(client, "item replace entity @p weapon.mainhand with minecraft:snowball 16");
+            enable("trajectories");
+        });
+        shot(10, "44-trajectories");
+        then(2, () -> {
+            disable("trajectories");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+        });
+
         // Redesign tour: full-screen menus captured over the live world.
         then(2, () -> {
             JilatonClient.clientConfig().setMenuBackground("Dark Veil");
