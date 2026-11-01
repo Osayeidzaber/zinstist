@@ -1,7 +1,9 @@
 package dev.jilaton.client.module.impl;
 
 /**
- * Ownership rule for the hotbar selection a consume module (AutoGapple, AutoEat) swaps in.
+ * Ownership rule for the hotbar selection a consume module swaps in. AutoGapple, AutoEat, AutoHead
+ * and AutoSoup all follow this one contract: the module may put the selection back only while the
+ * selection still points at the slot it took over.
  *
  * <p>The server stops a main-hand item use when the carried slot changes
  * ({@code ServerGamePacketListenerImpl#handleSetCarriedItem} calls {@code stopUsingItem}), so the

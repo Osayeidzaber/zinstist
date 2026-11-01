@@ -2,6 +2,10 @@ package dev.jilaton.client.module.impl;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,6 +28,11 @@ class HotbarSlotRestoreTest {
     }
 
     @Test
+    void restoresHotbarSlotZeroLikeAnyOtherOwnedSlot() {
+        assertTrue(HotbarSlotRestore.shouldRestore(0, 0, 4));
+    }
+
+    @Test
     void leavesTheSelectionAloneAfterThePlayerMovedIt() {
         assertFalse(HotbarSlotRestore.shouldRestore(5, 3, 1));
     }
@@ -33,5 +42,19 @@ class HotbarSlotRestoreTest {
         assertFalse(HotbarSlotRestore.shouldRestore(0, -1, -1));
         assertFalse(HotbarSlotRestore.shouldRestore(0, 0, -1));
         assertFalse(HotbarSlotRestore.shouldRestore(0, -1, 0));
+        // Offhand uses (AutoHead) never swap the selection, so there is nothing to give back.
+        assertFalse(HotbarSlotRestore.shouldRestore(0, -1, -1));
+    }
+
+    @Test
+    void everyConsumeModuleDelegatesTheOwnershipCheckToThisRule() throws Exception {
+        for (String name : List.of("AutoGappleModule", "AutoEatModule", "AutoHeadModule", "AutoSoupModule")) {
+            String source = Files.readString(Path.of(
+                    "src/main/java/dev/jilaton/client/module/impl/" + name + ".java"));
+            assertTrue(source.contains("HotbarSlotRestore.shouldRestore("),
+                    name + " must use the shared hotbar ownership rule");
+            assertFalse(source.contains("previousSlot >= 0"),
+                    name + " must not keep its own copy of the ownership check");
+        }
     }
 }

@@ -131,8 +131,9 @@ public final class AutoHeadModule extends ClientModule {
     }
 
     private void restoreSlotIfSafe() {
-        if (usingPlayer != null && !offhandUse && previousSlot >= 0 && headSlot >= 0
-                && usingPlayer.getInventory().getSelectedSlot() == headSlot) {
+        if (usingPlayer != null && !offhandUse
+                && HotbarSlotRestore.shouldRestore(
+                        usingPlayer.getInventory().getSelectedSlot(), headSlot, previousSlot)) {
             usingPlayer.getInventory().setSelectedSlot(previousSlot);
         }
     }

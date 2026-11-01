@@ -134,8 +134,9 @@ public final class AutoSoupModule extends ClientModule {
     }
 
     private void restoreSlotIfSafe() {
-        if (usingPlayer != null && previousSlot >= 0 && soupSlot >= 0
-                && usingPlayer.getInventory().getSelectedSlot() == soupSlot) {
+        if (usingPlayer != null
+                && HotbarSlotRestore.shouldRestore(
+                        usingPlayer.getInventory().getSelectedSlot(), soupSlot, previousSlot)) {
             usingPlayer.getInventory().setSelectedSlot(previousSlot);
         }
     }
