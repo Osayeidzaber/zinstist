@@ -886,6 +886,32 @@ public final class VisualVerifier {
             studio(client);
         });
 
+        // Waypoints and InventoryCleaner: a waypoint where we stand, seen from 12 blocks back; junk thrown out.
+        then(2, () -> {
+            studio(client);
+            enable("waypoints");
+            enable("fullbright");
+            var wp = dev.jilaton.client.module.impl.WaypointsModule.get();
+            if (wp != null) wp.add(client, "Verify Base");
+            command(client, "item replace entity @p inventory.5 with minecraft:rotten_flesh 12");
+            command(client, "item replace entity @p inventory.6 with minecraft:diamond 3");
+            setting("inventory_cleaner", "when", "Always");
+            enable("inventory_cleaner");
+        });
+        then(4, () -> command(client, "tp @a " + studioX + " " + studioY + " " + (studioZ - 12) + " 0 10"));
+        shot(20, "40-waypoint");
+        then(2, () -> {
+            var inv = client.player.getInventory();
+            LOGGER.info("[JilatonVerify] cleaner slot14={} slot15={}", inv.getItem(14), inv.getItem(15));
+            disable("inventory_cleaner");
+            disable("fullbright");
+            var wp = dev.jilaton.client.module.impl.WaypointsModule.get();
+            if (wp != null) wp.store().remove(dev.jilaton.client.module.impl.WaypointsModule.worldKey(client),
+                    dev.jilaton.client.module.impl.WaypointsModule.dimensionKey(client), "Verify Base");
+            command(client, "clear @p minecraft:diamond");
+            studio(client);
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {

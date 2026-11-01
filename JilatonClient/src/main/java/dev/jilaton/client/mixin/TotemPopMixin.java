@@ -22,6 +22,9 @@ public abstract class TotemPopMixin {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null) return;
         Entity entity = packet.getEntity(client.level);
-        if (entity instanceof LivingEntity living) TotemSpiritModule.onPop(living);
+        if (entity instanceof LivingEntity living) {
+            TotemSpiritModule.onPop(living);
+            dev.jilaton.client.module.impl.NotifierModule.onPop(living);
+        }
     }
 }

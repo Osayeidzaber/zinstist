@@ -47,6 +47,7 @@ public final class PreviewSpecs {
             Map.entry("item_esp", PreviewSpec.Motif.BOX),
             Map.entry("storage_esp", PreviewSpec.Motif.BOX),
             Map.entry("breadcrumbs", PreviewSpec.Motif.TRAIL),
+            Map.entry("waypoints", PreviewSpec.Motif.PEARL),
             Map.entry("tracers", PreviewSpec.Motif.BOX),
             Map.entry("block_outline", PreviewSpec.Motif.BOX),
             Map.entry("block_placement", PreviewSpec.Motif.BOX),
@@ -107,6 +108,10 @@ public final class PreviewSpecs {
             case "item_esp" -> itemEsp((ItemEspModule) module, accent);
             case "storage_esp" -> storageEsp(module, accent);
             case "breadcrumbs" -> breadcrumbs(module, accent);
+            case "waypoints" -> new PreviewSpec(PreviewSpec.Motif.PEARL, 0, 0xF2F2F2, accent, accent,
+                    flag(module, "beams", true) ? 0.8 : 0.2, 0.5, unit(num(module, "label_scale", 1), 0.5, 2),
+                    unit(num(module, "max_distance", 5000), 64, 20000), flag(module, "labels", true) ? 0.7 : 0.3,
+                    flag(module, "death_point", true) ? 0.9 : 0.6, 0);
             case "tracers" -> tracers((TracersModule) module, accent);
             case "block_outline" -> blockOutline(module, accent);
             case "block_placement" -> blockPlacement(module, accent);

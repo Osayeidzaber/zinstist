@@ -294,3 +294,13 @@ All other agent branches are merged into `jilaton/2026-10-31-work`.
 - Crowd (0–4): other characters run in from 5.5 blocks, stop at 2.4 and cheer. `CharacterCache.exact` keeps a
   stand-in model from being drawn while one is baking; the cache now holds 12 models (was 4).
 - Camera shake via `SmoothCameraMixin`, which respects reduced motion. Harness scene 38. Tests: `FinisherChoreographyTest`, `AllCharactersBuildTest`.
+
+### 2026-11-01 Utility modules (batch 1–2)
+- AutoTool (Player): fastest hotbar tool while mining; prefers the tool that gets drops; keeps a durability reserve; switches back.
+- AutoWalk (Movement): holds forward/back; jump into walls; safe mode stops at drops >3 blocks or liquid.
+- AutoFish (Player): bite = server `FISHING_BOBBER_SPLASH` sound at your hook (`SoundEventHookMixin`); reel and recast delays; rod swap.
+- StorageESP (Visuals): block-entity scan every 20 ticks, per-kind colours, fill, through walls. Breadcrumbs (Visuals): path line with fade; resets on teleport.
+- Waypoints (Visuals, on by default): `config/jilaton/waypoints.tsv` per world+dimension; `/jilaton waypoint add|remove|list`; auto "Death" point; beams and distance labels clamped to 96 blocks.
+- Notifier (Client): joins/leaves (tab-list diff), totem pops, low health, armour below N%; HUD notice id "notice" (skips spotlight); optional chat.
+- AutoReconnect (Client): countdown/Reconnect button on DisconnectedScreen via Fabric ScreenEvents. InventoryCleaner (Player): throws ids on a junk list; inventory-open or always.
+- Verified in harness scenes 39 (storage+breadcrumbs) and 40 (waypoint; cleaner threw flesh and kept diamonds). AutoFish/AutoReconnect are not runtime-verified (need water/a server).

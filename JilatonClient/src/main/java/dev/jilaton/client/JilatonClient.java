@@ -120,6 +120,7 @@ public final class JilatonClient implements ClientModInitializer {
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("jilaton", "hud"), hudRenderer::render);
         FriendHatRenderer.register();
         dev.jilaton.client.module.impl.FinisherModule.register();
+        dev.jilaton.client.module.impl.AutoReconnectModule.register();
         new dev.jilaton.client.render.EntityOverlayRenderer(MODULES, CONFIG).register();
         new dev.jilaton.client.render.DamageParticleRenderer().register(MODULES, CONFIG, overlayProjection);
         new dev.jilaton.client.render.NametagRenderer().register(MODULES, CONFIG, overlayProjection);

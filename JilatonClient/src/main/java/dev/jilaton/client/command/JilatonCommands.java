@@ -51,6 +51,48 @@ public final class JilatonCommands {
                                                         return 0;
                                                     }
                                                 })))))
+                .then(ClientCommandManager.literal("waypoint")
+                        .then(ClientCommandManager.literal("add")
+                                .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                                        .executes(context -> {
+                                            var module = dev.jilaton.client.module.impl.WaypointsModule.get();
+                                            var client = context.getSource().getClient();
+                                            if (module == null || client.player == null) return 0;
+                                            var w = module.add(client, StringArgumentType.getString(context, "name"));
+                                            context.getSource().sendFeedback(Component.literal("Waypoint " + w.name() + " set at "
+                                                    + w.x() + " " + w.y() + " " + w.z()));
+                                            return 1;
+                                        })))
+                        .then(ClientCommandManager.literal("remove")
+                                .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                                        .suggests((context, builder) -> {
+                                            var module = dev.jilaton.client.module.impl.WaypointsModule.get();
+                                            var client = context.getSource().getClient();
+                                            if (module != null) module.store().in(dev.jilaton.client.module.impl.WaypointsModule.worldKey(client),
+                                                    dev.jilaton.client.module.impl.WaypointsModule.dimensionKey(client)).forEach(w -> builder.suggest(w.name()));
+                                            return builder.buildFuture();
+                                        })
+                                        .executes(context -> {
+                                            var module = dev.jilaton.client.module.impl.WaypointsModule.get();
+                                            var client = context.getSource().getClient();
+                                            String name = StringArgumentType.getString(context, "name");
+                                            boolean removed = module != null && module.store().remove(
+                                                    dev.jilaton.client.module.impl.WaypointsModule.worldKey(client),
+                                                    dev.jilaton.client.module.impl.WaypointsModule.dimensionKey(client), name);
+                                            if (removed) context.getSource().sendFeedback(Component.literal("Removed waypoint " + name));
+                                            else context.getSource().sendError(Component.literal("No waypoint named " + name + " here"));
+                                            return removed ? 1 : 0;
+                                        })))
+                        .then(ClientCommandManager.literal("list").executes(context -> {
+                            var module = dev.jilaton.client.module.impl.WaypointsModule.get();
+                            var client = context.getSource().getClient();
+                            if (module == null) return 0;
+                            var list = module.store().in(dev.jilaton.client.module.impl.WaypointsModule.worldKey(client),
+                                    dev.jilaton.client.module.impl.WaypointsModule.dimensionKey(client));
+                            if (list.isEmpty()) context.getSource().sendFeedback(Component.literal("No waypoints in this dimension"));
+                            for (var w : list) context.getSource().sendFeedback(Component.literal(w.name() + ": " + w.x() + " " + w.y() + " " + w.z()));
+                            return list.size();
+                        })))
                 .then(ClientCommandManager.literal("gui").executes(context -> {
                     context.getSource().getClient().execute(() -> JilatonClient.openClickGui(null));
                     return 1;
