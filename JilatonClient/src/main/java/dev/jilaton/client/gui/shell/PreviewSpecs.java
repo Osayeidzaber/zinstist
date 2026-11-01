@@ -47,6 +47,8 @@ public final class PreviewSpecs {
             Map.entry("item_esp", PreviewSpec.Motif.BOX),
             Map.entry("storage_esp", PreviewSpec.Motif.BOX),
             Map.entry("block_esp", PreviewSpec.Motif.BOX),
+            Map.entry("no_render", PreviewSpec.Motif.LENS),
+            Map.entry("xray", PreviewSpec.Motif.BOX),
             Map.entry("breadcrumbs", PreviewSpec.Motif.TRAIL),
             Map.entry("waypoints", PreviewSpec.Motif.PEARL),
             Map.entry("tracers", PreviewSpec.Motif.BOX),
@@ -108,6 +110,13 @@ public final class PreviewSpecs {
             case "player_esp" -> playerEsp((PlayerEspModule) module, accent);
             case "item_esp" -> itemEsp((ItemEspModule) module, accent);
             case "storage_esp" -> storageEsp(module, accent);
+            case "xray" -> new PreviewSpec(PreviewSpec.Motif.BOX, 1, 0x6FD3FF, accent, accent,
+                    unit(num(module, "opacity", 10), 0, 100), 0.5, 0.5, 0.35, 0.1, 0.9,
+                    PreviewSpec.BOX_BOXES | PreviewSpec.BOX_THROUGH | (flag(module, "exposed_only", false) ? PreviewSpec.BOX_GLOW : 0));
+            case "no_render" -> new PreviewSpec(PreviewSpec.Motif.LENS, 0, 0xF2F2F2, accent, accent,
+                    flag(module, "hurt_cam", true) ? 0.2 : 0.8, 0.5, flag(module, "pumpkin", true) ? 0.3 : 0.7,
+                    flag(module, "portal", true) ? 0.3 : 0.7, flag(module, "vignette", false) ? 0.2 : 0.6,
+                    flag(module, "nausea", true) ? 0.9 : 0.5, 0);
             case "block_esp" -> new PreviewSpec(PreviewSpec.Motif.BOX, 0, hex(module, "color", "6FD3FF"), accent, accent,
                     0, 0.5, unit(num(module, "range", 4), 1, 8), unit(num(module, "vertical", 64), 16, 384), 0.1, 0.9,
                     PreviewSpec.BOX_BOXES | (flag(module, "tracers", false) ? PreviewSpec.BOX_TRACERS : 0)

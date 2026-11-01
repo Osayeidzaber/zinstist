@@ -949,6 +949,33 @@ public final class VisualVerifier {
             studio(client);
         });
 
+        // XRay (Anubis port): looking down through the studio floor at a diamond ore buried beneath it.
+        then(2, () -> {
+            studio(client);
+            command(client, at("setblock", 1, -3, 3) + " minecraft:diamond_ore");
+            command(client, at("setblock", -1, -2, 3) + " minecraft:gold_ore");
+            client.player.setYRot(0);
+            client.player.setXRot(60);
+            setting("xray", "opacity", 10.0);
+            enable("xray");
+        });
+        shot(40, "42-xray");
+        then(2, () -> disable("xray"));
+        // NoRender: a carved pumpkin on the head normally blurs the whole screen.
+        then(20, () -> {
+            client.player.setXRot(10);
+            command(client, "item replace entity @p armor.head with minecraft:carved_pumpkin");
+            enable("no_render");
+        });
+        shot(10, "42b-norender-pumpkin");
+        then(2, () -> {
+            disable("no_render");
+            command(client, "item replace entity @p armor.head with minecraft:air");
+            command(client, at("setblock", 1, -3, 3) + " minecraft:air");
+            command(client, at("setblock", -1, -2, 3) + " minecraft:air");
+            command(client, at("setblock", 0, 0, 2) + " minecraft:air");
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {

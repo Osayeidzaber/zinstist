@@ -145,6 +145,8 @@ public final class ModuleManager {
         register(new dev.jilaton.client.module.impl.BlockEspModule());
         register(new dev.jilaton.client.module.impl.ChestStealerModule());
         register(new dev.jilaton.client.module.impl.AutoRespawnModule());
+        register(new dev.jilaton.client.module.impl.NoRenderModule());
+        register(new dev.jilaton.client.module.impl.XRayModule());
         register(new dev.jilaton.client.module.impl.ZoomModule());
         register(new dev.jilaton.client.module.impl.FreecamModule());
         register(new dev.jilaton.client.module.impl.FreeLookModule());

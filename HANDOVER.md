@@ -307,3 +307,5 @@ All other agent branches are merged into `jilaton/2026-10-31-work`.
 - Config: `Setting.reset()/isDefault()`, `ClientModule.resetSettings()`; drawer "Reset" (dim when already default); Configs page Export (clipboard) / Import (clipboard → profile named in the field, rejects non-Jilaton text); drawer scroll persisted (`ui.drawer_scroll`).
 - Macros (Client): 5 key→text slots, "/" = command, chain with `&&`. BlockESP (Visuals): id list, palette-skip scan every 40 ticks, cap 2048, tracers. Verified scene 39.
 - ChestStealer (Player) and AutoRespawn (Player): runtime-verified in scene 41 (5/5 diamonds moved, junk left, chest closed; respawned with no screen).
+- XRay: faithful Anubis port (9 mixins, Sodium refuses); NoRender (LB AntiBlind option set). Runtime-verified scene 42 (xray fade + ores; pumpkin blur gone).
+- Port policy from the user (2026-11-01): when Anubis has the module, port its code (decompiled at analysis/anubis-vineflower, remap with tools/remap-anubis.py using Loom mappings.tiny); LiquidBounce source is at analysis/liquidbounce-upstream (GPL-3, Kotlin). Record each port in ATTRIBUTION.md.

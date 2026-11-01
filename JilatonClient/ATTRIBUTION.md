@@ -173,3 +173,12 @@ The KillAura scanning halo, feathered ribbon, corner markers, tracking/fade anim
 `render/fx/SkyPackTextures` still accepts a locally installed pack as an optional override of the bundled copies, reading `assets/skybox/<layer>.png` from, in order: `-Djilaton.skyPack=<zip-or-directory>`, `<gameDir>/config/jilaton/sky/`, or a pack carrying `assets/skybox/day.png` in `<gameDir>/resourcepacks/`. Override layers are decoded on first use and downscaled in memory to the same 2048×1365 / 1024×683 sizes; nothing is written to disk. With no override present the bundled textures are used, so the sky works with no external file. The FabricSkyboxes blueprint and Celestial layer definitions are reimplemented as original Java in `FxFrame.skyCube`/`CustomSkyModule.packSky` (layer order, fade windows, rotation); no FabricSkyboxes, Celestial or OptiFine code or jars are bundled. Layers are screen-blended, matching the pack's "screen" layers; its base gradient is reproduced as an interpolated palette rather than by sampling the pack textures.
 
 `music/LyricsMatcher` adapts the LRCLIB candidate scoring (title/artist folding, feat./remaster stripping, 3 s duration tolerance, synced-first ranking) and `OnlineLyrics` follows the exact-then-search lookup order of the recovered Anubis 0.9.9.3 `util/spotify/LyricsMatcher.java` and `LyricsService.java` (Horcus / 4ldenz, declared GPL-3.0-only; JAR SHA-256 `c5259f9ffee4bbe2511972f7941ab6fc2dcda691dc0d5ab18a558f3f8f4285de`), with the user's permission. Lyrics text is fetched at runtime from LRCLIB (lrclib.net) and is not bundled. The Windows media-session bridge (`assets/jilaton/scripts/media-session.ps1`, `music/MediaSessionSource`) is original Jilaton code.
+
+## Module ports (2026-11-01)
+
+- **XRay** — ported from Anubis Client `net.anubis.client.module.impl.render.XrayModule` and its mixins
+  (`MixinSectionCompiler`, `MixinBlock`, `MixinModelBlockRenderer`, Indigo `MixinAbstractTerrainRenderContext`,
+  `MixinLiquidBlockRenderer`, `MixinBlockEntityRenderDispatcher`, `MixinBlockStateBase`, `MixinLightTexture`,
+  `MixinVisGraph`), GPL-3.0, Horcus and 4ldenz. Logic kept; names remapped to Mojang mappings and the
+  block-colour list setting replaced by a text id list. Files: `module/impl/XRayModule.java`, `mixin/XRay*Mixin.java`.
+- **NoRender** — option set follows LiquidBounce `ModuleAntiBlind` (GPL-3.0-or-later, CCBlueX); hooks are Jilaton's.
