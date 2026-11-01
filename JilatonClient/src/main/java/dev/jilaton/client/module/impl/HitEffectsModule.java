@@ -79,7 +79,9 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     private final BooleanSetting self = addSetting(new BooleanSetting("self", "Also when I am hurt", false));
 
     private final ArrayDeque<Impact> impacts = new ArrayDeque<>();
-    private final Map<Integer, Integer> hurtTimes = new HashMap<>();
+    private Map<Integer, Integer> hurtTimes = new HashMap<>();
+    /** Next tick's hurt times; swapped with {@link #hurtTimes} so the tick never allocates a map. */
+    private Map<Integer, Integer> nextHurtTimes = new HashMap<>();
     private final FxParticles.Spec spec = new FxParticles.Spec();
     private final Random random = new Random();
     private int pendingTarget = -1;
@@ -137,7 +139,8 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
         long now = System.nanoTime();
         boolean any = trigger.value().equals("Any nearby damage");
         if (trigger.value().equals("Attack attempts")) return;
-        Map<Integer, Integer> next = new HashMap<>();
+        Map<Integer, Integer> next = nextHurtTimes;
+        next.clear();
         for (Entity entity : client.level.entitiesForRendering()) {
             if (!(entity instanceof LivingEntity living) || entity.distanceToSqr(client.player) > 48 * 48) continue;
             int hurt = living.hurtTime;
@@ -155,8 +158,8 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
                 spawnImpact(client, living, new Vec3(box.getCenter().x, box.minY + living.getBbHeight() * 0.6, box.getCenter().z), false, 0);
             }
         }
-        hurtTimes.clear();
-        hurtTimes.putAll(next);
+        nextHurtTimes = hurtTimes;
+        hurtTimes = next;
     }
 
     private Set<Style> styles() {
