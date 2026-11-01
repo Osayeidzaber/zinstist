@@ -144,6 +144,8 @@ public final class ModuleManager {
         register(new dev.jilaton.client.module.impl.MacrosModule());
         register(new dev.jilaton.client.module.impl.BlockEspModule());
         register(new dev.jilaton.client.module.impl.ChestStealerModule());
+        register(new dev.jilaton.client.module.impl.ChestCleanerModule());
+        register(new dev.jilaton.client.module.impl.TrajectoriesModule());
         register(new dev.jilaton.client.module.impl.AutoRespawnModule());
         register(new dev.jilaton.client.module.impl.NoRenderModule());
         register(new dev.jilaton.client.module.impl.XRayModule());
