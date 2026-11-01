@@ -141,12 +141,26 @@ public final class TerrainWave {
         int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
         int cx = (int) Math.floor(impactX), cz = (int) Math.floor(impactZ);
         int span = (int) Math.ceil(radius + LEADING_EDGE) + 1;
+        // Each row only walks the cells that can lie in the annulus (conservative bounds; selectsCell still
+        // decides), so a 64-block wave reads ~2-4k cells instead of the 17.7k of its bounding square.
+        double outer = radius + LEADING_EDGE, inner = Math.max(0, radius - Math.max(0.5, thickness));
+        double centreZ = impactZ - 0.5 - cz;
         int stride = 1;
         if (bandAreaBound(radius, thickness) > budget) {
             int candidates = 0;
             for (int dx = -span; dx <= span; dx++) {
-                for (int dz = -span; dz <= span; dz++) {
-                    double ox = cx + dx + 0.5 - impactX, oz = cz + dz + 0.5 - impactZ;
+                double rowX = cx + dx + 0.5 - impactX, reach = outer * outer - rowX * rowX;
+                if (reach < 0) continue;
+                reach = Math.sqrt(reach);
+                double hole = inner * inner - rowX * rowX;
+                hole = hole > 0 ? Math.sqrt(hole) : -1;
+                int last = Math.min(span, (int) Math.ceil(centreZ + reach));
+                for (int dz = Math.max(-span, (int) Math.floor(centreZ - reach)); dz <= last; dz++) {
+                    if (hole > 0 && dz > centreZ - hole && dz < centreZ + hole) {
+                        dz = (int) Math.ceil(centreZ + hole) - 1;
+                        continue;
+                    }
+                    double ox = rowX, oz = cz + dz + 0.5 - impactZ;
                     double distance = Math.sqrt(ox * ox + oz * oz);
                     if (selectsCell(ox, oz, distance, radius, thickness, forwardX, forwardZ)
                             && frontGlow(distance, radius, thickness) * alpha >= 0.02) candidates++;
@@ -156,7 +170,17 @@ public final class TerrainWave {
         }
         int used = 0, candidate = 0;
         for (int dx = -span; dx <= span && used < budget; dx++) {
-            for (int dz = -span; dz <= span && used < budget; dz++) {
+            double rowX = cx + dx + 0.5 - impactX, reach = outer * outer - rowX * rowX;
+            if (reach < 0) continue;
+            reach = Math.sqrt(reach);
+            double hole = inner * inner - rowX * rowX;
+            hole = hole > 0 ? Math.sqrt(hole) : -1;
+            int last = Math.min(span, (int) Math.ceil(centreZ + reach));
+            for (int dz = Math.max(-span, (int) Math.floor(centreZ - reach)); dz <= last && used < budget; dz++) {
+                if (hole > 0 && dz > centreZ - hole && dz < centreZ + hole) {
+                    dz = (int) Math.ceil(centreZ + hole) - 1;
+                    continue;
+                }
                 int bx = cx + dx, bz = cz + dz;
                 double ox = bx + 0.5 - impactX, oz = bz + 0.5 - impactZ;
                 double distance = Math.sqrt(ox * ox + oz * oz);

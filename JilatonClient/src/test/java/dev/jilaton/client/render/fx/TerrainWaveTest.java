@@ -180,6 +180,37 @@ class TerrainWaveTest {
         }
     }
 
+    @Test
+    void bandScanEmitsExactlyTheCellsABruteForceSquareScanSelects() {
+        // Fractional impacts, both cull directions, thin and thick bands, a near-zero inner hole.
+        double[][] cases = {{0, 0, 21, 3, 0, 1}, {100.3, -50.7, 44, 3, 0.6, -0.8}, {-7.9, 3.2, 64, 8, -1, 0},
+                {0.5, 0.5, 6, 8, 0.17, 0.05}, {12.01, -0.99, 33.3, 0.5, 0.7, 0.7}};
+        for (double[] c : cases) {
+            double ix = c[0], iz = c[1], radius = c[2], thickness = c[3], fx = c[4], fz = c[5];
+            double alpha = 0.9;
+            java.util.Set<Long> expected = new java.util.HashSet<>();
+            int cx = (int) Math.floor(ix), cz = (int) Math.floor(iz), span = (int) Math.ceil(radius + TerrainWave.LEADING_EDGE) + 1;
+            for (int dx = -span; dx <= span; dx++) {
+                for (int dz = -span; dz <= span; dz++) {
+                    double ox = cx + dx + 0.5 - ix, oz = cz + dz + 0.5 - iz, d = Math.sqrt(ox * ox + oz * oz);
+                    if (TerrainWave.selectsCell(ox, oz, d, radius, thickness, fx, fz)
+                            && TerrainWave.frontGlow(d, radius, thickness) * alpha >= 0.02) {
+                        expected.add(((long) (cx + dx) << 32) ^ ((cz + dz) & 0xFFFFFFFFL));
+                    }
+                }
+            }
+            EffectBatch batch = new EffectBatch();
+            TerrainWave.emitBand(batch, (x, z) -> 64.0, ix, iz, 0, 0, 0, radius, thickness, alpha, 0xF2F2F2,
+                    fx, fz, Integer.MAX_VALUE, new double[12]);
+            java.util.Set<Long> actual = new java.util.HashSet<>();
+            for (EffectBatch.Quad quad : batch.quads()) {
+                int bx = (int) Math.floor(Math.min(quad.ax(), quad.cx())), bz = (int) Math.floor(Math.min(quad.az(), quad.cz()));
+                actual.add(((long) bx << 32) ^ (bz & 0xFFFFFFFFL));
+            }
+            assertEquals(expected, actual, "cells differ for case " + java.util.Arrays.toString(c));
+        }
+    }
+
     /** Block tops per 30-degree sector of the half-plane in front of a camera looking along +z. */
     private static int[] sectors(EffectBatch batch) {
         int[] counts = new int[6];
