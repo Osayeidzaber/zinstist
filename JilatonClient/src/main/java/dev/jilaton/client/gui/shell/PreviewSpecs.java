@@ -45,6 +45,8 @@ public final class PreviewSpecs {
             Map.entry("target_esp", PreviewSpec.Motif.TARGET),
             Map.entry("player_esp", PreviewSpec.Motif.BOX),
             Map.entry("item_esp", PreviewSpec.Motif.BOX),
+            Map.entry("storage_esp", PreviewSpec.Motif.BOX),
+            Map.entry("breadcrumbs", PreviewSpec.Motif.TRAIL),
             Map.entry("tracers", PreviewSpec.Motif.BOX),
             Map.entry("block_outline", PreviewSpec.Motif.BOX),
             Map.entry("block_placement", PreviewSpec.Motif.BOX),
@@ -103,6 +105,8 @@ public final class PreviewSpecs {
             case "target_esp" -> target(module, accent);
             case "player_esp" -> playerEsp((PlayerEspModule) module, accent);
             case "item_esp" -> itemEsp((ItemEspModule) module, accent);
+            case "storage_esp" -> storageEsp(module, accent);
+            case "breadcrumbs" -> breadcrumbs(module, accent);
             case "tracers" -> tracers((TracersModule) module, accent);
             case "block_outline" -> blockOutline(module, accent);
             case "block_placement" -> blockPlacement(module, accent);
@@ -400,6 +404,31 @@ public final class PreviewSpecs {
                 module.expansion() / 0.5,
                 1,
                 detail);
+    }
+
+    private static PreviewSpec storageEsp(ClientModule module, int accent) {
+        int detail = (flag(module, "fill", true) ? PreviewSpec.BOX_GLOW : 0) | PreviewSpec.BOX_BOXES
+                | (flag(module, "through_walls", true) ? PreviewSpec.BOX_THROUGH : 0);
+        return new PreviewSpec(PreviewSpec.Motif.BOX, 0, hex(module, "chest_color", "F0C060"),
+                hex(module, "shulker_color", "FF70B0"), accent,
+                flag(module, "fill", true) ? 0.18 : 0,
+                0.5,
+                unit(num(module, "range", 6), 1, 12),
+                0.35,
+                0.1,
+                num(module, "opacity", 0.85),
+                detail);
+    }
+
+    private static PreviewSpec breadcrumbs(ClientModule module, int accent) {
+        return new PreviewSpec(PreviewSpec.Motif.TRAIL, 0, palette(module, accent, "palette", "custom"), accent, accent,
+                0.1,
+                0.5,
+                unit(num(module, "width", 2), 1, 4),
+                unit(num(module, "spacing", 0.5), 0.1, 3),
+                unit(num(module, "length", 1000), 50, 4096),
+                flag(module, "fade", true) ? 0.6 : 0.9,
+                0);
     }
 
     private static PreviewSpec itemEsp(ItemEspModule module, int accent) {

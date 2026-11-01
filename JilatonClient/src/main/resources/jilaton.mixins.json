@@ -39,6 +39,7 @@
     "FreeLookCameraMixin",
     "SmoothCameraMixin",
     "FinisherDeathMixin",
+    "SoundEventHookMixin",
     "ViewModelMixin",
     "CustomCrosshairMixin",
     "GameRendererFovAccess",

@@ -857,6 +857,35 @@ public final class VisualVerifier {
             disable("fullbright");
         });
 
+        // Storage ESP and Breadcrumbs: containers placed on the studio platform, then a short walked path.
+        then(2, () -> {
+            studio(client);
+            client.player.setYRot(0);
+            client.player.setXRot(25);
+            command(client, at("setblock", 2, 0, 5) + " minecraft:chest");
+            command(client, at("setblock", -2, 0, 6) + " minecraft:barrel");
+            command(client, at("setblock", 0, 0, 8) + " minecraft:white_shulker_box");
+            command(client, at("setblock", 3, 0, 9) + " minecraft:ender_chest");
+            enable("breadcrumbs");
+            enable("fullbright");
+        });
+        for (int step = 0; step < 8; step++) {
+            final int k = step;
+            then(2, () -> command(client, "tp @a " + (studioX + (k % 2 == 0 ? 0.6 : -0.6)) + " " + studioY + " "
+                    + (studioZ - 0.5 * (k + 1)) + " 0 25"));
+        }
+        then(5, () -> enable("storage_esp"));
+        shot(25, "39-storage-breadcrumbs");
+        then(2, () -> {
+            disable("storage_esp");
+            disable("breadcrumbs");
+            disable("fullbright");
+            for (int[] o : new int[][]{{2, 0, 5}, {-2, 0, 6}, {0, 0, 8}, {3, 0, 9}}) {
+                command(client, at("setblock", o[0], o[1], o[2]) + " minecraft:air");
+            }
+            studio(client);
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {
@@ -1231,6 +1260,11 @@ public final class VisualVerifier {
         if (Double.isNaN(studioY)) return;
         command(client, "tp @a " + studioX + " " + studioY + " " + studioZ + " 0 8");
         client.player.setDeltaMovement(0, 0, 0);
+    }
+
+    /** A command verb followed by absolute block coordinates offset from the studio centre. */
+    private String at(String verb, int dx, int dy, int dz) {
+        return verb + " " + (int) Math.floor(studioX + dx) + " " + (int) Math.floor(studioY + dy) + " " + (int) Math.floor(studioZ + dz);
     }
 
     private static void command(Minecraft client, String command) {
