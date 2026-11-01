@@ -112,11 +112,13 @@ public final class AutoGappleModule extends ClientModule {
     }
 
     private void restoreSlotIfSafe(Minecraft client) {
-        if (client.player == null || slotBeforeUse < 0 || appleSlot < 0 || client.player.isUsingItem()) {
+        Player player = client.player;
+        if (player == null) {
             return;
         }
-        if (client.player.getInventory().getSelectedSlot() == appleSlot) {
-            client.player.getInventory().setSelectedSlot(slotBeforeUse);
+        if (HotbarSlotRestore.shouldRestore(
+                player.getInventory().getSelectedSlot(), appleSlot, slotBeforeUse)) {
+            player.getInventory().setSelectedSlot(slotBeforeUse);
         }
     }
 

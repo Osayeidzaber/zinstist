@@ -269,7 +269,7 @@ public final class ModuleManager {
             boolean down = keyCode >= 0 && GLFW.glfwGetKey(window, keyCode) == GLFW.GLFW_PRESS;
             if (module.id().equals("free_look") && modules.get("freecam").enabled()) {
                 module.setEnabled(false);
-                previousKeyStates.put(module.id(), down);
+                previousKeyStates.put(module.id(), previousKeyState(down, client.isWindowActive()));
                 continue;
             }
             boolean wasDown = previousKeyStates.getOrDefault(module.id(), false);
@@ -279,7 +279,7 @@ public final class ModuleManager {
                 else if (action == HoldKeyAction.DISABLE) module.setEnabled(false);
                 // An unfocused window never counts as a held key, so returning with the key still
                 // down reads as a fresh press instead of being swallowed by a stale true.
-                previousKeyStates.put(module.id(), down && client.isWindowActive());
+                previousKeyStates.put(module.id(), previousKeyState(down, client.isWindowActive()));
             } else {
                 if (down && !wasDown) module.toggle();
                 previousKeyStates.put(module.id(), down);
@@ -296,5 +296,14 @@ public final class ModuleManager {
         if (!windowActive) return HoldKeyAction.DISABLE;
         if (down == wasDown) return HoldKeyAction.NONE;
         return down ? HoldKeyAction.ENABLE : HoldKeyAction.DISABLE;
+    }
+
+    /**
+     * State recorded for the next tick. An unfocused window must never be stored as "held", so a
+     * module that is let go of (or force-disabled by another module) while the game is unfocused
+     * still sees a fresh press when the player comes back with the key down.
+     */
+    static boolean previousKeyState(boolean down, boolean windowActive) {
+        return down && windowActive;
     }
 }
