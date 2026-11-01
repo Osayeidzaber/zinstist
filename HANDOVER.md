@@ -102,10 +102,10 @@ A green unit test never proves a mixin applies; `BUILD SUCCESSFUL` never proves 
 ClickGUI rendering, block outline, afterglow, CustomSky galaxy, wings/companion handedness, knife
 view-model and first-person hand stages, ambience sky tint (precedence now runtime-verified, see above).
 
-### Implemented but blocked by the environment
+### Lyrics
 
-- **Spatial / Sky Lyrics.** No lyrics resolve offline (`lines=0`); needs an authorized metadata source
-  or user-provided synchronized lyrics.
+- **Spatial / Sky Lyrics** runtime-verified offline with user-provided `.lrc` (scene 35). Online lookup
+  (LRCLIB) still cannot be exercised without network access; nothing was scraped or invented.
 
 ---
 
@@ -131,15 +131,17 @@ unused `FxShapes.softRing`, pinned target card.
 
 ### Open
 
-1. **Spatial / Sky Lyrics — blocked.** No lyrics resolve offline (`lines=0`); needs an authorized lyrics
-   metadata source or user-provided synchronized lyrics. Do not scrape or invent metadata.
-2. **`SpatialLyricsModule` per-frame allocations** (run lists, lambdas). Untouched on purpose: the module
-   cannot be exercised offline (item 1), so a change could not be verified. Do it together with item 1.
+Nothing. Every backlog item is closed and runtime-verified where it has visible behaviour.
 
-Also closed after the first handover pass: ClickGUI click-through is runtime-verified by the existing
-scenes 18b/18c (real `mouseClicked` events: the switch toggled exactly one module, the card body toggled
-nothing and opened the AntiBot drawer); the pinned card's empty preview tile was a picture-in-picture
-coordinate bug, fixed in the commit after `0c7a2f2`.
+- **Lyrics** are no longer blocked for verification: the *online/Spotify* path still needs a network and an
+  authorized source, but user-provided synced lyrics (Local files + `.lrc`) work offline. Harness scene 35
+  writes a silent WAV plus an `.lrc` of placeholder lines and shoots Curved Arc, World Trail and Sky Lyrics
+  (`lines=10`, active line advancing, status "Synced lyrics · local .lrc"). That pass found and fixed two
+  defects: Curved Arc printed the next line over the active one, and Sky Lyrics text was ~70 px wide.
+- **SpatialLyrics allocations:** per-character String allocation removed (glyph-width table); sky run list
+  reused. World-text run lists stay per line because `FxFrame.WorldText` keeps them until drawing.
+- Also closed after the first handover pass: ClickGUI click-through (scenes 18b/18c, real `mouseClicked`);
+  the pinned card's empty preview tile (picture-in-picture coordinate bug).
 
 ---
 
@@ -235,7 +237,9 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 - Pre-merge head `bbc1f53`: 206 / 958 / 0 / 0 / 0.
 - Harness on `bbc1f53`: exit 0, `BUILD SUCCESSFUL in 3m 35s`, clean boot, screenshots at 06:33.
 - `8f6aa87`: 207 / 965 / 0 / 0 / 0 (forced rerun); harness exit 0, `BUILD SUCCESSFUL in 3m 35s`.
-- After `0c7a2f2`: **208 / 975 / 0 / 0 / 0** (softRing test removed); harness exit 0 twice in a row, 98
+- Final head of the session: **209 / 976 / 0 / 0 / 0** (forced rerun); harness exit 0, 0 mixin/linkage/`ERROR`
+  lines, scenes 33/33b/35/35b/35c added.
+- After `0c7a2f2`: 208 / 975 / 0 / 0 / 0 (softRing test removed); harness exit 0 twice in a row, 98
   screenshots, 0 mixin/linkage/`ERROR`/"failed and was disabled" lines.
 - After `b1137d9`: 209 / 978 / 0 / 0 / 0; harness exit 0 with 98 screenshots (scenes 33/33b added).
 - After `356d346`: **209 / 976 / 0 / 0 / 0**. Harness not re-run (changes are GUI input and an over-budget
@@ -248,7 +252,7 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 1. **Read first:** this file, then `git log --oneline -25`, then `JilatonClient/development/BACKLOG.md`
    for item wording. Do not re-derive state from the older `development/*.md` status files.
 2. **First action:** run the gate (command in §G); run the harness if you touch rendering.
-3. **Priorities:** nothing unblocked is left in §D. Lyrics stay blocked. New harness scenes 33/33b (pinned card), 34-style AutoArmor log and the
+3. **Priorities:** §D is empty. Start new work from user requests; keep running the gate and the harness. Lyrics stay blocked. New harness scenes 33/33b (pinned card), 34-style AutoArmor log and the
    `gui-restore` lines are part of the baseline now.
 4. **Do not rewrite:** `EffectBatch`/`FxFrame`/`FxShapes` API, the module contract, `ClientConfig`
    persistence format, or the `HotbarSlotRestore`/hold-key rules — all were deliberately consolidated.
