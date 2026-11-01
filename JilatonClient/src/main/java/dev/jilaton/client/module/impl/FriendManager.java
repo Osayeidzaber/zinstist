@@ -42,7 +42,7 @@ public final class FriendManager {
     }
 
     public static boolean contains(String name) {
-        return FRIENDS.contains(normalize(name));
+        return name != null && name.matches("[A-Za-z0-9_]{1,16}") && FRIENDS.contains(normalize(name));
     }
 
     public static List<String> names() {

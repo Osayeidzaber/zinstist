@@ -107,12 +107,12 @@ final class FirstPersonArm {
          && !stack.is(Items.SPYGLASS)) {
          Minecraft.getInstance().getItemModelResolver().updateForTopItem(MODEL, stack, context, holder.level(), holder, holder.getId() + context.ordinal());
          AccessorHandItemRenderState state = (AccessorHandItemRenderState)MODEL;
-         if (state.anubis$handLayerCount() <= 0) {
+         if (state.jilaton$handLayerCount() <= 0) {
             return null;
          }
 
-         AccessorHandItemLayer layer = (AccessorHandItemLayer)state.anubis$handLayers()[0];
-         ItemTransform transform = layer.anubis$handTransform();
+         AccessorHandItemLayer layer = (AccessorHandItemLayer)state.jilaton$handLayers()[0];
+         ItemTransform transform = layer.jilaton$handTransform();
          Pose display = new Pose();
          if (transform != null) {
             transform.apply(context.leftHand(), display);
@@ -120,7 +120,7 @@ final class FirstPersonArm {
 
          Matrix4f m = display.pose();
          if (!MODEL.usesBlockLight()) {
-            float[] handle = handle(layer.anubis$handExtents() != null ? layer.anubis$handExtents().get() : null);
+            float[] handle = handle(layer.jilaton$handExtents() != null ? layer.jilaton$handExtents().get() : null);
             Vector3f grip = m.transformPosition(handle[0] - 0.5F, handle[1] - 0.5F, 0.0F, new Vector3f());
             if (context.leftHand()) {
                grip.x = -grip.x;

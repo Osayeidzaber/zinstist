@@ -12,6 +12,7 @@ import java.util.function.Predicate;
 public final class RotationManager {
     private final Map<String, RotationRequest> requests = new LinkedHashMap<>();
     private boolean requestsSuspended;
+    private RotationRequest lastApplied;
 
     public void beginTick() {
         requests.clear();
@@ -43,12 +44,23 @@ public final class RotationManager {
         requestsSuspended = true;
     }
 
+    /** Mouse assistance yields to the same higher-priority owners as tick-driven visible rotations. */
+    public boolean permitsMouseCorrection(int priority, Predicate<String> ownerEnabled) {
+        if (requestsSuspended) return false;
+        if (lastApplied != null && lastApplied.priority() > priority && ownerEnabled.test(lastApplied.owner())) return false;
+        for (RotationRequest request : requests.values()) {
+            if (request.priority() > priority && ownerEnabled.test(request.owner())) return false;
+        }
+        return true;
+    }
+
     public void apply(Minecraft client, Predicate<String> ownerEnabled) {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(ownerEnabled, "ownerEnabled");
         Player player = client.player;
         if (player == null) {
             requests.clear();
+            lastApplied = null;
             return;
         }
 
@@ -61,6 +73,7 @@ public final class RotationManager {
         }
         requests.clear();
         requestsSuspended = false;
+        lastApplied = winner;
         if (winner == null) {
             return;
         }

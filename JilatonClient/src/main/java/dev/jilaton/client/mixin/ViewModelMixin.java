@@ -21,8 +21,8 @@ public abstract class ViewModelMixin {
     private void jilaton$transformHand(AbstractClientPlayer player, float partial, float pitch,
             InteractionHand hand, float swing, ItemStack item, float equip, PoseStack pose,
             SubmitNodeCollector collector, int light, CallbackInfo callback) {
-        if (JilatonClient.moduleManager().get("view_model") instanceof ViewModelModule model && model.enabled())
-            model.apply(pose, hand, hand == InteractionHand.MAIN_HAND && item.has(DataComponents.MAP_ID)
-                    && player.getOffhandItem().isEmpty());
+        if (JilatonClient.moduleManager().get("view_model") instanceof ViewModelModule model && model.renderActive())
+            model.applyRendered(pose, hand, hand == InteractionHand.MAIN_HAND && item.has(DataComponents.MAP_ID)
+                    && player.getOffhandItem().isEmpty(), player.getMainArm());
     }
 }

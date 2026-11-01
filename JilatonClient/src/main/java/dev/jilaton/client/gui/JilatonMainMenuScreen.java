@@ -17,39 +17,37 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.storage.LevelSummary;
 import org.lwjgl.glfw.GLFW;
 
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Home: a calm landing built on the {@link Kit} design system. Top bar with brand, clock and account; a hero with
- * a greeting, the wordmark and the two main actions (continue your last world, multiplayer); four quick tiles
- * (worlds, servers, client, settings); the player on the right; music and quit along the bottom. Everything
- * enters with a short stagger and every control has eased hover and press states. Keyboard: Tab/arrows move
- * focus through the actions, Enter activates.
+ * Home, editorial direction (after zaber.tech): a live GPU shader background with parallax hairline rings, a
+ * "volume" header with a pill navigation whose white capsule slides to the hovered item and a working FULL EFFECTS
+ * switch, a kinetic wordmark revealed letter by letter, a hairline rule with a travelling light sweep, four
+ * numbered columns (I.–IV.) with magnetic hover and growing indicator lines, and a slow kinetic marquee along the
+ * bottom. Every motion goes through {@link Kit#spring} / {@link Kit#enter}, so transition speed and reduced motion
+ * apply everywhere.
  */
 public final class JilatonMainMenuScreen extends Screen {
-    private static final float HERO_X = 96;
-    private static final float TILE_Y = 452, TILE_W = 190, TILE_H = 132, TILE_GAP = 16;
-    private static final float AVATAR_CX = 1000, AVATAR_FLOOR = 556, AVATAR_H = 340;
-    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
+    private static final float M = 64;
+    private static final String[] NAV = {"Home", "Worlds", "Servers", "Client", "Settings"};
+    private static final String[] COL_NUM = {"I.", "II.", "III.", "IV."};
+    private static final String[] COL_TITLE = {"Singleplayer", "Multiplayer", "Client", "Settings"};
 
-    /** A clickable region: its key (for eased state), bounds and what it does. */
-    private record Action(String key, float x, float y, float w, float h, Runnable run) {
-        boolean hit(double mx, double my) {
+    private record Hit(String key, float x, float y, float w, float h, Runnable run) {
+        boolean inside(double mx, double my) {
             return Ui.inside(mx, my, x, y, w, h);
         }
     }
 
     private final Canvas canvas = new Canvas();
-    private final List<Action> actions = new ArrayList<>();
-    private MenuAvatar avatar;
+    private final List<Hit> hits = new ArrayList<>();
     private long openedAt;
+    private String pressed;
     private int focused = -1;
-    private String pressedKey;
     private LevelSummary lastWorld;
     private int worldCount = -1;
     private CompletableFuture<List<LevelSummary>> worlds;
@@ -63,13 +61,6 @@ public final class JilatonMainMenuScreen extends Screen {
     @Override
     protected void init() {
         canvas.fit(width, height);
-        if (avatar == null) {
-            try {
-                avatar = new MenuAvatar(minecraft);
-            } catch (RuntimeException exception) {
-                avatar = null;
-            }
-        }
         if (worlds == null) {
             try {
                 var source = minecraft.getLevelSource();
@@ -85,14 +76,20 @@ public final class JilatonMainMenuScreen extends Screen {
         return false;
     }
 
+    @Override
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        Backdrops.drawScreen(graphics, width, height, partialTick);
+    }
+
     // ---------------------------------------------------------------- actions
 
     private void play() {
-        if (lastWorld != null) {
-            minecraft.createWorldOpenFlows().openWorld(lastWorld.getLevelId(), () -> minecraft.setScreen(this));
-        } else {
-            minecraft.setScreen(new JilatonWorldsScreen(this));
-        }
+        if (lastWorld != null) minecraft.createWorldOpenFlows().openWorld(lastWorld.getLevelId(), () -> minecraft.setScreen(this));
+        else minecraft.setScreen(new JilatonWorldsScreen(this));
+    }
+
+    private void worldsScreen() {
+        minecraft.setScreen(new JilatonWorldsScreen(this));
     }
 
     private void multiplayer() {
@@ -101,172 +98,272 @@ public final class JilatonMainMenuScreen extends Screen {
                 : new net.minecraft.client.gui.screens.multiplayer.SafetyScreen(this));
     }
 
-    private void layoutActions() {
-        actions.clear();
-        actions.add(new Action("play", HERO_X, 360, 248, 52, this::play));
-        actions.add(new Action("multi", HERO_X + 260, 360, 172, 52, this::multiplayer));
-        String[] tiles = {"worlds", "servers", "client", "settings"};
-        Runnable[] runs = {
-                () -> minecraft.setScreen(new JilatonWorldsScreen(this)),
-                this::multiplayer,
-                () -> JilatonClient.openClickGui(this),
-                () -> minecraft.setScreen(new OptionsScreen(this, minecraft.options))};
-        for (int i = 0; i < 4; i++) {
-            actions.add(new Action(tiles[i], HERO_X + i * (TILE_W + TILE_GAP), TILE_Y, TILE_W, TILE_H, runs[i]));
-        }
-        String name = minecraft.getUser().getName();
-        float accW = 52 + Ui.width(name, Kit.CALLOUT, JilatonType.Face.MEDIUM);
-        actions.add(new Action("account", 1184 - accW, 28, accW, 38, () -> minecraft.setScreen(new AccountsScreen(this))));
-        actions.add(new Action("music", HERO_X, 640, musicWidth(), 44, () -> minecraft.setScreen(new MusicCenterScreen(this))));
-        actions.add(new Action("quit", 1104, 642, 80, 40, minecraft::stop));
-        actions.add(new Action("skin", AVATAR_CX - 132, AVATAR_FLOOR + 34, 124, 36, () -> minecraft.setScreen(new AccountsScreen(this))));
-        actions.add(new Action("character", AVATAR_CX + 8, AVATAR_FLOOR + 34, 124, 36, () -> JilatonClient.openClickGui(this)));
+    private void client() {
+        JilatonClient.openClickGui(this);
+    }
+
+    private void settings() {
+        minecraft.setScreen(new OptionsScreen(this, minecraft.options));
+    }
+
+    private Runnable navAction(int i) {
+        return switch (i) {
+            case 1 -> this::worldsScreen;
+            case 2 -> this::multiplayer;
+            case 3 -> this::client;
+            case 4 -> this::settings;
+            default -> () -> { };
+        };
     }
 
     // ---------------------------------------------------------------- render
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        long now = System.nanoTime();
-        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = now;
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        if (openedAt == 0L || minecraft.getOverlay() != null) openedAt = System.nanoTime();
         resolveWorlds();
-        layoutActions();
         double mx = canvas.x(mouseX), my = canvas.y(mouseY);
-        String hovered = null;
-        for (Action a : actions) if (a.hit(mx, my)) hovered = a.key();
-        String focusKey = focused >= 0 && focused < actions.size() ? actions.get(focused).key() : null;
+        // Parallax offsets: the cursor's distance from centre, eased.
+        double px = Kit.spring("home:px", (mx - 640) / 640.0), py = Kit.spring("home:py", (my - 360) / 360.0);
+        String focusKey = focused >= 0 && focused < hits.size() ? hits.get(focused).key() : null;
+        List<Hit> previous = new ArrayList<>(hits);
+        hits.clear();
 
-        Backdrops.drawScreen(graphics, width, height, partialTick);
-        canvas.begin(graphics);
-        Backdrops.drawBoard(graphics);
+        canvas.begin(g);
+        rings(g, px, py);
+        header(g, mx, my, previous, focusKey);
+        hero(g, px, py);
+        columns(g, mx, my, previous, focusKey);
+        footer(g, mx, my, previous, focusKey);
+        marquee(g);
+        canvas.end(g);
+    }
 
-        topBar(graphics, now, hovered, focusKey);
-        hero(graphics, now, hovered, focusKey);
-        tiles(graphics, now, hovered, focusKey);
-        bottom(graphics, now, hovered, focusKey);
-        avatarChips(graphics, now, hovered, focusKey);
-        canvas.end(graphics);
+    private boolean over(String key, double mx, double my, List<Hit> previous, String focusKey) {
+        if (key.equals(focusKey)) return true;
+        for (Hit h : previous) if (h.key().equals(key)) return h.inside(mx, my);
+        return false;
+    }
 
-        if (avatar != null) {
-            int floor = canvas.screenY(AVATAR_FLOOR);
-            avatar.render(graphics, canvas.screenX(AVATAR_CX), floor, Math.round(AVATAR_H * canvas.scale()),
-                    canvas.screenX(720), width, openedAt, now, mouseX, mouseY, Kit.reduced(),
-                    JilatonClient.clientConfig().animationIntensity());
+    /** Concentric hairline rings on the right, drifting against the cursor; a tick orbits the inner one. */
+    private void rings(GuiGraphics g, double px, double py) {
+        double in = Kit.enter(openedAt, 0.1);
+        float cx = (float) (930 - px * 22), cy = (float) (330 - py * 14);
+        float[] radii = {150, 250, 370, 520};
+        for (int i = 0; i < radii.length; i++) {
+            Ui.ring(g, cx, cy, radii[i] * (float) (0.9 + 0.1 * in), 1, Kit.a(0xFFFFFFFF, (0.09 - i * 0.015) * in));
+        }
+        double t = Kit.reduced() ? 0.6 : System.nanoTime() / 1e9 * 0.25;
+        for (int i = 0; i < 3; i++) {
+            double a = t + i * 2.1;
+            float r = radii[i];
+            Ui.circle(g, cx + (float) (Math.cos(a) * r), cy + (float) (Math.sin(a) * r), 2.5F - i * 0.5F, Kit.a(Kit.LABEL, 0.7 * in));
         }
     }
 
-    private boolean active(String key, String hovered, String focusKey) {
-        return key.equals(hovered) || key.equals(focusKey);
+    private void header(GuiGraphics g, double mx, double my, List<Hit> previous, String focusKey) {
+        double in = Kit.enter(openedAt, 0);
+        mono(g, "JL — VOL. 01", M, 34, Kit.a(Kit.LABEL, in));
+
+        // Pill navigation; the white capsule slides to the hovered item, resting on Home.
+        float navW = 0;
+        float[] widths = new float[NAV.length];
+        for (int i = 0; i < NAV.length; i++) {
+            widths[i] = Ui.spacedWidth(NAV[i].toUpperCase(Locale.ROOT), Kit.CAPTION, 1.6F, JilatonType.Face.MONO) + 32;
+            navW += widths[i];
+        }
+        float nx = (Canvas.W - navW - 8) / 2, ny = 22;
+        Ui.round(g, nx, ny, navW + 8, 38, 19, Kit.a(0xFF0C0C0C, 0.85 * in));
+        dev.jilaton.client.gui.design.Paint.outline(g, nx, ny, navW + 8, 38, 19, 0, Kit.a(0xFFFFFFFF, 0.12 * in));
+        int target = 0;
+        float cx = nx + 4;
+        float[] xs = new float[NAV.length];
+        for (int i = 0; i < NAV.length; i++) {
+            xs[i] = cx;
+            hits.add(new Hit("nav" + i, cx, ny + 4, widths[i], 30, navAction(i)));
+            if (over("nav" + i, mx, my, previous, focusKey)) target = i;
+            cx += widths[i];
+        }
+        double sx = Kit.spring("home:navx", xs[target]), sw = Kit.spring("home:navw", widths[target]);
+        Ui.round(g, (float) sx, ny + 4, (float) sw, 30, 15, Kit.a(Kit.LABEL, in));
+        for (int i = 0; i < NAV.length; i++) {
+            double on = 1 - Math.min(1, Math.abs(sx - xs[i]) / Math.max(1, widths[i]));
+            int color = Kit.mix(Kit.LABEL_2, 0xFF0A0A0A, on);
+            Ui.spaced(g, NAV[i].toUpperCase(Locale.ROOT), xs[i] + 16, ny + 14, Kit.CAPTION, 1.6F, JilatonType.Face.MONO, Kit.a(color, in));
+        }
+
+        // FULL EFFECTS switch: the dot is lit while high-quality effects run.
+        boolean full = JilatonClient.clientConfig().fullEffects();
+        String label = "FULL EFFECTS";
+        float fw = Ui.spacedWidth(label, Kit.CAPTION, 1.6F, JilatonType.Face.MONO_MEDIUM) + 46;
+        float fx = Canvas.W - M - fw;
+        hits.add(new Hit("effects", fx, ny, fw, 38, () -> {
+            JilatonClient.clientConfig().setFullEffects(!JilatonClient.clientConfig().fullEffects());
+            JilatonClient.clientConfig().save(JilatonClient.moduleManager());
+        }));
+        double fh = Kit.spring("home:fx", over("effects", mx, my, previous, focusKey));
+        Ui.round(g, fx, ny, fw, 38, 19, Kit.a(Kit.mix(0xFF0C0C0C, 0xFF1C1C1C, fh), 0.9 * in));
+        dev.jilaton.client.gui.design.Paint.outline(g, fx, ny, fw, 38, 19, 0, Kit.a(0xFFFFFFFF, (0.18 + 0.2 * fh) * in));
+        double lit = Kit.spring("home:fxlit", full);
+        Ui.circle(g, fx + 20, ny + 19, 4, Kit.a(Kit.mix(Kit.LABEL_4, Kit.LABEL, lit), in));
+        if (lit > 0.01) Ui.glow(g, fx + 20, ny + 19, 12, 0xFFFFFF, 0.25 * lit * in);
+        Ui.spaced(g, label, fx + 32, ny + 14, Kit.CAPTION, 1.6F, JilatonType.Face.MONO_MEDIUM, Kit.a(Kit.LABEL, in));
+
+        // Section meta row.
+        double meta = Kit.enter(openedAt, 0.12);
+        mono(g, "00 — HOME", M, 112, Kit.a(Kit.LABEL_3, meta));
+        String right = "MINECRAFT 1.21.11 · JILATON " + version.toUpperCase(Locale.ROOT);
+        mono(g, right, Canvas.W - M - Ui.spacedWidth(right, Kit.CAPTION, 1.6F, JilatonType.Face.MONO), 112, Kit.a(Kit.LABEL_3, meta));
     }
 
-    private void topBar(GuiGraphics g, long now, String hovered, String focusKey) {
-        double in = Kit.enter(openedAt, 0.0);
-        float y = 28 - (float) (6 * (1 - in));
-        Ui.mark(g, HERO_X, y + 9, 20, Kit.a(Kit.LABEL, in));
-        Kit.text(g, "Jilaton", HERO_X + 30, y + 12, Kit.HEADLINE, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
-        Action account = find("account");
-        String clock = LocalTime.now().format(CLOCK);
-        Ui.textRight(g, clock, account.x() - 18, y + 13, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL_2, in));
-        double hv = Kit.spring("home:account", active("account", hovered, focusKey));
-        Kit.glass(g, account.x(), y, account.w(), 38, 19, hv);
-        Ui.face(g, account.x() + 7, y + 7, 24);
-        Kit.text(g, minecraft.getUser().getName(), account.x() + 40, y + 13, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL, in));
+    /** Kinetic wordmark: each letter rises out of a mask in turn; the subtitle types in after. */
+    private void hero(GuiGraphics g, double px, double py) {
+        String word = "Jilaton";
+        float size = 168, x = M - 6 + (float) (px * 6), base = 168 + (float) (py * 4);
+        float cx = x;
+        g.enableScissor(0, Math.round(base - 4), Math.round(Canvas.W), Math.round(base + size * 0.98F));
+        for (int i = 0; i < word.length(); i++) {
+            String ch = word.substring(i, i + 1);
+            double in = Kit.enter(openedAt, 0.15 + i * 0.05);
+            float rise = (float) ((1 - in) * size * 0.9);
+            Kit.text(g, ch, cx, base + rise, size, JilatonType.Face.BOLD, Kit.LABEL);
+            cx += Kit.width(ch, size, JilatonType.Face.BOLD) - 4;
+        }
+        g.disableScissor();
+        double sub = Kit.enter(openedAt, 0.55);
+        String line = "client for people who notice the details.";
+        int shown = (int) Math.round(line.length() * sub);
+        float lx = cx + 24;
+        Kit.text(g, "/ minecraft", lx, base + 52, 34, JilatonType.Face.REGULAR, Kit.a(Kit.accentSoft(), sub));
+        Kit.text(g, line.substring(0, shown), lx, base + 102, Kit.HEADLINE, JilatonType.Face.REGULAR, Kit.a(Kit.LABEL_2, sub));
+        if (shown < line.length() && !Kit.reduced()) {
+            float caret = lx + Kit.width(line.substring(0, shown), Kit.HEADLINE, JilatonType.Face.REGULAR) + 2;
+            Ui.rect(g, caret, base + 101, 2, 16, Kit.LABEL);
+        }
     }
 
-    private void hero(GuiGraphics g, long now, String hovered, String focusKey) {
-        double a = Kit.enter(openedAt, 0.08), b = Kit.enter(openedAt, 0.16), c = Kit.enter(openedAt, 0.24);
-        Kit.text(g, greeting(), HERO_X, 186 + rise(a), Kit.HEADLINE, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL_2, a));
-        Kit.text(g, "Jilaton", HERO_X - 3, 212 + rise(b), 84, JilatonType.Face.BOLD, Kit.a(Kit.LABEL, b));
-        Kit.text(g, "Everything you need, nothing you don't.", HERO_X, 312 + rise(c), 17, JilatonType.Face.REGULAR,
-                Kit.a(Kit.LABEL_2, c));
-
-        double d = Kit.enter(openedAt, 0.32);
-        Action play = find("play"), multi = find("multi");
-        String label = lastWorld == null ? (worldCount == 0 ? "Create a world" : "Play") : "Continue  ·  " + lastWorld.getLevelName();
-        label = Ui.fit(label, play.w() - 40, Kit.HEADLINE, JilatonType.Face.SEMIBOLD);
-        float lift = rise(d);
-        Kit.button(g, "home:play", label, play.x(), play.y() + lift, play.w(), play.h(), 0,
-                active("play", hovered, focusKey), "play".equals(pressedKey));
-        Kit.button(g, "home:multi", "Multiplayer", multi.x(), multi.y() + lift, multi.w(), multi.h(), 1,
-                active("multi", hovered, focusKey), "multi".equals(pressedKey));
-    }
-
-    private void tiles(GuiGraphics g, long now, String hovered, String focusKey) {
-        String[] icons = {"folder", "globe", "grid", "gear"};
-        String[] titles = {"Worlds", "Servers", "Client", "Settings"};
-        String worldsLine = worldCount < 0 ? "Loading…" : worldCount == 0 ? "No worlds yet" : worldCount + (worldCount == 1 ? " world" : " worlds");
+    /** Four editorial columns under a rule with a travelling light sweep. */
+    private void columns(GuiGraphics g, double mx, double my, List<Hit> previous, String focusKey) {
+        float ruleY = 410;
+        double rule = Kit.enter(openedAt, 0.4);
+        float rw = (Canvas.W - 2 * M) * (float) rule;
+        Ui.rect(g, M, ruleY, rw, 1, Kit.a(0xFFFFFFFF, 0.14));
+        if (!Kit.reduced() && JilatonClient.clientConfig().fullEffects()) {
+            double sweep = (System.nanoTime() / 1e9 * 0.18) % 1.4 - 0.2;
+            float sx = M + (float) (sweep * (Canvas.W - 2 * M));
+            for (int i = 0; i < 24; i++) {
+                float k = 1 - Math.abs(i - 12) / 12F;
+                Ui.rect(g, sx + i * 6, ruleY, 6, 1, Kit.a(0xFFFFFFFF, 0.55 * k * k * rule));
+            }
+        }
+        String worldsLine = worldCount < 0 ? "Reading your saves…" : lastWorld != null
+                ? "Continue " + lastWorld.getLevelName() + ", or open one of " + worldCount + "." : "Create your first world.";
         int on = 0;
         for (var m : JilatonClient.moduleManager().all()) if (m.enabled()) on++;
-        String[] lines = {worldsLine, "Multiplayer and LAN", on + " modules on", "Video, audio, controls"};
+        String[] desc = {worldsLine, "Saved servers, direct connect and LAN games.",
+                on + " modules running. Visuals, combat, music, cosmetics.", "Video, audio, controls and language."};
+        Runnable[] run = {this::worldsScreen, this::multiplayer, this::client, this::settings};
+        float colW = (Canvas.W - 2 * M - 3 * 28) / 4;
         for (int i = 0; i < 4; i++) {
-            Action t = find(new String[]{"worlds", "servers", "client", "settings"}[i]);
-            double in = Kit.enter(openedAt, 0.4 + i * 0.05);
-            double hv = Kit.spring("home:tile:" + i, active(t.key(), hovered, focusKey));
-            double pr = Kit.spring("home:tilep:" + i, t.key().equals(pressedKey));
-            float y = t.y() + rise(in) - (float) (3 * hv) + (float) (1.5 * pr);
-            if (in < 0.02) continue;
-            Kit.glass(g, t.x(), y, t.w(), t.h(), Kit.R_TILE, hv * (1 - pr));
-            Ui.round(g, t.x() + 18, y + 18, 36, 36, 10, Kit.a(Kit.mix(Kit.SURFACE_3, Kit.accent(), 0.12 * hv), in));
-            Kit.icon(g, icons[i], t.x() + 36, y + 36, 20, Kit.a(Kit.mix(Kit.LABEL_2, Kit.LABEL, hv), in));
-            Kit.text(g, titles[i], t.x() + 18, y + 76, Kit.HEADLINE, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
-            Kit.text(g, Ui.fit(lines[i], t.w() - 36, Kit.FOOTNOTE, JilatonType.Face.REGULAR), t.x() + 18, y + 98,
-                    Kit.FOOTNOTE, JilatonType.Face.REGULAR, Kit.a(Kit.LABEL_2, in));
-            Kit.icon(g, "chevron", t.x() + t.w() - 22, y + 24, 14, Kit.a(Kit.LABEL_3, hv * in));
+            float x = M + i * (colW + 28), y = ruleY + 26;
+            String key = "col" + i;
+            hits.add(new Hit(key, x, y - 10, colW, 150, run[i]));
+            boolean hot = over(key, mx, my, previous, focusKey);
+            double hv = Kit.spring("home:col" + i, hot);
+            double pr = Kit.spring("home:colp" + i, key.equals(pressed));
+            double in = Kit.enter(openedAt, 0.48 + i * 0.07);
+            // Magnetic pull toward the cursor while hovered.
+            float pull = hot ? (float) Math.max(-6, Math.min(6, (mx - (x + colW / 2)) * 0.03)) : 0;
+            double mag = Kit.spring("home:colm" + i, pull);
+            float ox = (float) (mag * hv), oy = (float) ((1 - in) * 24 + pr * 2);
+            Ui.rect(g, x, y - 26, (float) (colW * hv), 2, Kit.a(Kit.accentStrong(), hv));
+            mono(g, COL_NUM[i], x + ox, y + oy, Kit.a(Kit.mix(Kit.LABEL_3, Kit.LABEL, hv), in));
+            Kit.text(g, COL_TITLE[i], x + ox + (float) (8 * hv), y + 28 + oy, 24, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
+            float tw = Kit.width(COL_TITLE[i], 24, JilatonType.Face.SEMIBOLD);
+            if (hv > 0.02) {
+                Kit.text(g, "↗", x + ox + tw + 18 + (float) (4 * hv), y + 30 + oy - (float) (4 * hv), 20,
+                        JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL, hv * in));
+            }
+            wrap(g, desc[i], x + ox, y + 68 + oy, colW - 8, Kit.a(Kit.mix(Kit.LABEL_3, Kit.LABEL_2, hv), in));
         }
     }
 
-    private void bottom(GuiGraphics g, long now, String hovered, String focusKey) {
-        double in = Kit.enter(openedAt, 0.6);
-        Action music = find("music");
+    private void footer(GuiGraphics g, double mx, double my, List<Hit> previous, String focusKey) {
+        double in = Kit.enter(openedAt, 0.7);
+        float y = 612;
+        String label = lastWorld != null ? "Continue — " + Ui.fit(lastWorld.getLevelName(), 160, Kit.HEADLINE, JilatonType.Face.SEMIBOLD)
+                : worldCount == 0 ? "Create a world" : "Play";
+        float pw = Kit.width(label, Kit.HEADLINE, JilatonType.Face.SEMIBOLD) + 66;
+        hits.add(new Hit("play", M, y, pw, 48, this::play));
+        double ph = Kit.spring("home:play", over("play", mx, my, previous, focusKey));
+        double pp = Kit.spring("home:playp", "play".equals(pressed));
+        float sink = (float) (pp * 1.5);
+        Ui.round(g, M, y + sink, pw, 48, 24, Kit.a(Kit.mix(Kit.LABEL, 0xFFFFFFFF, ph), in));
+        Kit.text(g, label, M + 26, y + 17 + sink, Kit.HEADLINE, JilatonType.Face.SEMIBOLD, Kit.a(0xFF0A0A0A, in));
+        Kit.text(g, "↘", M + pw - 32 + (float) (3 * ph), y + 15 + sink + (float) (2 * ph), 17, JilatonType.Face.MEDIUM, Kit.a(0xFF0A0A0A, in));
+
+        float qx = M + pw + 12, qw = 104;
+        hits.add(new Hit("quit", qx, y, qw, 48, minecraft::stop));
+        double qh = Kit.spring("home:quit", over("quit", mx, my, previous, focusKey));
+        Ui.round(g, qx, y, qw, 48, 24, Kit.a(Kit.mix(0xFF000000, 0xFF1A1A1A, qh), 0.6 * in));
+        dev.jilaton.client.gui.design.Paint.outline(g, qx, y, qw, 48, 24, 0, Kit.a(0xFFFFFFFF, (0.22 + 0.25 * qh) * in));
+        Ui.textCentre(g, "Quit", qx + qw / 2, y + 17, Kit.HEADLINE, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
+
+        // Right side: music line and account.
         MusicCenter center = MusicCenter.get();
         NowPlaying np = center.nowPlaying();
-        boolean off = center.source() == MusicCenter.Source.OFF;
-        String title = off ? "Music" : np.hasTrack() ? np.title() : "Nothing playing";
-        String sub = off ? "Connect Spotify or play local files" : np.hasTrack() ? np.artist() : "Open the music center";
-        double hv = Kit.spring("home:music", active("music", hovered, focusKey));
-        Kit.glass(g, music.x(), music.y(), music.w(), music.h(), 22, hv);
-        Ui.circle(g, music.x() + 22, music.y() + 22, 14, Kit.a(Kit.SURFACE_3, in));
-        Kit.icon(g, "music", music.x() + 22, music.y() + 22, 14, Kit.a(np.hasTrack() && np.playing() ? Kit.LABEL : Kit.LABEL_2, in));
-        Kit.text(g, Ui.fit(title, music.w() - 64, Kit.CALLOUT, JilatonType.Face.SEMIBOLD), music.x() + 46, music.y() + 8,
-                Kit.CALLOUT, JilatonType.Face.SEMIBOLD, Kit.a(Kit.LABEL, in));
-        Kit.text(g, Ui.fit(sub, music.w() - 64, Kit.CAPTION, JilatonType.Face.REGULAR), music.x() + 46, music.y() + 25,
-                Kit.CAPTION, JilatonType.Face.REGULAR, Kit.a(Kit.LABEL_2, in));
-
-        Action quit = find("quit");
-        double qh = Kit.spring("home:quit", active("quit", hovered, focusKey));
-        if (qh > 0.01) Ui.round(g, quit.x(), quit.y(), quit.w(), quit.h(), 20, Kit.a(Kit.SURFACE_3, 0.7 * qh));
-        Kit.icon(g, "power", quit.x() + 22, quit.y() + 20, 14, Kit.mix(Kit.LABEL_2, Kit.RED, qh));
-        Kit.text(g, "Quit", quit.x() + 38, quit.y() + 13, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.mix(Kit.LABEL_2, Kit.LABEL, qh));
-        Ui.textRight(g, "Jilaton " + version + "  ·  Minecraft 1.21.11", 1184, 694, Kit.CAPTION, JilatonType.Face.REGULAR,
-                Kit.a(Kit.LABEL_3, in));
+        String music = center.source() == MusicCenter.Source.OFF ? "MUSIC — OFF" : np.hasTrack()
+                ? "NOW — " + np.title().toUpperCase(Locale.ROOT) : "MUSIC — IDLE";
+        music = Ui.fit(music, 300, Kit.CAPTION, JilatonType.Face.MONO);
+        float mw = Ui.spacedWidth(music, Kit.CAPTION, 1.6F, JilatonType.Face.MONO);
+        String name = minecraft.getUser().getName();
+        float aw = 44 + Kit.width(name, Kit.CALLOUT, JilatonType.Face.MEDIUM);
+        float ax = Canvas.W - M - aw;
+        hits.add(new Hit("account", ax, y + 5, aw, 38, () -> minecraft.setScreen(new AccountsScreen(this))));
+        double ah = Kit.spring("home:acc", over("account", mx, my, previous, focusKey));
+        Ui.round(g, ax, y + 5, aw, 38, 19, Kit.a(Kit.mix(0xFF0C0C0C, 0xFF1C1C1C, ah), 0.9 * in));
+        dev.jilaton.client.gui.design.Paint.outline(g, ax, y + 5, aw, 38, 19, 0, Kit.a(0xFFFFFFFF, (0.14 + 0.2 * ah) * in));
+        Ui.face(g, ax + 7, y + 12, 24);
+        Kit.text(g, name, ax + 38, y + 18, Kit.CALLOUT, JilatonType.Face.MEDIUM, Kit.a(Kit.LABEL, in));
+        float mxp = ax - 24 - mw;
+        hits.add(new Hit("music", mxp - 8, y + 5, mw + 16, 38, () -> minecraft.setScreen(new MusicCenterScreen(this))));
+        double mh = Kit.spring("home:music", over("music", mx, my, previous, focusKey));
+        mono(g, music, mxp, y + 19, Kit.a(Kit.mix(Kit.LABEL_3, Kit.LABEL, mh), in));
+        Ui.rect(g, mxp, y + 34, (float) (mw * mh), 1, Kit.a(Kit.LABEL, mh * in));
     }
 
-    private void avatarChips(GuiGraphics g, long now, String hovered, String focusKey) {
-        double in = Kit.enter(openedAt, 0.5);
-        Kit.button(g, "home:skin", "Skin", find("skin").x(), find("skin").y() + rise(in), 124, 36, 1,
-                active("skin", hovered, focusKey), "skin".equals(pressedKey));
-        Kit.button(g, "home:character", "Character", find("character").x(), find("character").y() + rise(in), 124, 36, 1,
-                active("character", hovered, focusKey), "character".equals(pressedKey));
+    /** A slow mono marquee along the bottom edge. */
+    private void marquee(GuiGraphics g) {
+        double in = Kit.enter(openedAt, 0.8);
+        String unit = "SINGLEPLAYER  /  MULTIPLAYER  /  MODULES  /  VISUALS  /  MUSIC  /  COSMETICS  /  ";
+        float uw = Ui.spacedWidth(unit, Kit.CAPTION, 1.6F, JilatonType.Face.MONO);
+        double t = Kit.reduced() ? 0 : System.nanoTime() / 1e9 * 26;
+        float off = (float) (t % uw);
+        float y = 690;
+        Ui.rect(g, 0, y - 12, Canvas.W, 1, Kit.a(0xFFFFFFFF, 0.08 * in));
+        for (float x = -off; x < Canvas.W; x += uw) mono(g, unit, x, y, Kit.a(Kit.LABEL_4, in));
     }
 
-    private float musicWidth() {
-        NowPlaying np = MusicCenter.get().nowPlaying();
-        String title = np.hasTrack() ? np.title() : "Connect Spotify or play local files";
-        return Math.min(340, Math.max(220, 72 + Ui.width(title, Kit.CALLOUT, JilatonType.Face.SEMIBOLD)));
+    // ---------------------------------------------------------------- helpers
+
+    private static void mono(GuiGraphics g, String s, float x, float y, int color) {
+        Ui.spaced(g, s, x, y, Kit.CAPTION, 1.6F, JilatonType.Face.MONO, color);
     }
 
-    private static float rise(double in) {
-        return (float) (12 * (1 - in));
-    }
-
-    private static String greeting() {
-        int h = LocalTime.now().getHour();
-        return h < 5 ? "Late night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-    }
-
-    private Action find(String key) {
-        for (Action a : actions) if (a.key().equals(key)) return a;
-        throw new IllegalStateException(key);
+    private static void wrap(GuiGraphics g, String text, float x, float y, float w, int color) {
+        StringBuilder line = new StringBuilder();
+        float ly = y;
+        for (String word : text.split(" ")) {
+            String next = line.isEmpty() ? word : line + " " + word;
+            if (Kit.width(next, Kit.CALLOUT, JilatonType.Face.REGULAR) > w && !line.isEmpty()) {
+                Kit.text(g, line.toString(), x, ly, Kit.CALLOUT, JilatonType.Face.REGULAR, color);
+                line = new StringBuilder(word);
+                ly += 19;
+            } else {
+                line = new StringBuilder(next);
+            }
+        }
+        if (!line.isEmpty()) Kit.text(g, line.toString(), x, ly, Kit.CALLOUT, JilatonType.Face.REGULAR, color);
     }
 
     private void resolveWorlds() {
@@ -283,28 +380,26 @@ public final class JilatonMainMenuScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (event.button() == 0) {
             double mx = canvas.x(event.x()), my = canvas.y(event.y());
-            for (Action a : actions) {
-                if (a.hit(mx, my)) {
-                    pressedKey = a.key();
+            for (Hit h : hits) {
+                if (h.inside(mx, my)) {
+                    pressed = h.key();
                     return true;
                 }
             }
-            if (avatar != null && avatar.mouseClicked(event.x(), event.y())) return true;
         }
         return super.mouseClicked(event, doubleClick);
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (avatar != null) avatar.mouseReleased();
-        if (pressedKey != null) {
-            String key = pressedKey;
-            pressedKey = null;
+        if (pressed != null) {
+            String key = pressed;
+            pressed = null;
             double mx = canvas.x(event.x()), my = canvas.y(event.y());
-            for (Action a : actions) {
-                if (a.key().equals(key) && a.hit(mx, my)) {
-                    a.run().run();
-                    return true;
+            for (Hit h : hits) {
+                if (h.key().equals(key) && h.inside(mx, my)) {
+                    h.run().run();
+                    break;
                 }
             }
             return true;
@@ -313,26 +408,22 @@ public final class JilatonMainMenuScreen extends Screen {
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
-        if (avatar != null && avatar.mouseDragged(dragX)) return true;
-        return super.mouseDragged(event, dragX, dragY);
-    }
-
-    @Override
     public boolean keyPressed(KeyEvent event) {
         int key = event.key();
-        if (actions.isEmpty()) return super.keyPressed(event);
-        if (key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_DOWN) {
-            focused = (focused + 1) % actions.size();
-            return true;
-        }
-        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_UP) {
-            focused = focused <= 0 ? actions.size() - 1 : focused - 1;
-            return true;
-        }
-        if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_SPACE) && focused >= 0) {
-            actions.get(focused).run().run();
-            return true;
+        if (!hits.isEmpty()) {
+            if (key == GLFW.GLFW_KEY_TAB || key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_DOWN) {
+                focused = (focused + 1) % hits.size();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_UP) {
+                focused = focused <= 0 ? hits.size() - 1 : focused - 1;
+                return true;
+            }
+            if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_SPACE)
+                    && focused >= 0 && focused < hits.size()) {
+                hits.get(focused).run().run();
+                return true;
+            }
         }
         return super.keyPressed(event);
     }

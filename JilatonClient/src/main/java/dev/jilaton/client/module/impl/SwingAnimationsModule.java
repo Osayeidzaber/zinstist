@@ -49,7 +49,7 @@ public final class SwingAnimationsModule extends ClientModule {
     private boolean styled;
 
     public SwingAnimationsModule() {
-        super("swing_animations", "Swing Animations", "Anubis swing styles: slash, chop, hook, spin, double tap and push.", ModuleCategory.RENDER);
+        super("swing_animations", "Swing Animations", "Swing styles: slash, chop, hook, spin, double tap and push.", ModuleCategory.RENDER);
         cacheStyle();
     }
 

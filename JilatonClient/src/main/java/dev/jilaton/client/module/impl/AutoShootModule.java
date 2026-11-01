@@ -44,6 +44,8 @@ public final class AutoShootModule extends ClientModule {
     private int originalSlot = -1;
     private int ownedSlot = -1;
     private boolean manualSlotOverride;
+    private Player slotPlayer;
+    private Object slotWorld;
     private final ClickSchedule throwSchedule = new ClickSchedule();
 
     public AutoShootModule() {
@@ -81,10 +83,12 @@ public final class AutoShootModule extends ClientModule {
 
     @Override
     protected void onDisable(Minecraft client) {
-        restoreOwnedSlot(client.player);
+        restoreOwnedSlot(client != null && client.player == slotPlayer && client.level == slotWorld ? client.player : null);
         currentTarget = null;
         throwSchedule.reset();
         manualSlotOverride = false;
+        slotPlayer = null;
+        slotWorld = null;
     }
 
     @Override
@@ -92,6 +96,14 @@ public final class AutoShootModule extends ClientModule {
         int scheduledThrows = throwSchedule.advanceClicks(
                 minimumCps.value(), maximumCps.value(), clickPattern.value());
         Player player = client.player;
+        if (slotPlayer != player || slotWorld != client.level) {
+            // A respawn/dimension transition must not apply another inventory's restore selection.
+            originalSlot = ownedSlot = -1;
+            manualSlotOverride = false;
+            currentTarget = null;
+            slotPlayer = player;
+            slotWorld = client.level;
+        }
         if (player == null || client.level == null || client.gameMode == null || client.screen != null
                 || player.isUsingItem() || !killAuraRequirementMet() || shouldYieldToOtherActions(client)) {
             resetTargetAndSlot(player);
@@ -299,7 +311,7 @@ public final class AutoShootModule extends ClientModule {
             return null;
         }
         if (bestSlot != selected) {
-            originalSlot = selected;
+            if (originalSlot < 0) originalSlot = selected;
             ownedSlot = bestSlot;
             player.getInventory().setSelectedSlot(bestSlot);
         }

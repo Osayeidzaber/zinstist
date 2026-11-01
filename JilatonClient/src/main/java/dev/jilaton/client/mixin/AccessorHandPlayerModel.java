@@ -11,5 +11,5 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(PlayerModel.class)
 public interface AccessorHandPlayerModel {
    @Accessor("slim")
-   boolean anubis$handSlim();
+   boolean jilaton$handSlim();
 }

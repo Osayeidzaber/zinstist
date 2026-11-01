@@ -14,8 +14,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(LayerRenderState.class)
 public interface AccessorHandItemLayer {
    @Accessor("transform")
-   ItemTransform anubis$handTransform();
+   ItemTransform jilaton$handTransform();
 
    @Accessor("extents")
-   Supplier<Vector3fc[]> anubis$handExtents();
+   Supplier<Vector3fc[]> jilaton$handExtents();
 }

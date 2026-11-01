@@ -33,14 +33,14 @@ public final class ReachMath {
 
     /**
      * Extends {@code Player.entityInteractionRange()} for the local player. The cap is the server's own
-     * padding, so a creative player's 5.0 base still reaches the server-accepted 8.0 instead of being
+     * padding, so a creative player's 5.0 base can select out to 8.0 locally instead of being
      * mistaken for a block range (which the old heuristic did for any base of 4.0 or more).
      */
     public static double extendEntityInteractionRange(double vanillaRange, boolean activeLocalPlayer, double bonus) {
         return addBonus(vanillaRange, activeLocalPlayer, bonus, ENTITY_RANGE_PADDING);
     }
 
-    /** Extends {@code Player.blockInteractionRange()}; the server accepts the attribute plus 1.0. */
+    /** Extends the local block range within vanilla's attribute-plus-1.0 padding; servers can reject interactions. */
     public static double extendBlockInteractionRange(double vanillaRange, boolean activeLocalPlayer, double bonus) {
         return addBonus(vanillaRange, activeLocalPlayer, bonus, BLOCK_RANGE_PADDING);
     }
@@ -57,7 +57,8 @@ public final class ReachMath {
      * Extends both maxima of the player's attack range by at most the server padding. The server compares
      * the attack hitbox against {@code effectiveMaxRange + hitboxMargin + 3.0}, where the effective maximum
      * is {@code maxRange} in survival and {@code maxCreativeRange} in creative; extending each by that same
-     * 3.0 keeps the client able to target everything the server will accept, including the creative 5.0 base.
+     * 3.0 follows that vanilla padding, including the creative 5.0 base. Server-side attributes, plugins and
+     * interaction rules still determine acceptance; this does not grant server-side reach.
      */
     public static AttackRange extendAttackRange(AttackRange vanillaRange, boolean activeLocalPlayer, double bonus) {
         if (!activeLocalPlayer || !Double.isFinite(bonus)) {

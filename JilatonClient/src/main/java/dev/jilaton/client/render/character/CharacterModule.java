@@ -160,10 +160,10 @@ public final class CharacterModule extends ClientModule {
         CharacterModule module = active;
         WornCharacter worn = module == null ? null : module.resolve(state);
         CharacterHolder holder = (CharacterHolder) state;
-        holder.anubis$setCharacter(worn);
+        holder.jilaton$setCharacter(worn);
         if (worn != null) {
             Entity vehicle = entity.getVehicle();
-            holder.anubis$setSeat(vehicle == null ? 0.0F : (vehicle instanceof LivingEntity ? 1.35F : 0.3F));
+            holder.jilaton$setSeat(vehicle == null ? 0.0F : (vehicle instanceof LivingEntity ? 1.35F : 0.3F));
             if (state.nameTagAttachment != null) {
                 CharacterModel model = worn.model;
                 float over = model.maxY * model.scale - 32.0F;
@@ -217,11 +217,11 @@ public final class CharacterModule extends ClientModule {
     }
 
     static WornCharacter worn(EntityRenderState state) {
-        return state instanceof CharacterHolder holder ? holder.anubis$character() : null;
+        return state instanceof CharacterHolder holder ? holder.jilaton$character() : null;
     }
 
     static float seat(EntityRenderState state) {
-        return state instanceof CharacterHolder holder ? holder.anubis$seat() : 0.0F;
+        return state instanceof CharacterHolder holder ? holder.jilaton$seat() : 0.0F;
     }
 
     public static boolean hidesModel(EntityRenderState state) {

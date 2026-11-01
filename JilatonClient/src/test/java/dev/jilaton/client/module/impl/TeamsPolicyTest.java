@@ -33,4 +33,12 @@ class TeamsPolicyTest {
         assertFalse(TeamsPolicy.sameExplicitColor(null, 0xAA33CC));
         assertFalse(TeamsPolicy.sameExplicitColor(0xAA33CC, 0x33AACC));
     }
+
+    @Test void prefixMatchingStripsFormattingAndRequiresAnActualPrefix() {
+        assertTrue(TeamsPolicy.samePrefix("§c[RED] Alice", "§4[RED] Bob"));
+        assertFalse(TeamsPolicy.samePrefix("[RED] Alice", "[BLUE] Bob"));
+        assertFalse(TeamsPolicy.samePrefix("Alice", "Alice"));
+        assertFalse(TeamsPolicy.samePrefix(" Alice", " Bob"));
+        assertFalse(TeamsPolicy.samePrefix(null, "[RED] Bob"));
+    }
 }

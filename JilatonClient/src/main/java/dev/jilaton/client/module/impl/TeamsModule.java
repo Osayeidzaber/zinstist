@@ -12,16 +12,20 @@ import net.minecraft.world.item.component.DyedItemColor;
 public final class TeamsModule extends ClientModule {
     private final BooleanSetting ignoreTeammates;
     private final BooleanSetting matchNameColor;
+    private final BooleanSetting matchScoreboard;
+    private final BooleanSetting matchPrefix;
     private final BooleanSetting armorHead;
     private final BooleanSetting armorChest;
     private final BooleanSetting armorLegs;
     private final BooleanSetting armorFeet;
 
     public TeamsModule() {
-        super("teams", "Teams", "Filters scoreboard allies and players with a matching colored name.",
+        super("teams", "Teams", "Filters scoreboard allies and matching name colors, prefixes or dyed armor.",
                 ModuleCategory.COMBAT);
         ignoreTeammates = addSetting(new BooleanSetting("ignore_teammates", "Ignore teammates", true));
         matchNameColor = addSetting(new BooleanSetting("match_name_color", "Match same name color", true));
+        matchScoreboard = addSetting(new BooleanSetting("match_scoreboard", "Match scoreboard team", true));
+        matchPrefix = addSetting(new BooleanSetting("match_prefix", "Match name prefix", false));
         armorHead = addSetting(new BooleanSetting("armor_head", "Match helmet color", true));
         armorChest = addSetting(new BooleanSetting("armor_chest", "Match chestplate color", false));
         armorLegs = addSetting(new BooleanSetting("armor_legs", "Match leggings color", false));
@@ -43,9 +47,12 @@ public final class TeamsModule extends ClientModule {
         }
         TextColor selfColor = self.getDisplayName().getStyle().getColor();
         TextColor candidateColor = candidate.getDisplayName().getStyle().getColor();
-        if (TeamsPolicy.isTeammate(self.isAlliedTo(candidate),
+        if (TeamsPolicy.isTeammate(matchScoreboard.value() && self.isAlliedTo(candidate),
                 selfColor == null ? null : selfColor.getValue(),
                 candidateColor == null ? null : candidateColor.getValue(), matchNameColor.value())) {
+            return true;
+        }
+        if (matchPrefix.value() && TeamsPolicy.samePrefix(self.getDisplayName().getString(), candidate.getDisplayName().getString())) {
             return true;
         }
         return (armorHead.value() && sameArmorColor(self, candidate, EquipmentSlot.HEAD))

@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LivingEntityRenderer.class)
 public abstract class MixinCharacterLivingEntityRenderer {
    @Inject(method = "getRenderType", at = @At("HEAD"), cancellable = true)
-   private void anubis$hideModelUnderCharacter(
+   private void jilaton$hideModelUnderCharacter(
       LivingEntityRenderState state, boolean bodyVisible, boolean translucent, boolean glowing, CallbackInfoReturnable<RenderType> cir
    ) {
       if (CharacterModule.hidesModel(state)) {
@@ -37,7 +37,7 @@ public abstract class MixinCharacterLivingEntityRenderer {
          target = "Lnet/minecraft/client/renderer/entity/layers/RenderLayer;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/EntityRenderState;FF)V"
       )
    )
-   private void anubis$hideLayersUnderCharacter(
+   private void jilaton$hideLayersUnderCharacter(
       RenderLayer<?, ?> layer, PoseStack poseStack, SubmitNodeCollector collector, int light, EntityRenderState state, float yRot, float xRot, Operation<Void> original
    ) {
       if (!CharacterModule.hidesLayer(layer, state)) {

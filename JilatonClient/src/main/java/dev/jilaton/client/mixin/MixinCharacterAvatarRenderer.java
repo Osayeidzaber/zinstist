@@ -29,18 +29,18 @@ public abstract class MixinCharacterAvatarRenderer<T extends Avatar & ClientAvat
    }
 
    @Inject(method = "<init>", at = @At("TAIL"))
-   private void anubis$addCharacterLayer(Context context, boolean slim, CallbackInfo ci) {
+   private void jilaton$addCharacterLayer(Context context, boolean slim, CallbackInfo ci) {
       this.addLayer(new CharacterLayer(this));
    }
 
    @Inject(method = "extractRenderState", at = @At("TAIL"))
-   private void anubis$extractCharacter(Avatar entity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
+   private void jilaton$extractCharacter(Avatar entity, AvatarRenderState state, float partialTick, CallbackInfo ci) {
       CharacterModule.extract(entity, state);
       dev.jilaton.client.module.impl.GlassMaterialModule.applyGhost(entity, state);
    }
 
    @Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)
-   private void anubis$characterFirstPersonHand(
+   private void jilaton$characterFirstPersonHand(
       PoseStack poseStack, SubmitNodeCollector collector, int light, Identifier skin, ModelPart arm, boolean sleeve, CallbackInfo ci
    ) {
       if (CharacterLayer.firstPersonHand((PlayerModel)this.getModel(), poseStack, collector, light, arm)) {

@@ -72,6 +72,10 @@ public abstract class ClientModule {
         for (Setting setting : settings()) setting.reset();
     }
 
+    /** Reconciles derived setting state after a complete profile load, before enable states change. */
+    public void settingsLoaded() {
+    }
+
     public List<Setting> settings() {
         return settingsView;
     }

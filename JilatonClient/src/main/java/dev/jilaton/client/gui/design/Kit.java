@@ -32,18 +32,18 @@ public final class Kit {
     /** Base background behind everything. */
     public static final int BASE = 0xFF050506;
     /** Elevation 1: sheets, sidebars. */
-    public static final int SURFACE = 0xFF141416;
+    public static final int SURFACE = 0xFF151515;
     /** Elevation 2: tiles, grouped lists, fields. */
-    public static final int SURFACE_2 = 0xFF1E1E21;
+    public static final int SURFACE_2 = 0xFF1E1E1E;
     /** Elevation 3: hovered rows, pressed controls, switch tracks. */
-    public static final int SURFACE_3 = 0xFF2A2A2E;
-    public static final int SEPARATOR = 0xFF2C2C30;
+    public static final int SURFACE_3 = 0xFF2A2A2A;
+    public static final int SEPARATOR = 0xFF2C2C2C;
     public static final int HAIRLINE = 0x24FFFFFF;
 
-    public static final int LABEL = 0xFFF5F5F7;
-    public static final int LABEL_2 = 0xFFA1A1A6;
-    public static final int LABEL_3 = 0xFF6E6E73;
-    public static final int LABEL_4 = 0xFF48484D;
+    public static final int LABEL = 0xFFF5F5F5;
+    public static final int LABEL_2 = 0xFFA3A3A3;
+    public static final int LABEL_3 = 0xFF6F6F6F;
+    public static final int LABEL_4 = 0xFF494949;
 
     public static final int GREEN = 0xFF32D74B, RED = 0xFFFF453A, ORANGE = 0xFFFF9F0A;
 
@@ -59,6 +59,17 @@ public final class Kit {
 
     public static int accent() {
         return Ui.accent();
+    }
+
+    /** Accent for large secondary type: the accent itself, or a soft grey when the accent is white. */
+    public static int accentSoft() {
+        int accent = accent();
+        return luminance(accent) > 0.85 ? LABEL_3 : mix(accent, LABEL_2, 0.25);
+    }
+
+    /** Accent for thin indicators and rules: full strength. */
+    public static int accentStrong() {
+        return accent();
     }
 
     /** Colour drawn on top of the accent (text on the primary button, switch knob when on). */
@@ -185,7 +196,7 @@ public final class Kit {
         float stretch = (float) (5 * press);
         float kx = x + 2 + (float) ((SWITCH_W - knob - 4 - stretch) * t);
         Ui.round(g, kx, y + 3, knob + stretch, knob, knob / 2, a(BLACK, 0.25));
-        Ui.round(g, kx, y + 2, knob + stretch, knob, knob / 2, mix(0xFFE8E8ED, onAccentKnob(accent), t));
+        Ui.round(g, kx, y + 2, knob + stretch, knob, knob / 2, mix(0xFFE8E8E8, onAccentKnob(accent), t));
     }
 
     /** The knob stays light unless the track is light too (white accent), then it turns dark for contrast. */
@@ -260,7 +271,7 @@ public final class Kit {
         float r = (float) (9 + 2 * grab);
         float cx = x + (float) (w * f);
         Ui.circle(g, cx, cy + 1, r, a(BLACK, 0.3));
-        Ui.circle(g, cx, cy, r, 0xFFF2F2F7);
+        Ui.circle(g, cx, cy, r, 0xFFF2F2F2);
     }
 
     /** Text field background; {@code focus} 0..1 eases the accent ring in. */

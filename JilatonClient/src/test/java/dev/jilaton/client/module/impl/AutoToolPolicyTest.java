@@ -41,4 +41,16 @@ class AutoToolPolicyTest {
         java.util.Arrays.fill(a, v);
         return a;
     }
+
+    @Test void anInstantWrongToolNeverOutranksAToolThatPreservesDrops() {
+        org.junit.jupiter.api.Assertions.assertTrue(AutoToolPolicy.prefer(.1f, true, Float.POSITIVE_INFINITY, false));
+        org.junit.jupiter.api.Assertions.assertFalse(AutoToolPolicy.prefer(Float.POSITIVE_INFINITY, false, .1f, true));
+        org.junit.jupiter.api.Assertions.assertFalse(AutoToolPolicy.prefer(Float.NaN, true, .1f, true));
+    }
+
+    @Test void customDrillNamesUseTheReferenceNormalization() {
+        assertEquals("shard pickaxe", ToolNameText.normalize("§bＳｈａｒｄ §rPíckaxe"));
+        assertEquals("breaks 9 blocks at once", ToolNameText.normalize("Breaks 9 blocks at once!"));
+        assertEquals("", ToolNameText.normalize(null));
+    }
 }

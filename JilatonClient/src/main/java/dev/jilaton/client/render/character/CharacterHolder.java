@@ -5,11 +5,11 @@ import net.fabricmc.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface CharacterHolder {
-   WornCharacter anubis$character();
+   WornCharacter jilaton$character();
 
-   void anubis$setCharacter(WornCharacter var1);
+   void jilaton$setCharacter(WornCharacter var1);
 
-   float anubis$seat();
+   float jilaton$seat();
 
-   void anubis$setSeat(float var1);
+   void jilaton$setSeat(float var1);
 }

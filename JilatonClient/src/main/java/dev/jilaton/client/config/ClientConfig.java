@@ -44,7 +44,9 @@ public final class ClientConfig {
     private boolean backdropBlur = true;
     private double guiScale = 1.0;
     private double transitionSpeed = 1.0;
-    private String menuBackground = "Ambient";
+    private String menuBackground = "Dark Veil";
+    private double shaderIntensity = 1.0;
+    private boolean fullEffects = true;
     /**
      * Explicit opt-in for the desktop media bridge (PowerShell/AppleScript reading the OS media session).
      * Off by default and never enabled implicitly: while off no process is spawned and no media is read.
@@ -148,9 +150,19 @@ public final class ClientConfig {
     }
 
     /** Full-screen menu backdrop mode (see gui.design.Backdrops.MODES). */
+    /** Brightness of shader backgrounds, 0.2 - 1.5. */
+    public double shaderIntensity() { return shaderIntensity; }
+    public void setShaderIntensity(double value) {
+        this.shaderIntensity = Double.isFinite(value) ? Math.max(0.2, Math.min(1.5, Math.round(value * 20) / 20.0)) : 1.0;
+    }
+
+    /** Full effects: high-quality shaders, particles and light sweeps. Off = the cheap path for weaker GPUs. */
+    public boolean fullEffects() { return fullEffects; }
+    public void setFullEffects(boolean value) { this.fullEffects = value; }
+
     public String menuBackground() { return menuBackground; }
     public void setMenuBackground(String mode) {
-        this.menuBackground = dev.jilaton.client.gui.design.Backdrops.MODES.contains(mode) ? mode : "Ambient";
+        this.menuBackground = dev.jilaton.client.gui.design.Backdrops.MODES.contains(mode) ? mode : "Dark Veil";
     }
 
     public double guiScroll() { return guiScroll; }
@@ -377,7 +389,9 @@ public final class ClientConfig {
         backdropBlur = Boolean.parseBoolean(values.getProperty("ui.backdrop_blur", "true"));
         try {
             setGuiScale(Double.parseDouble(values.getProperty("ui.gui_scale", "1.0")));
-            setMenuBackground(values.getProperty("ui.menu_background", "Ambient"));
+            setMenuBackground(values.getProperty("ui.menu_background", "Dark Veil"));
+            setShaderIntensity(Double.parseDouble(values.getProperty("ui.shader_intensity", "1.0")));
+            setFullEffects(Boolean.parseBoolean(values.getProperty("ui.full_effects", "true")));
             setTransitionSpeed(Double.parseDouble(values.getProperty("ui.transition_speed", "1.0")));
         } catch (NumberFormatException ignored) {
             guiScale = 1.0;
@@ -502,6 +516,8 @@ public final class ClientConfig {
         values.setProperty("ui.backdrop_blur", Boolean.toString(backdropBlur));
         values.setProperty("ui.gui_scale", Double.toString(guiScale));
         values.setProperty("ui.menu_background", menuBackground);
+        values.setProperty("ui.shader_intensity", Double.toString(shaderIntensity));
+        values.setProperty("ui.full_effects", Boolean.toString(fullEffects));
         values.setProperty("ui.transition_speed", Double.toString(transitionSpeed));
         values.setProperty("music.desktop_bridge", Boolean.toString(desktopMediaBridge));
         values.setProperty("ui.font", uiFont);

@@ -12,13 +12,14 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 public final class Ui {
     // Neutral black and white (zaber.tech): no hue in any surface or text token.
-    public static final int BACKDROP = 0xFF0A0A0A, DEEP = 0xFF060606, PANEL = 0xFF0E0E0E, SIDEBAR = 0xFF0A0A0A,
-            CARD = 0xFF131313, RAISED = 0xFF1B1B1B, DRAWER = 0xFF0F0F0F, STROKE = 0xFF262626;
+    // Mapped onto the Kit system (second-generation design): charcoal elevation steps over a true-black base.
+    public static final int BACKDROP = 0xFF050505, DEEP = 0xFF020202, PANEL = 0xFF101010, SIDEBAR = 0xFF0B0B0B,
+            CARD = 0xFF1A1A1A, RAISED = 0xFF262626, DRAWER = 0xFF121212, STROKE = 0xFF262626;
     // Secondary text stays readable on #0A0A0A: TEXT_2 is about 9:1, TEXT_3 about 5:1 (above WCAG AA).
     // FAINT is the lowest step and still clears 3:1 on the brightest shell surface (#131313) for hints.
-    public static final int TEXT = 0xFFF5F5F5, TEXT_2 = 0xFFB8B8B8, TEXT_3 = 0xFF8C8C8C, SOFT = 0xFFD6D6D6,
-            FAINT = 0xFF6A6A6A;
-    public static final int DANGER = 0xFFE5484D, ONLINE = 0xFF30A46C, WARN = 0xFFE5A13E;
+    public static final int TEXT = 0xFFF5F5F5, TEXT_2 = 0xFFB4B4B4, TEXT_3 = 0xFF8A8A8A, SOFT = 0xFFD8D8D8,
+            FAINT = 0xFF646464;
+    public static final int DANGER = 0xFFFF453A, ONLINE = 0xFF32D74B, WARN = 0xFFFF9F0A;
 
     private Ui() { }
 
@@ -48,14 +49,14 @@ public final class Ui {
     /** Card: fill + hairline, the design's default surface. */
     public static void card(GuiGraphics g, float x, float y, float w, float h, float radius, int fill, int stroke) {
         round(g, x, y, w, h, radius, fill);
-        outline(g, x, y, w, h, radius, stroke);
+        // Plain strokes read as a soft hairline; an accent stroke (focus, selection) keeps its colour.
+        outline(g, x, y, w, h, radius, stroke == STROKE ? Kit.HAIRLINE : stroke);
     }
 
     /** Active surface: accent hairline at ~45% plus a soft halo, the only glow the design allows. */
     public static void glowRing(GuiGraphics g, float x, float y, float w, float h, float radius, int accent, double amount) {
-        for (int i = 3; i >= 1; i--)
-            outline(g, x - i * 2, y - i * 2, w + i * 4, h + i * 4, radius + i * 2, alpha(accent, 0.05 * amount / i));
-        outline(g, x, y, w, h, radius, alpha(accent, 0.5 * amount));
+        // Kit: selection is a calm accent hairline over a lifted surface, never a halo.
+        outline(g, x, y, w, h, radius, alpha(accent, 0.42 * amount));
     }
 
     public static void circle(GuiGraphics g, float cx, float cy, float r, int color) {
@@ -129,24 +130,29 @@ public final class Ui {
 
     /** 40x22 switch; {@code t} 0..1 slides the knob and fades the track to the accent. */
     public static void toggle(GuiGraphics g, float x, float y, double t, int accent) {
-        round(g, x, y, TOGGLE_W, TOGGLE_H, 11, mix(STROKE, accent, t));
-        float knob = x + 3 + (float) (18 * t);
-        // The knob contrasts with the track: dark on a light accent (white by default), light on a dark one.
-        round(g, knob, y + 3, 16, 16, 8, mix(TEXT_2, JilatonUi.onColor(accent), t));
+        sw(g, x, y, TOGGLE_W, TOGGLE_H, t, accent);
+    }
+
+    /** Kit switch at any size: a capsule track and a round knob with a soft shadow. */
+    private static void sw(GuiGraphics g, float x, float y, float w, float h, double t, int accent) {
+        round(g, x, y, w, h, h / 2, mix(Kit.SURFACE_3, accent, t));
+        float k = h - 4;
+        float kx = x + 2 + (float) ((w - k - 4) * t);
+        round(g, kx, y + 3, k, k, k / 2, alpha(0xFF000000, 0.28));
+        round(g, kx, y + 2, k, k, k / 2, mix(0xFFE8E8E8, JilatonUi.onColor(accent) == 0xFF000000 ? 0xFF0A0A0A : 0xFFFFFFFF, t));
     }
 
     /** Small toggle for drawers: 32x18. */
     public static void smallToggle(GuiGraphics g, float x, float y, double t, int accent) {
-        round(g, x, y, SMALL_TOGGLE_W, SMALL_TOGGLE_H, 9, mix(STROKE, accent, t));
-        round(g, x + 2 + (float) (14 * t), y + 2, 14, 14, 7, mix(TEXT_2, JilatonUi.onColor(accent), t));
+        sw(g, x, y, SMALL_TOGGLE_W, SMALL_TOGGLE_H, t, accent);
     }
 
     /** Chip / segmented option. Selected = 14% accent fill + 50% accent hairline. */
     public static void chip(GuiGraphics g, String label, float x, float y, float w, float h, boolean selected,
                             boolean hovered, int accent) {
-        int fill = selected ? alpha(accent, 0.14) : hovered ? RAISED : 0;
-        if ((fill >>> 24) != 0) round(g, x, y, w, h, 7, fill);
-        outline(g, x, y, w, h, 7, selected ? alpha(accent, 0.55) : STROKE);
+        int fill = selected ? Kit.SURFACE_3 : hovered ? mix(Kit.SURFACE_2, Kit.SURFACE_3, 0.5) : Kit.SURFACE_2;
+        round(g, x, y, w, h, h / 2, fill);
+        if (selected) outline(g, x, y, w, h, h / 2, alpha(accent, 0.45));
         float size = 12;
         text(g, label, x + (w - width(label, size, JilatonType.Face.MEDIUM)) / 2, y + (h - size) / 2 + 1, size,
                 JilatonType.Face.MEDIUM, selected ? TEXT : TEXT_2);
@@ -162,11 +168,13 @@ public final class Ui {
     public static void button(GuiGraphics g, String label, float x, float y, float w, float h, double t,
                               boolean primary, int accent) {
         y -= (float) t;
+        float r = Math.min(h / 2, 18);
         if (primary) {
-            round(g, x, y, w, h, 10, mix(accent, 0xFFFFFFFF, 0.14 * t));
+            Kit.shadow(g, x, y, w, h, r, 0.3 + 0.3 * t);
+            round(g, x, y, w, h, r, mix(accent, 0xFFFFFFFF, 0.14 * t));
         } else {
-            if (t > 0.01) round(g, x, y, w, h, 10, alpha(RAISED, t));
-            outline(g, x, y, w, h, 10, mix(STROKE, mix(STROKE, accent, 0.45), t));
+            round(g, x, y, w, h, r, mix(Kit.SURFACE_2, Kit.SURFACE_3, t));
+            outline(g, x, y, w, h, r, alpha(0xFFFFFFFF, 0.06 + 0.05 * t));
         }
         float size = 13;
         JilatonType.Face face = primary ? JilatonType.Face.SEMIBOLD : JilatonType.Face.MEDIUM;

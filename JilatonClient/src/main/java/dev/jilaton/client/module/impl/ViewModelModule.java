@@ -7,12 +7,14 @@ import com.mojang.math.Axis;
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
 import dev.jilaton.client.render.model.ViewModelPreset;
+import dev.jilaton.client.render.model.HandPoseState;
 import dev.jilaton.client.setting.BooleanSetting;
 import dev.jilaton.client.setting.ChoiceSetting;
 import dev.jilaton.client.setting.NumberSetting;
 import dev.jilaton.client.setting.TextSetting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,11 +41,18 @@ public final class ViewModelModule extends ClientModule {
 
     private final HandOptions main = new HandOptions("main", "Main hand");
     private final HandOptions off = new HandOptions("off", "Off hand");
+    private final BooleanSetting linkHands = addSetting(new BooleanSetting("link_hands", "Link hands", false));
+    private final ChoiceSetting pivot = addSetting(new ChoiceSetting("pivot", "Transform origin",
+            List.of("Camera", "Hand"), "Camera"));
+    private final NumberSetting glide = addSetting(new NumberSetting("glide", "Pose glide", 0, 1, 0.05, 0));
+    private final HandPoseState mainState = new HandPoseState(), offState = new HandPoseState();
+    private final float[] mainTarget = new float[7], offTarget = new float[7];
+    private boolean fading;
     private final TextSetting saved = addSetting(
             new TextSetting("saved_presets", "Saved presets", 2048, "", value -> value));
     private final ChoiceSetting preset = addSetting(
             new ChoiceSetting("preset", "Preset", names(SHIPPED), "Default").deferUnknownValues());
-    private String appliedSelection;
+    private String appliedSelection = preset.value();
     private String savedSeen = "";
 
     public ViewModelModule() {
@@ -51,19 +60,71 @@ public final class ViewModelModule extends ClientModule {
     }
 
     public void apply(PoseStack pose, InteractionHand hand, boolean twoHandedMap) {
-        HandOptions options = hand == InteractionHand.MAIN_HAND ? main : off;
-        if (twoHandedMap) {
-            // A shared map is rendered once for both hands. Average the enabled transforms.
-            if (!main.enabled.value() && !off.enabled.value()) return;
-            float divisor = main.enabled.value() && off.enabled.value() ? 2 : 1;
-            pose.translate((main.x() + off.x()) / divisor, (main.y() + off.y()) / divisor, (main.z() + off.z()) / divisor);
-            rotate(pose, (main.rx() + off.rx()) / divisor, (main.ry() + off.ry()) / divisor, (main.rz() + off.rz()) / divisor);
-            float scale = ((main.enabled.value() ? main.scale() : 0) + (off.enabled.value() ? off.scale() : 0)) / divisor;
+        applyAt(pose, hand, twoHandedMap, HumanoidArm.RIGHT, true, false, System.nanoTime());
+    }
+
+    /** Render path shared by vanilla hands and the cosmetic knife, including the disable transition. */
+    public void applyRendered(PoseStack pose, InteractionHand hand, boolean twoHandedMap, HumanoidArm mainArm) {
+        applyAt(pose, hand, twoHandedMap, mainArm, enabled(),
+                dev.jilaton.client.JilatonClient.clientConfig().reducedMotion(), System.nanoTime());
+    }
+
+    public boolean renderActive() { return enabled() || fading; }
+
+    @Override protected void onEnable(Minecraft client) {
+        if (!fading) { mainState.reset(); offState.reset(); }
+        fading = false;
+    }
+
+    @Override protected void onDisable(Minecraft client) {
+        fading = glide.value() > 0 && (!mainState.rested() || !offState.rested());
+        if (client == null || client.player == null || !fading) {
+            mainState.reset(); offState.reset(); fading = false;
+        }
+    }
+
+    void applyAt(PoseStack pose, InteractionHand hand, boolean map, HumanoidArm mainArm,
+                 boolean on, boolean reducedMotion, long now) {
+        HandOptions offOptions = linkHands.value() ? main : off;
+        main.target(mainTarget);
+        offOptions.target(offTarget);
+        double smoothing = reducedMotion ? 0 : glide.value();
+        // Step both even when one is hidden: an empty offhand cannot keep a disabled module alive.
+        mainState.step(mainTarget, on, smoothing, now);
+        offState.step(offTarget, on, smoothing, now);
+        if (!on && mainState.rested() && offState.rested()) fading = false;
+        boolean mainOn = main.enabled.value(), offOn = offOptions.enabled.value();
+        boolean localHand = pivot.value().equals("Hand");
+        int mainSide = mainArm == HumanoidArm.RIGHT ? 1 : -1;
+        if (map) {
+            if (!mainOn && !offOn && on) return;
+            float divisor = mainOn && offOn ? 2 : 1;
+            // Shared maps have one pose; mirror each hand before blending in hand-origin mode.
+            float mx = mainState.value(0), ox = offState.value(0);
+            float my = mainState.value(4), oy = offState.value(4);
+            float mz = mainState.value(5), oz = offState.value(5);
+            if (localHand) { mx *= mainSide; ox *= -mainSide; my *= mainSide; oy *= -mainSide; mz *= mainSide; oz *= -mainSide; }
+            pose.translate((mx + ox) / divisor, (mainState.value(1) + offState.value(1)) / divisor,
+                    (mainState.value(2) + offState.value(2)) / divisor);
+            rotate(pose, (mainState.value(3) + offState.value(3)) / divisor, (my + oy) / divisor, (mz + oz) / divisor);
+            float scale = ((mainOn ? mainState.value(6) : 0) + (offOn ? offState.value(6) : 0)) / divisor;
+            if (!mainOn && !offOn) scale = (mainState.value(6) + offState.value(6)) / 2;
             pose.scale(scale, scale, scale);
-        } else if (options.enabled.value()) {
-            pose.translate(options.x(), options.y(), options.z());
-            rotate(pose, options.rx(), options.ry(), options.rz());
-            pose.scale(options.scale(), options.scale(), options.scale());
+        } else {
+            HandPoseState state = hand == InteractionHand.MAIN_HAND ? mainState : offState;
+            int side = hand == InteractionHand.MAIN_HAND ? mainSide : -mainSide;
+            if (localHand) {
+                pose.translate(side * (0.56f + state.value(0)), -0.52f + state.value(1), -0.72f + state.value(2));
+                pose.mulPose(Axis.YP.rotationDegrees(side * state.value(4)));
+                pose.mulPose(Axis.XP.rotationDegrees(state.value(3)));
+                pose.mulPose(Axis.ZP.rotationDegrees(side * state.value(5)));
+                float scale = state.value(6); pose.scale(scale, scale, scale);
+                pose.translate(-side * 0.56f, 0.52f, 0.72f);
+            } else {
+                pose.translate(state.value(0), state.value(1), state.value(2));
+                rotate(pose, state.value(3), state.value(4), state.value(5));
+                float scale = state.value(6); pose.scale(scale, scale, scale);
+            }
         }
     }
 
@@ -128,6 +189,14 @@ public final class ViewModelModule extends ClientModule {
     }
 
     @Override
+    public void settingsLoaded() {
+        // Profiles save both the preset label and the current hand settings. Those settings may
+        // have been edited after selecting the preset, so loading is not a new preset selection.
+        syncChoices();
+        appliedSelection = preset.value();
+    }
+
+    @Override
     protected void onTick(Minecraft client) {
         syncChoices();
         if (!preset.value().equals(appliedSelection)) {
@@ -188,6 +257,12 @@ public final class ViewModelModule extends ClientModule {
         ViewModelPreset.Hand snapshot() {
             return new ViewModelPreset.Hand(enabled.value(), x.value(), y.value(), z.value(),
                     rx.value(), ry.value(), rz.value(), scale.value());
+        }
+
+        void target(float[] target) {
+            target[0] = x(); target[1] = y(); target[2] = z();
+            target[3] = rx(); target[4] = ry(); target[5] = rz();
+            target[6] = enabled.value() ? scale() : 1;
         }
 
         float x() { return enabled.value() ? (float) x.value() : 0; }

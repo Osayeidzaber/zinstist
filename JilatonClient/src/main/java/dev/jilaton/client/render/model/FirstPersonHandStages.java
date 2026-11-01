@@ -38,6 +38,13 @@ public final class FirstPersonHandStages {
         return true;
     }
 
+    /** Live pass, with the player's handedness and the module's animated disable lifecycle. */
+    public static boolean viewmodel(PoseStack pose, ViewModelModule module, InteractionHand hand, HumanoidArm mainArm) {
+        if (module == null) return false;
+        module.applyRendered(pose, hand, false, mainArm);
+        return true;
+    }
+
     /**
      * The active swing style of a main-hand pass, composed about {@link #HAND_X the hand}. False when no style
      * covers this swing, so the caller can leave vanilla's own swing in place instead of replacing it with a static

@@ -36,12 +36,12 @@ public abstract class KnifeViewmodelMixin {
         ClientModule knifeModule = JilatonClient.moduleManager().get("cosmetic_knife");
         if (!(knifeModule instanceof CosmeticKnifeModule knife) || !knife.enabled() || !knife.replaces(item)) return;
         ViewModelModule viewModel = JilatonClient.moduleManager().get("view_model") instanceof ViewModelModule model
-                && model.enabled() ? model : null;
+                && model.renderActive() ? model : null;
         SwingAnimationsModule swingStyles = JilatonClient.moduleManager().get("swing_animations")
                 instanceof SwingAnimationsModule styles && styles.enabled() ? styles : null;
 
         pose.pushPose();
-        FirstPersonHandStages.viewmodel(pose, viewModel, InteractionHand.MAIN_HAND);
+        FirstPersonHandStages.viewmodel(pose, viewModel, InteractionHand.MAIN_HAND, player.getMainArm());
         if (!knife.csSkin()) FirstPersonHandStages.swing(pose, swingStyles, player.getMainArm(), swing);
         knife.renderInHand((ItemInHandRendererInvoker) this, player, partial, swing, pose, collector, light);
         pose.popPose();

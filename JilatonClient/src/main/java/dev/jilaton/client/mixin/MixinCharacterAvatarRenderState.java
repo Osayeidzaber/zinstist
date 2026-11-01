@@ -13,27 +13,27 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(AvatarRenderState.class)
 public abstract class MixinCharacterAvatarRenderState implements CharacterHolder {
    @Unique
-   private WornCharacter anubis$character;
+   private WornCharacter jilaton$character;
    @Unique
-   private float anubis$seat;
+   private float jilaton$seat;
 
    @Override
-   public WornCharacter anubis$character() {
-      return this.anubis$character;
+   public WornCharacter jilaton$character() {
+      return this.jilaton$character;
    }
 
    @Override
-   public void anubis$setCharacter(WornCharacter character) {
-      this.anubis$character = character;
+   public void jilaton$setCharacter(WornCharacter character) {
+      this.jilaton$character = character;
    }
 
    @Override
-   public float anubis$seat() {
-      return this.anubis$seat;
+   public float jilaton$seat() {
+      return this.jilaton$seat;
    }
 
    @Override
-   public void anubis$setSeat(float knee) {
-      this.anubis$seat = knee;
+   public void jilaton$setSeat(float knee) {
+      this.jilaton$seat = knee;
    }
 }

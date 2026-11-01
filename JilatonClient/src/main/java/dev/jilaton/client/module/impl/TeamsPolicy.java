@@ -17,4 +17,12 @@ public final class TeamsPolicy {
         return selfColor != null && selfColor.equals(candidateColor);
     }
 
+    /** LiquidBounce Teams PREFIX predicate, rejecting empty prefixes from leading spaces. */
+    public static boolean samePrefix(String selfName, String candidateName) {
+        if (selfName == null || candidateName == null) return false;
+        String[] self = selfName.replaceAll("(?i)§[0-9a-fk-orx]", "").split(" ", 2);
+        String[] other = candidateName.replaceAll("(?i)§[0-9a-fk-orx]", "").split(" ", 2);
+        return self.length > 1 && other.length > 1 && !self[0].isBlank() && self[0].equals(other[0]);
+    }
+
 }

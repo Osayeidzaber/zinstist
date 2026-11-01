@@ -124,9 +124,9 @@ public final class KillAuraModule extends ClientModule {
             return;
         }
 
-        // AimAssist owns the player's rotation while the attack key is held.
+        // Preserve the legacy held-attack reservation; mouse assistance yields to aura priority.
         ClientModule aimAssist = JilatonClient.moduleManager().get("aim_assist");
-        if (client.options.keyAttack.isDown() && aimAssist != null && aimAssist.enabled()) {
+        if (client.options.keyAttack.isDown() && aimAssist instanceof AimAssistModule assist && assist.claimsAttackInput()) {
             currentTarget = null;
             return;
         }

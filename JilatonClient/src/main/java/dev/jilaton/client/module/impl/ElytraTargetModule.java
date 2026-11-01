@@ -37,6 +37,8 @@ public final class ElytraTargetModule extends ClientModule {
 
     private Player currentTarget;
     private long lastFireworkTick = Long.MIN_VALUE;
+    private Player sessionPlayer;
+    private Object sessionLevel;
 
     public ElytraTargetModule() {
         super("elytra_target", "ElytraTarget",
@@ -63,20 +65,31 @@ public final class ElytraTargetModule extends ClientModule {
 
     @Override
     protected void onEnable(Minecraft client) {
-        currentTarget = null;
-        lastFireworkTick = Long.MIN_VALUE;
+        resetSession();
     }
 
     @Override
     protected void onDisable(Minecraft client) {
+        resetSession();
+    }
+
+    private void resetSession() {
         currentTarget = null;
         lastFireworkTick = Long.MIN_VALUE;
+        sessionPlayer = null;
+        sessionLevel = null;
     }
 
     @Override
     protected void onTick(Minecraft client) {
+        if (client == null || client.player == null || client.level == null) { resetSession(); return; }
         Player player = client.player;
-        if (player == null || client.level == null || client.screen != null || !player.isFallFlying()) {
+        if (player != sessionPlayer || client.level != sessionLevel) {
+            resetSession();
+            sessionPlayer = player;
+            sessionLevel = client.level;
+        }
+        if (client.screen != null || !client.isWindowActive() || !player.isAlive() || !player.isFallFlying()) {
             currentTarget = null;
             return;
         }
@@ -137,7 +150,7 @@ public final class ElytraTargetModule extends ClientModule {
     }
 
     private boolean isEligible(Minecraft client, Player player, Player candidate) {
-        if (candidate == null || candidate == player || !candidate.isAlive() || candidate.isSpectator()
+        if (candidate == null || candidate == player || candidate.level() != client.level || !candidate.isAlive() || candidate.isSpectator()
                 || !PlayerTargetFilters.allowsPlayer(client, player, candidate)
                 || !player.hasLineOfSight(candidate)) {
             return false;
@@ -168,7 +181,7 @@ public final class ElytraTargetModule extends ClientModule {
     }
 
     private void tryUseFirework(Minecraft client, Player player) {
-        if (client.gameMode == null || client.options.keyUse.isDown()) {
+        if (client.gameMode == null || client.options.keyUse.isDown() || player.isUsingItem()) {
             return;
         }
         long now = client.level.getGameTime();

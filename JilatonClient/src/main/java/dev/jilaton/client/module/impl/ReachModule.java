@@ -10,7 +10,7 @@ public final class ReachModule extends ClientModule {
 
     public ReachModule() {
         super("reach", "Reach", "Adjusts local entity and block interaction ranges.", ModuleCategory.PLAYER);
-        // Slider ceilings stop where the server stops listening: 3.0 + 3.0 = 6.0, 4.5 + 1.0 = 5.5.
+        // Conservative local ceilings follow vanilla padding; server attributes and validation remain authoritative.
         entityBonus = addSetting(new NumberSetting("entity_bonus", "Entity range increase", 0.0, 3.0, 0.1, 1.0));
         blockBonus = addSetting(new NumberSetting("block_bonus", "Block range increase", 0.0, 1.0, 0.5, 0.5));
     }

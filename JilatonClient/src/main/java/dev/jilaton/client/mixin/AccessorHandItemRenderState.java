@@ -12,8 +12,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(ItemStackRenderState.class)
 public interface AccessorHandItemRenderState {
    @Accessor("layers")
-   LayerRenderState[] anubis$handLayers();
+   LayerRenderState[] jilaton$handLayers();
 
    @Accessor("activeLayerCount")
-   int anubis$handLayerCount();
+   int jilaton$handLayerCount();
 }

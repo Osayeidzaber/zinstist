@@ -5,6 +5,10 @@ final class AutoToolPolicy {
     private AutoToolPolicy() {
     }
 
+    static boolean prefer(float speed, boolean correct, float bestSpeed, boolean bestCorrect) {
+        return !Float.isNaN(speed) && (correct && !bestCorrect || correct == bestCorrect && speed > bestSpeed);
+    }
+
     /**
      * Best slot for the block, or -1 to keep the current one. {@code speed[i]} is the destroy speed of slot i
      * (1 for bare hands), {@code correct[i]} whether it gets drops, {@code durabilityLeft[i]} remaining uses or
@@ -12,21 +16,19 @@ final class AutoToolPolicy {
      */
     static int best(float[] speed, boolean[] correct, int[] durabilityLeft, int current, int reserve, boolean needsTool) {
         int best = -1;
-        float bestScore = score(speed, correct, durabilityLeft, current, reserve, needsTool);
+        boolean currentValid = current >= 0 && current < speed.length && durabilityLeft[current] > reserve;
+        float bestScore = currentValid ? speed[current] : Float.NEGATIVE_INFINITY;
+        boolean bestCorrect = currentValid && (!needsTool || correct[current]);
         for (int i = 0; i < speed.length; i++) {
-            float s = score(speed, correct, durabilityLeft, i, reserve, needsTool);
-            if (s > bestScore + 1e-4F) {
-                bestScore = s;
+            if (durabilityLeft[i] <= reserve) continue;
+            boolean candidateCorrect = !needsTool || correct[i];
+            if (prefer(speed[i], candidateCorrect, bestScore, bestCorrect)) {
+                bestScore = speed[i];
+                bestCorrect = candidateCorrect;
                 best = i;
             }
         }
         return best;
     }
 
-    private static float score(float[] speed, boolean[] correct, int[] durabilityLeft, int i, int reserve, boolean needsTool) {
-        if (i < 0 || i >= speed.length) return Float.NEGATIVE_INFINITY;
-        if (durabilityLeft[i] <= reserve) return Float.NEGATIVE_INFINITY;
-        // A tool that yields the drop always beats a faster one that does not, for blocks that need one.
-        return speed[i] + (needsTool && correct[i] ? 1000F : 0F);
-    }
 }

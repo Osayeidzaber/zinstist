@@ -1018,8 +1018,20 @@ public final class VisualVerifier {
         });
 
         // Redesign tour: full-screen menus captured over the live world.
-        then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen()));
+        then(2, () -> {
+            JilatonClient.clientConfig().setMenuBackground("Dark Veil");
+            client.setScreen(new dev.jilaton.client.gui.JilatonMainMenuScreen());
+        });
         shot(40, "50-home");
+        then(2, () -> JilatonClient.clientConfig().setMenuBackground("Aurora"));
+        shot(10, "50b-home-aurora");
+        then(2, () -> JilatonClient.clientConfig().setMenuBackground("Threads"));
+        shot(10, "50c-home-threads");
+        then(2, () -> JilatonClient.clientConfig().setMenuBackground("Galaxy"));
+        shot(10, "50d-home-galaxy");
+        then(2, () -> JilatonClient.clientConfig().setMenuBackground("Liquid Chrome"));
+        shot(10, "50e-home-chrome");
+        then(2, () -> JilatonClient.clientConfig().setMenuBackground("Dark Veil"));
         then(2, () -> client.setScreen(null));
         then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonPauseScreen()));
         shot(30, "51-pause");
@@ -1221,6 +1233,74 @@ public final class VisualVerifier {
                 LOGGER.info("[JilatonVerify] aim-assist mouse-yaw={} higher-priority-yield={}", nudge.yaw(), yielded.yaw() == 0);
                 if (!(nudge.yaw() > 0) || yielded.yaw() != 0)
                     throw new IllegalStateException("AimAssist mouse target/correction arbitration failed");
+
+                // Keep aim off the target so no item is used; exercise two real hotbar acquisitions.
+                var shoot = (dev.jilaton.client.module.impl.AutoShootModule) JilatonClient.moduleManager().get("auto_shoot");
+                var inventory = client.player.getInventory();
+                var savedHotbar = new java.util.ArrayList<net.minecraft.world.item.ItemStack>();
+                for (int i = 0; i < 9; i++) savedHotbar.add(inventory.getItem(i).copy());
+                var savedOffhand = client.player.getOffhandItem().copy();
+                int selectedBefore = inventory.getSelectedSlot();
+                boolean shootEnabled = shoot.enabled();
+                try {
+                    for (int i = 0; i < 9; i++) inventory.setItem(i, net.minecraft.world.item.ItemStack.EMPTY);
+                    client.player.setItemInHand(InteractionHand.OFF_HAND, net.minecraft.world.item.ItemStack.EMPTY);
+                    inventory.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK));
+                    inventory.setItem(2, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SNOWBALL));
+                    inventory.setItem(4, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EGG));
+                    inventory.setSelectedSlot(0);
+                    shoot.resetSettings();
+                    setting("auto_shoot", "aim_mode", "Direct");
+                    setting("auto_shoot", "aim_tolerance", .5);
+                    shoot.setEnabled(true);
+                    shoot.tick(client);
+                    int first = inventory.getSelectedSlot();
+                    inventory.setItem(2, net.minecraft.world.item.ItemStack.EMPTY);
+                    shoot.tick(client);
+                    int second = inventory.getSelectedSlot();
+                    shoot.setEnabled(false);
+                    int restored = inventory.getSelectedSlot();
+                    LOGGER.info("[JilatonVerify] auto-shoot first-slot={} second-slot={} restored={}", first, second, restored);
+                    if (first != 2 || second != 4 || restored != 0)
+                        throw new IllegalStateException("AutoShoot lost the original hotbar slot across projectile stacks");
+                } finally {
+                    shoot.setEnabled(false);
+                    for (int i = 0; i < 9; i++) inventory.setItem(i, savedHotbar.get(i));
+                    client.player.setItemInHand(InteractionHand.OFF_HAND, savedOffhand);
+                    inventory.setSelectedSlot(selectedBefore);
+                    shoot.resetSettings();
+                    shoot.setEnabled(shootEnabled);
+                    rotations.cancelAll();
+                }
+
+                var hitbox = (dev.jilaton.client.module.impl.HitboxModule) JilatonClient.moduleManager().get("hitbox");
+                boolean hitboxEnabled = hitbox.enabled();
+                hitbox.setEnabled(false);
+                var physicalBox = friend.getBoundingBox();
+                float basePick = friend.getPickRadius();
+                var attackRange = client.player.entityAttackRange();
+                var beyondRange = client.player.getEyePosition().add(client.player.getViewVector(1).scale(
+                        attackRange.effectiveMaxRange(client.player) + attackRange.hitboxMargin() + .25));
+                boolean baseRange = attackRange.isInRange(client.player, beyondRange);
+                try {
+                    hitbox.size().setValue(.5);
+                    setting("hitbox", "apply_to_component", true);
+                    hitbox.setEnabled(true);
+                    float expandedPick = friend.getPickRadius();
+                    boolean component = attackRange.isInRange(client.player, beyondRange);
+                    setting("hitbox", "apply_to_component", false);
+                    boolean optedOut = attackRange.isInRange(client.player, beyondRange);
+                    hitbox.setEnabled(false);
+                    boolean restored = friend.getPickRadius() == basePick;
+                    LOGGER.info("[JilatonVerify] hitbox pick={} component={} base={} opt-out={} collision-unchanged={} restored={}",
+                            expandedPick, component, baseRange, optedOut, physicalBox.equals(friend.getBoundingBox()), restored);
+                    if (expandedPick != .5f || !component || baseRange || optedOut || !restored
+                            || !physicalBox.equals(friend.getBoundingBox()))
+                        throw new IllegalStateException("Hitbox native pick/component/lifecycle regression");
+                } finally {
+                    hitbox.resetSettings();
+                    hitbox.setEnabled(hitboxEnabled);
+                }
             } finally {
                 friend.discard();
                 dev.jilaton.client.module.impl.FriendManager.replace(names);

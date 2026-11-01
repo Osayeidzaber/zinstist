@@ -39,6 +39,46 @@ class ViewModelPresetConfigTest {
     }
 
     @Test
+    void loadingCustomTransformsDoesNotReapplyTheSelectedPreset() {
+        ModuleManager modules = new ModuleManager();
+        ViewModelModule original = (ViewModelModule) modules.get("view_model");
+        original.applyPreset("Low");
+        setting(original, "main_y", NumberSetting.class).setValue(-0.75);
+        setting(original, "off_x", NumberSetting.class).setValue(0.45);
+        new ClientConfig(directory).save(modules);
+
+        ModuleManager reloaded = new ModuleManager();
+        new ClientConfig(directory).load(reloaded);
+        ViewModelModule restored = (ViewModelModule) reloaded.get("view_model");
+        restored.onTick(null);
+        assertEquals(-0.75, setting(restored, "main_y", NumberSetting.class).value(), 1e-9);
+        assertEquals(0.45, setting(restored, "off_x", NumberSetting.class).value(), 1e-9);
+        assertEquals("Low", setting(restored, "preset", ChoiceSetting.class).value());
+
+        // Explicitly choosing a different preset must still apply it.
+        setting(restored, "preset", ChoiceSetting.class).setValue("Close");
+        restored.onTick(null);
+        assertEquals(1.15, setting(restored, "main_scale", NumberSetting.class).value(), 1e-9);
+    }
+
+    @Test
+    void switchingProfilesPreservesEditsToCustomPresets() throws Exception {
+        ModuleManager modules = new ModuleManager();
+        ViewModelModule module = (ViewModelModule) modules.get("view_model");
+        module.savePreset("Blade");
+        setting(module, "main_x", NumberSetting.class).setValue(0.8);
+        ClientConfig config = new ClientConfig(directory);
+        config.saveProfile("blade", modules);
+
+        module.applyPreset("Wide");
+        module.onTick(null);
+        assertTrue(config.loadProfile("blade", modules));
+        module.onTick(null);
+        assertEquals("Blade", setting(module, "preset", ChoiceSetting.class).value());
+        assertEquals(0.8, setting(module, "main_x", NumberSetting.class).value(), 1e-9);
+    }
+
+    @Test
     void aSavedPresetSurvivesTheConfigRoundTrip() throws Exception {
         ModuleManager modules = new ModuleManager();
         ViewModelModule viewModel = (ViewModelModule) modules.get("view_model");
@@ -52,7 +92,7 @@ class ViewModelPresetConfigTest {
         ModuleManager reloaded = new ModuleManager();
         new ClientConfig(directory).load(reloaded);
         ViewModelModule restored = (ViewModelModule) reloaded.get("view_model");
-        // The first tick is where a pending config selection (saved before this session) is resolved and applied.
+        // Loading resolves the preset choices without overwriting the saved current transforms.
         restored.onTick(null);
 
         ViewModelPreset found = ViewModelPreset.find(restored.presets(), "My Blade");

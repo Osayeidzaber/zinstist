@@ -17,19 +17,25 @@ import java.util.List;
  * Drawn in board coordinates on a {@link Canvas}; motion stops with reduced motion.
  */
 public final class Backdrops {
-    public static final List<String> MODES = List.of("Ambient", "Particles", "Panorama", "Dark");
+    public static final List<String> MODES = List.of("Dark Veil", "Aurora", "Threads", "Beams", "Galaxy", "Liquid Chrome",
+            "Ambient", "Particles", "Panorama", "Dark");
     private static final long EPOCH = System.nanoTime();
 
     private Backdrops() {
     }
 
     public static String mode() {
-        String m = JilatonClient.clientConfig() == null ? "Ambient" : JilatonClient.clientConfig().menuBackground();
-        return MODES.contains(m) ? m : "Ambient";
+        String m = JilatonClient.clientConfig() == null ? "Dark Veil" : JilatonClient.clientConfig().menuBackground();
+        return MODES.contains(m) ? m : "Dark Veil";
     }
 
     /** Full-screen backdrop for a screen of {@code width}x{@code height} GUI px; call before {@link Canvas#begin}. */
     public static void drawScreen(GuiGraphics g, int width, int height, float partial) {
+        Minecraft client = Minecraft.getInstance();
+        double scale = client.getWindow().getGuiScale();
+        double mx = client.mouseHandler.xpos() / scale, my = client.mouseHandler.ypos() / scale;
+        g.fill(0, 0, width, height, Kit.BASE);
+        if (ShaderBackdrop.isShaderMode(mode()) && ShaderBackdrop.draw(g, mode(), width, height, mx, my)) return;
         if (mode().equals("Panorama")) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.gameRenderer != null && mc.level == null) {
@@ -44,12 +50,13 @@ public final class Backdrops {
     /** The animated layer, in board coordinates inside {@link Canvas#begin}. */
     public static void drawBoard(GuiGraphics g) {
         double t = Kit.reduced() ? 0 : (System.nanoTime() - EPOCH) / 1e9;
+        if (ShaderBackdrop.isShaderMode(mode())) return;
         switch (mode()) {
             case "Ambient" -> {
                 float ax = (float) (980 + Math.sin(t * 0.07) * 120), ay = (float) (230 + Math.cos(t * 0.05) * 60);
                 float bx = (float) (220 + Math.cos(t * 0.06) * 140), by = (float) (620 + Math.sin(t * 0.045) * 50);
                 Ui.glow(g, ax, ay, 560, Kit.accent() & 0xFFFFFF, 0.075);
-                Ui.glow(g, bx, by, 520, 0x8FA3C2, 0.05);
+                Ui.glow(g, bx, by, 520, 0xBFBFBF, 0.05);
                 Ui.glow(g, 640, 360, 900, 0xFFFFFF, 0.018);
             }
             case "Particles" -> {

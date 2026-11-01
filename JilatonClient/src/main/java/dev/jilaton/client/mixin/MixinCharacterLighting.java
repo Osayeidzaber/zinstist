@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Lighting.class)
 public abstract class MixinCharacterLighting {
    @Inject(method = "setupFor", at = @At("HEAD"))
-   private void anubis$trackCharacterLighting(Entry entry, CallbackInfo ci) {
+   private void jilaton$trackCharacterLighting(Entry entry, CallbackInfo ci) {
       CharacterLighting.setup(entry);
    }
 }

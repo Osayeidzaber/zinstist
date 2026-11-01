@@ -34,4 +34,23 @@ class FriendManagerTest {
         assertThrows(IllegalArgumentException.class, () -> FriendManager.add("name with spaces"));
         assertThrows(IllegalArgumentException.class, () -> FriendManager.toggle(""));
     }
+
+    @Test void malformedRemoteNamesDoNotCrashFriendLookups() {
+        assertFalse(FriendManager.contains((String) null));
+        assertFalse(FriendManager.contains("NPC name with spaces"));
+    }
+
+    @Test void attackGuardHonorsItsModuleAndSetting() {
+        FriendsModule module = new FriendsModule();
+        FriendManager.add("Player_One");
+        assertFalse(module.blocks("Player_One"));
+        module.setEnabled(true);
+        try {
+            assertTrue(module.blocks("PLAYER_ONE"));
+            assertFalse(module.blocks("OtherPlayer"));
+            module.settings().stream().filter(s -> s.id().equals("protect_attacks"))
+                    .map(dev.jilaton.client.setting.BooleanSetting.class::cast).findFirst().orElseThrow().setValue(false);
+            assertFalse(module.blocks("Player_One"));
+        } finally { module.setEnabled(false); }
+    }
 }
