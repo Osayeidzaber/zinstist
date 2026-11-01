@@ -793,6 +793,32 @@ public final class VisualVerifier {
             command(client, "kill @e[type=minecraft:end_crystal]");
         });
 
+        // Video UI: info bar watermark, module spotlight card, shield cooldown pill, hexagram target marker.
+        then(2, () -> {
+            client.player.setYRot(0);
+            client.player.setXRot(20);
+            summonAhead(client, "zombie", 3.0);
+            command(client, "item replace entity @p weapon.offhand with minecraft:shield");
+            enable("target_esp");
+            setting("target_esp", "source", "Last hit");
+            setting("target_esp", "memory", 15.0);
+            setting("target_esp", "style", "Hexagram");
+        });
+        then(30, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
+            // Stand-in for an axe hit on the shield: the same item cooldown the server applies.
+            client.player.getCooldowns().addCooldown(client.player.getOffhandItem(), 100);
+            enable("fullbright");
+        });
+        shot(8, "37-video-ui");
+        then(3, () -> {
+            disable("fullbright");
+            disable("target_esp");
+            command(client, "item replace entity @p weapon.offhand with minecraft:air");
+            command(client, "kill @e[type=minecraft:zombie]");
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {
@@ -1064,7 +1090,7 @@ public final class VisualVerifier {
         return name.startsWith("10-") || name.startsWith("27") || name.startsWith("31") || name.startsWith("11-") || name.startsWith("12-")
                 || name.startsWith("14-") || name.startsWith("15-") || name.startsWith("16-")
                 || name.startsWith("17-") || name.startsWith("18-") || name.startsWith("19-")
-                || name.startsWith("20-") || name.startsWith("33") || name.startsWith("35");
+                || name.startsWith("20-") || name.startsWith("33") || name.startsWith("35") || name.startsWith("37");
     }
 
     private void logDisabled() {

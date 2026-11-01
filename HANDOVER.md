@@ -136,6 +136,8 @@ unused `FxShapes.softRing`, pinned target card.
 - Lyrics are never hidden: they sit farther out (default distance 4.5 blocks, text grows with sqrt of distance)
   and beside the gaze (default side angle 36°); World Trail spawns at the side angle. First-person music cards
   moved lower-left. Polled sources run through `PlaybackClock`. The dev config had distance 1.5 / side -90.
+- HUD from the videos: "Info bar" watermark (name · server · fps · clock), module spotlight card on toggle,
+  shield cooldown pill (assumes vanilla's 5 s disable), TargetESP "Hexagram" style. Harness scene 37.
 - Crystal & Anchor FX "Glass cubes" style, TargetESP "Outline target", and a Smooth Camera module (scene 36).
 
 ### Open

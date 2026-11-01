@@ -12,6 +12,7 @@ public final class TargetEspGeometry {
     public static final String BRACKETS = "Brackets";
     public static final String CYBER_TARGET = "Cyber Target";
     public static final String CINEMATIC = "Cinematic";
+    public static final String HEXAGRAM = "Hexagram";
     public static final String CUSTOM = "Custom";
 
     public static final int COMP_HALO = 1;
@@ -23,7 +24,7 @@ public final class TargetEspGeometry {
     public static final int DEFAULT_CUSTOM_MASK = COMP_HALO | COMP_ORBIT | COMP_CYBER | COMP_RETICLE;
 
     public static final List<String> STYLES = List.of(
-            HALO, MINIMAL, ORBIT, HELIX, GROUND_AURA, BRACKETS, CYBER_TARGET, CINEMATIC, CUSTOM
+            HALO, MINIMAL, ORBIT, HELIX, GROUND_AURA, BRACKETS, CYBER_TARGET, CINEMATIC, HEXAGRAM, CUSTOM
     );
 
     private TargetEspGeometry() { }
@@ -46,6 +47,7 @@ public final class TargetEspGeometry {
             case BRACKETS -> brackets(batch, m);
             case CYBER_TARGET -> cyberTarget(batch, m);
             case CINEMATIC -> cinematic(batch, m);
+            case HEXAGRAM -> hexagram(batch, m);
             case CUSTOM -> custom(batch, m, customMask);
             default -> halo(batch, m);
         }
@@ -71,6 +73,25 @@ public final class TargetEspGeometry {
     }
 
     /** Concentric ground aura with radial ticks and rising energy pillars around the target. */
+    /** Six-pointed star turning slowly on the ground under the target, inside a thin ring. */
+    static void hexagram(EffectBatch batch, Marker m) {
+        double ground = m.y() + 0.03;
+        double r = m.radius() * 1.1;
+        int edge = EffectBatch.withAlpha(m.rgb(), m.alpha() * 0.95);
+        for (int t = 0; t < 2; t++) {
+            double base = m.phase() * 0.6 + t * Math.PI / 3;
+            for (int i = 0; i < 3; i++) {
+                double a0 = base + i * Math.PI * 2 / 3, a1 = base + (i + 1) * Math.PI * 2 / 3;
+                batch.glowLine(m.x() + Math.cos(a0) * r, ground, m.z() + Math.sin(a0) * r,
+                        m.x() + Math.cos(a1) * r, ground, m.z() + Math.sin(a1) * r, edge, 2.0F, m.walls());
+            }
+        }
+        batch.glowRing(m.x(), ground, m.z(), r * 1.04, 72, EffectBatch.withAlpha(m.rgb(), m.alpha() * 0.6), 1.4F,
+                m.walls(), 0.45, -m.phase());
+        batch.band(m.x(), ground - 0.002, m.z(), r * 0.2, r, 48, EffectBatch.withAlpha(m.rgb(), m.alpha() * 0.12),
+                EffectBatch.withAlpha(m.rgb(), 0), m.walls());
+    }
+
     static void groundAura(EffectBatch batch, Marker m) {
         double ground = m.y() + 0.025;
         double r = m.radius();

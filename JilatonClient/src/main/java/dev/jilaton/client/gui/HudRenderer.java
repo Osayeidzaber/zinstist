@@ -76,6 +76,10 @@ public final class HudRenderer {
     private dev.jilaton.client.render.WorldOverlayProjection projection;
     private float partialTick;
     private java.util.UUID lastTargetId;
+    private final java.util.List<String> infoSegments = new java.util.ArrayList<>();
+    /** Shield cooldown last frame, to show "Ready" briefly once it ends. */
+    private boolean shieldWasCooling;
+    private long shieldReadyAt;
     private final AnimatedValue sideBarHealth = new AnimatedValue();
     private final dev.jilaton.client.render.FightStats fightStats = new dev.jilaton.client.render.FightStats();
     private final ModuleManager modules;
@@ -252,7 +256,18 @@ public final class HudRenderer {
         int moduleListTop = 8;
         if (hud.watermark() && visible("watermark", editorPreview)) {
             String version = "JILATON";
-            int width = Math.round(dev.jilaton.client.gui.design.Ui.spacedWidth(version, 9, 1.6F, JilatonType.Face.BOLD)) + 34;
+            int logoWidth = Math.round(dev.jilaton.client.gui.design.Ui.spacedWidth(version, 9, 1.6F, JilatonType.Face.BOLD)) + 34;
+            // Info bar: the logo followed by name, server, fps and clock segments, like a status strip.
+            infoSegments.clear();
+            if (hud.infoBar() && client.player != null) {
+                infoSegments.add(client.player.getName().getString());
+                var server = client.getCurrentServer();
+                infoSegments.add(server != null ? server.ip : client.hasSingleplayerServer() ? "Singleplayer" : "Offline");
+                infoSegments.add(client.getFps() + " fps");
+                infoSegments.add(java.time.LocalTime.now().format(CLOCK));
+            }
+            int width = logoWidth;
+            for (String segment : infoSegments) width += JilatonType.font().width(segment) + 17;
             int x = widgetX("watermark", 8, width, guiWidth);
             int y = widgetY("watermark", 8, 22, guiHeight);
             beginWidget(graphics, "watermark", x, y, width, 22, editorPreview);
@@ -260,6 +275,12 @@ public final class HudRenderer {
             drawPanel(graphics, x, y, width, 22);
             dev.jilaton.client.gui.design.Ui.mark(graphics, x + 8, y + 5, 12, 0xFFF5F5F5);
             dev.jilaton.client.gui.design.Ui.spaced(graphics, version, x + 26, y + 7, 9, 1.6F, JilatonType.Face.BOLD, 0xFFF5F5F5);
+            int segmentX = x + logoWidth;
+            for (String segment : infoSegments) {
+                graphics.fill(segmentX - 6, y + 6, segmentX - 5, y + 16, 0x33FFFFFF);
+                graphics.drawString(JilatonType.font(), segment, segmentX + 3, y + 7, 0xFFD8D8D8, false);
+                segmentX += JilatonType.font().width(segment) + 17;
+            }
             graphics.pose().popMatrix();
             moduleListTop = activeLayout.y() + activeLayout.height() + 6;
         }
@@ -444,6 +465,9 @@ public final class HudRenderer {
         if (hud.notifications() && visible("notifications", editorPreview)) {
             renderNotifications(graphics, client, editorPreview);
         }
+        if (hud.spotlight() && !editorPreview) renderSpotlight(graphics);
+        if (hud.shieldCooldown() && !editorPreview && client.player != null && client.screen == null)
+            renderShieldCooldown(graphics, client);
     }
 
     private void renderNotifications(GuiGraphics graphics, Minecraft client, boolean preview) {
@@ -471,6 +495,85 @@ public final class HudRenderer {
                     HudDesign.withAlpha(0xFFF5F5F5, 0.35));
         }
         graphics.pose().popMatrix();
+    }
+
+    /** How long the spotlight card stays up after a module is toggled. */
+    static final long SPOTLIGHT_NANOS = 2_600_000_000L;
+
+    /**
+     * Big top-centre card for the module you just toggled: icon tile, name, its description, and a counter of how
+     * many modules are on. Slides in, then fades away.
+     */
+    private void renderSpotlight(GuiGraphics graphics) {
+        long now = System.nanoTime();
+        var notices = modules.notifications().current(now);
+        if (notices.isEmpty()) return;
+        var notice = notices.get(notices.size() - 1);
+        ClientModule module = modules.get(notice.id());
+        long age = now - notice.createdAt();
+        if (module == null || age > SPOTLIGHT_NANOS) return;
+        double in = config.reducedMotion() ? 1 : Math.min(1, age / 2.2e8);
+        double out = Math.min(1, (SPOTLIGHT_NANOS - age) / 4e8);
+        double alpha = Math.min(in, out);
+        if (alpha <= 0.02) return;
+        Font font = JilatonType.font();
+        String title = module.name();
+        int active = 0, total = 0;
+        for (ClientModule each : modules.all()) { total++; if (each.enabled()) active++; }
+        String counter = String.format(Locale.ROOT, "%02d / %02d", active, total);
+        // Measured as a whole string: per-character widths overcount this font and cut the line short.
+        String subtitle = notice.enabled() ? module.description() : "Disabled";
+        if (font.width(subtitle) > 260) subtitle = font.plainSubstrByWidth(subtitle, 260 - font.width("…")).stripTrailing() + "…";
+        int textWidth = Math.max(Math.round(font.width(title) * 1.6F), font.width(subtitle));
+        int width = textWidth + 54, height = 40;
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = 34 - (int) Math.round((1 - in) * 10);
+        int a = (int) Math.round(alpha * 255);
+        int chipWidth = font.width(counter) + 16, chipX = (graphics.guiWidth() - chipWidth) / 2;
+        JilatonUi.fillRounded(graphics, chipX, y - 15, chipWidth, 11, 5, (Math.round(a * 0.8F) << 24) | 0x101010);
+        graphics.drawString(font, counter, chipX + 8, y - 13, (a << 24) | 0xBDBDBD, false);
+        JilatonUi.fillRounded(graphics, x, y, width, height, 9, (Math.round(a * 0.86F) << 24) | 0x0C0C0F);
+        JilatonUi.strokeRounded(graphics, x, y, width, height, 9, (Math.round(a * 0.18F) << 24) | 0xFFFFFF);
+        int tile = 24;
+        JilatonUi.fillRounded(graphics, x + 9, y + 8, tile, tile, 7, (a << 24) | (notice.enabled() ? 0xF2F2F2 : 0x3A3A3A));
+        String initial = title.isEmpty() ? "?" : title.substring(0, 1).toUpperCase(Locale.ROOT);
+        graphics.drawString(font, initial, x + 9 + (tile - font.width(initial)) / 2, y + 16,
+                (a << 24) | (notice.enabled() ? 0x0C0C0F : 0xF2F2F2), false);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x + 42, y + 7);
+        graphics.pose().scale(1.6F, 1.6F);
+        graphics.drawString(font, title, 0, 0, (a << 24) | 0xFFFFFF, false);
+        graphics.pose().popMatrix();
+        graphics.drawString(font, subtitle, x + 42, y + 26, (a << 24) | 0x9A9A9A, false);
+    }
+
+    /**
+     * Pill beside the crosshair while your shield is disabled (an axe hit), counting down, then "Ready" for a
+     * moment. Only shown while you hold a shield; the countdown assumes vanilla's 5 second disable.
+     */
+    private void renderShieldCooldown(GuiGraphics graphics, Minecraft client) {
+        ItemStack shield = client.player.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                ? client.player.getOffhandItem() : client.player.getMainHandItem();
+        if (!shield.is(net.minecraft.world.item.Items.SHIELD)) { shieldWasCooling = false; return; }
+        float percent = client.player.getCooldowns().getCooldownPercent(shield, partialTick);
+        long now = System.nanoTime();
+        String label;
+        if (percent > 0) {
+            shieldWasCooling = true;
+            label = String.format(Locale.ROOT, "%.1fs", percent * 5.0);
+        } else {
+            if (shieldWasCooling) { shieldWasCooling = false; shieldReadyAt = now; }
+            if (shieldReadyAt == 0 || now - shieldReadyAt > 1_200_000_000L) return;
+            label = "Ready";
+        }
+        Font font = JilatonType.font();
+        int width = font.width(label) + 24, height = 14;
+        int x = graphics.guiWidth() / 2 - width - 14, y = graphics.guiHeight() / 2 + 12;
+        JilatonUi.fillRounded(graphics, x, y, width, height, 7, 0xCC0C0C0F);
+        JilatonUi.strokeRounded(graphics, x, y, width, height, 7, 0x30FFFFFF);
+        int cx = x + 8, cy = y + 7;
+        graphics.fill(cx - 3, cy - 3, cx + 3, cy + 3, percent > 0 ? 0xFF5A5A5A : 0xFFF2F2F2);
+        graphics.drawString(font, label, x + 15, y + 3, 0xFFF2F2F2, false);
     }
 
     private void renderArmor(GuiGraphics graphics, Minecraft client, boolean preview, int defaultY) {
