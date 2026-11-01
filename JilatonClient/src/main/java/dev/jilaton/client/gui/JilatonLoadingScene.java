@@ -88,56 +88,109 @@ public final class JilatonLoadingScene {
     public static void render(GuiGraphics graphics, int width, int height, float opacity, float progress,
                               double time, boolean showProgress) {
         if (opacity <= 0.004F) return;
-        // Board "Loading screen": deep black, a faint white light, the mark in a round badge circled by the progress
-        // ring, and the wordmark with its gliding shine. Everything is anti-aliased and drawn 1:1 in physical pixels
-        // (Paint). No font text: fonts are not loaded yet while this screen is up.
-        graphics.fill(0, 0, width, height, JilatonUi.alpha(Ui.DEEP, opacity));
+        // Editorial boot sequence. No font text: fonts are not loaded while this screen is up, so the numbers are
+        // drawn as segment digits and the wordmark comes from the brand texture. Progress is the real reload
+        // progress; nothing here is faked or delayed.
+        graphics.fill(0, 0, width, height, JilatonUi.alpha(0xFF030303, opacity));
         Canvas canvas = new Canvas().fit(width, height);
         graphics.pose().pushMatrix();
         float scale = canvas.scale();
         graphics.pose().translate((width - Canvas.W * scale) / 2F, (height - Canvas.H * scale) / 2F);
         graphics.pose().scale(scale, scale);
-        double breathe = 0.5 + 0.5 * Math.sin(time * 1.6);
-        Ui.glow(graphics, 640, 300, 360, 0xFFFFFF, (0.05 + 0.025 * breathe) * opacity);
-
-        float cx = 640, cy = 292, r = 66;
-        // Ripples: two rings leaving the badge and fading, one every 1.4 s.
-        for (int i = 0; i < 2; i++) {
-            double phase = ((time / 1.4) + i * 0.5) % 1.0;
-            double eased = 1 - Math.pow(1 - phase, 2);
-            Ui.ring(graphics, cx, cy, (float) (r + 6 + 46 * eased), 1, JilatonUi.alpha(Ui.TEXT, 0.16 * (1 - phase) * opacity));
-        }
-        // Progress ring: hairline track plus a 2px white arc; while waiting on the first step, a comet circles.
-        Ui.ring(graphics, cx, cy, r, 1, JilatonUi.alpha(Ui.TEXT, 0.10 * opacity));
         float done = showProgress ? Math.max(0, Math.min(1, progress)) : 0;
-        arc(graphics, cx, cy, r, -Math.PI / 2, done, 2.2F, JilatonUi.alpha(Ui.TEXT, 0.95 * opacity));
-        double head = -Math.PI / 2 + time * 2.6;
-        for (int i = 0; i < 18; i++) {
-            double a = head - i * 0.05;
-            float px = (float) (cx + Math.cos(a) * r), py = (float) (cy + Math.sin(a) * r);
-            Ui.circle(graphics, px, py, 1.6F, JilatonUi.alpha(Ui.TEXT, (1 - i / 18.0) * 0.55 * opacity * (1 - done)));
-        }
-        // The mark in its badge, breathing very slightly.
-        float badge = (float) (50 + 1.2 * breathe);
-        Ui.circle(graphics, cx, cy, badge, JilatonUi.alpha(Ui.CARD, opacity));
-        Ui.ring(graphics, cx, cy, badge, 1, JilatonUi.alpha(Ui.TEXT, 0.14 * opacity));
-        Ui.mark(graphics, cx - 24, cy - 24, 48, JilatonUi.alpha(Ui.TEXT, opacity));
+        // Leaving: when the overlay starts fading, everything blooms outward slightly.
+        float leave = 1 - opacity;
 
-        // Wordmark (text only; the mark is already above), resampled to its exact pixel size.
-        float wordW = 300, wordH = wordW * WORD_H / WORD_W, wordX = cx - wordW / 2, wordY = 402;
+        // 12-column hairline grid, drawn in from the top.
+        double gridIn = Math.min(1, time / 0.8);
+        for (int i = 1; i < 12; i++) {
+            float x = 64 + i * (1152 / 12F);
+            Ui.rect(graphics, x, 0, 1, (float) (720 * gridIn), JilatonUi.alpha(0xFFFFFFFF, 0.035 * opacity));
+        }
+        Ui.rect(graphics, 64, 96, 1152, 1, JilatonUi.alpha(0xFFFFFFFF, 0.08 * opacity));
+
+        // Concentric rings around the mark; each draws as an arc in proportion to progress.
+        float cx = 860, cy = 330;
+        float[] radii = {110, 170, 240, 320};
+        for (int i = 0; i < radii.length; i++) {
+            float r = radii[i] * (1 + 0.25F * leave);
+            Ui.ring(graphics, cx, cy, r, 1, JilatonUi.alpha(0xFFFFFFFF, (0.05 - i * 0.008) * opacity));
+            double share = Math.max(0, Math.min(1, done * radii.length - i));
+            arc(graphics, cx, cy, r, -Math.PI / 2 + i * 0.6, (float) share, 1.6F,
+                    JilatonUi.alpha(0xFFFFFFFF, (0.55 - i * 0.1) * opacity));
+            double a = time * (0.5 + i * 0.18) + i * 1.7;
+            Ui.circle(graphics, cx + (float) Math.cos(a) * r, cy + (float) Math.sin(a) * r, 2.2F - i * 0.3F,
+                    JilatonUi.alpha(0xFFFFFFFF, 0.6 * opacity));
+        }
+        Ui.glow(graphics, cx, cy, 260, 0xFFFFFF, 0.05 * opacity);
+
+        // The J assembles from its five blocks, then breathes.
+        float size = 150, mx = cx - size / 2, my = cy - size / 2, u = size / 24F;
+        float[][] blocks = {{4, 3, 17, 4}, {17, 7, 4, 10}, {14, 17, 6, 3}, {7, 20, 10, 3}, {3, 13, 4, 8}};
+        float[][] from = {{-40, 0}, {0, -40}, {40, 0}, {0, 40}, {-40, 20}};
+        for (int i = 0; i < blocks.length; i++) {
+            double k = Math.max(0, Math.min(1, (time - 0.15 - i * 0.09) / 0.5));
+            double e = 1 - Math.pow(1 - k, 3);
+            float ox = (float) (from[i][0] * (1 - e)), oy = (float) (from[i][1] * (1 - e));
+            Ui.rect(graphics, mx + blocks[i][0] * u + ox, my + blocks[i][1] * u + oy, blocks[i][2] * u, blocks[i][3] * u,
+                    JilatonUi.alpha(0xFFF5F5F5, e * opacity));
+        }
+
+        // Left column: wordmark, then the percentage in segment digits.
+        float wordW = 360, wordH = wordW * WORD_H / WORD_W, wordX = 64, wordY = 150;
         int alpha = Math.round(opacity * 255.0F);
         Paint.image(graphics, LOGO_PATH, WORD_X, WORD_Y, WORD_W, WORD_H, wordX, wordY, wordW, wordH,
-                Math.round(alpha * 0.66F) << 24 | 0xFFFFFF, 0, 1);
-        for (double[] layer : SHINE_LAYERS) {
-            for (int strip = 0; strip < STRIPS; strip++) {
-                double glow = shine(time, (strip + 0.5) / STRIPS, layer[0]);
-                int stripAlpha = (int) Math.round(alpha * layer[1] * glow * 0.6);
-                if (stripAlpha < 3) continue;
-                Paint.image(graphics, LOGO_PATH, WORD_X, WORD_Y, WORD_W, WORD_H, wordX, wordY, wordW, wordH,
-                        stripAlpha << 24 | 0xFFFFFF, strip / (double) STRIPS, (strip + 1) / (double) STRIPS);
-            }
+                Math.round(alpha * 0.9F) << 24 | 0xFFFFFF, 0, 1);
+        for (int strip = 0; strip < STRIPS; strip++) {
+            double glow = shine(time, (strip + 0.5) / STRIPS, 0.12);
+            int stripAlpha = (int) Math.round(alpha * glow * 0.45);
+            if (stripAlpha < 3) continue;
+            Paint.image(graphics, LOGO_PATH, WORD_X, WORD_Y, WORD_W, WORD_H, wordX, wordY, wordW, wordH,
+                    stripAlpha << 24 | 0xFFFFFF, strip / (double) STRIPS, (strip + 1) / (double) STRIPS);
+        }
+        int percent = Math.round(done * 100);
+        digits(graphics, String.valueOf(percent), 64, 420, 54, JilatonUi.alpha(0xFFF5F5F5, opacity));
+        float pw = String.valueOf(percent).length() * 44;
+        // A small % sign from two dots and a slash of rects.
+        Ui.circle(graphics, 64 + pw + 10, 432, 4, JilatonUi.alpha(0xFFB0B0B0, opacity));
+        Ui.circle(graphics, 64 + pw + 26, 466, 4, JilatonUi.alpha(0xFFB0B0B0, opacity));
+        for (int i = 0; i < 9; i++) Ui.rect(graphics, 64 + pw + 26 - i * 2, 428 + i * 5, 2, 5, JilatonUi.alpha(0xFFB0B0B0, opacity));
+
+        // Progress rule with a travelling light head and four stage ticks that light as real progress passes them.
+        float ry = 620, rx = 64, rw = 1152;
+        Ui.rect(graphics, rx, ry, rw, 1, JilatonUi.alpha(0xFFFFFFFF, 0.12 * opacity));
+        Ui.rect(graphics, rx, ry, rw * done, 1, JilatonUi.alpha(0xFFFFFFFF, 0.85 * opacity));
+        for (int i = 0; i < 18; i++) {
+            float k = 1 - i / 18F;
+            Ui.rect(graphics, rx + rw * done - i * 4, ry - 1, 4, 3, JilatonUi.alpha(0xFFFFFFFF, 0.6 * k * k * opacity));
+        }
+        for (int i = 1; i <= 4; i++) {
+            float tx = rx + rw * i / 4F;
+            boolean lit = done >= i / 4F - 0.001F;
+            Ui.rect(graphics, tx - 1, ry - 8, 2, 16, JilatonUi.alpha(lit ? 0xFFFFFFFF : 0xFF3A3A3A, opacity));
+            Ui.rect(graphics, tx - 30, ry + 18, 30, 2, JilatonUi.alpha(lit ? 0xFF9A9A9A : 0xFF2A2A2A, opacity));
         }
         graphics.pose().popMatrix();
+    }
+
+    /** Seven-segment digits drawn from rects, {@code h} tall, for text-free screens. */
+    private static void digits(GuiGraphics g, String text, float x, float y, float h, int color) {
+        float w = h * 0.62F, t = h * 0.1F;
+        int[] masks = {0b1110111, 0b0010010, 0b1011101, 0b1011011, 0b0111010, 0b1101011, 0b1101111, 0b1010010, 0b1111111, 0b1111011};
+        for (int i = 0; i < text.length(); i++) {
+            int d = text.charAt(i) - '0';
+            if (d < 0 || d > 9) continue;
+            int m = masks[d];
+            float ox = x + i * (w + h * 0.2F);
+            float half = (h - t) / 2;
+            if ((m & 0b1000000) != 0) Ui.rect(g, ox + t, y, w - 2 * t, t, color);
+            if ((m & 0b0100000) != 0) Ui.rect(g, ox, y + t, t, half - t / 2, color);
+            if ((m & 0b0010000) != 0) Ui.rect(g, ox + w - t, y + t, t, half - t / 2, color);
+            if ((m & 0b0001000) != 0) Ui.rect(g, ox + t, y + half, w - 2 * t, t, color);
+            if ((m & 0b0000100) != 0) Ui.rect(g, ox, y + half + t, t, half - t / 2, color);
+            if ((m & 0b0000010) != 0) Ui.rect(g, ox + w - t, y + half + t, t, half - t / 2, color);
+            if ((m & 0b0000001) != 0) Ui.rect(g, ox + t, y + h - t, w - 2 * t, t, color);
+        }
     }
 
     private static final String LOGO_PATH = "/assets/jilaton/textures/brand/loading-logo.png";

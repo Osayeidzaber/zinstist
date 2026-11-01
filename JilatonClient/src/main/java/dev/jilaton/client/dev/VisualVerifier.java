@@ -47,6 +47,9 @@ public final class VisualVerifier {
     private static final Logger LOGGER = LogUtils.getLogger();
     private double spiderStartY;
     private double autoWalkStartZ, autoWalkTurnZ;
+    private java.util.UUID criticalFixtureId;
+    private LivingEntity criticalFixture;
+    private boolean criticalsBefore, sprintBefore;
     private static final Set<String> VISUALS = Set.of("target_esp", "jump_circles", "trails", "hit_particles", "hit_effects",
             "damage_particles", "player_effects", "custom_sky", "ambience", "visual_engine", "explosive_highlights",
             "custom_crosshair", "nametags", "player_esp", "tracers", "item_esp", "kill_aura", "fullbright");
@@ -1035,6 +1038,16 @@ public final class VisualVerifier {
         then(2, () -> client.setScreen(null));
         then(2, () -> client.setScreen(new dev.jilaton.client.gui.JilatonPauseScreen()));
         shot(30, "51-pause");
+        then(2, () -> client.setScreen(new net.minecraft.client.gui.screens.Screen(net.minecraft.network.chat.Component.literal("load")) {
+            @Override
+            public void render(net.minecraft.client.gui.GuiGraphics graphics, int mx, int my, float partial) {
+                dev.jilaton.client.gui.JilatonLoadingScene.render(graphics, width, height, 1, 0.62F, 2.4, true);
+            }
+
+            @Override
+            public void renderBackground(net.minecraft.client.gui.GuiGraphics graphics, int mx, int my, float partial) { }
+        }));
+        shot(10, "49-loading");
         then(2, () -> client.setScreen(null));
         then(2, () -> {
             var list = new net.minecraft.client.multiplayer.ServerList(client);
@@ -1309,6 +1322,68 @@ public final class VisualVerifier {
                 assist.resetSettings();
                 bots.setEnabled(botsEnabled);
             }
+        });
+
+        // A normal diamond hit leaves a 10-HP cow alive; a server-applied critical kills it.
+        then(2, () -> {
+            studio(client);
+            disable("kill_aura");
+            disable("auto_clicker");
+            disable("triggerbot");
+            criticalsBefore = JilatonClient.moduleManager().get("criticals").enabled();
+            sprintBefore = JilatonClient.moduleManager().get("sprint").enabled();
+            JilatonClient.moduleManager().get("criticals").resetSettings();
+            setting("criticals", "players_only", false);
+            setting("criticals", "wait_ticks", 12.0);
+            command(client, "gamemode survival @p");
+            command(client, "item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+            spawnCriticalCow(client);
+        });
+        then(24, () -> {
+            criticalFixture = findCriticalCow(client);
+            if (criticalFixture == null || criticalFixture.getHealth() != 10)
+                throw new IllegalStateException("Criticals cow fixture was not a fresh 10-HP cow");
+            client.player.setSprinting(true);
+            client.options.keyUp.setDown(true);
+            JilatonClient.moduleManager().get("criticals").setEnabled(true);
+            JilatonClient.moduleManager().get("sprint").setEnabled(true);
+            client.gameMode.attack(client.player, criticalFixture);
+            boolean queued = ((dev.jilaton.client.module.impl.CriticalsModule) JilatonClient.moduleManager().get("criticals")).hasPendingAttack();
+            LOGGER.info("[JilatonVerify] criticals jump queued={}", queued);
+            if (!queued) throw new IllegalStateException("Criticals did not queue the real attack");
+        });
+        then(16, () -> {
+            client.options.keyUp.setDown(false);
+            boolean defeated = criticalFixture != null && !criticalFixture.isAlive();
+            LOGGER.info("[JilatonVerify] criticals server cow defeated={} health={}", defeated,
+                    criticalFixture == null ? -1 : criticalFixture.getHealth());
+            JilatonClient.moduleManager().get("criticals").setEnabled(false);
+            if (!defeated) throw new IllegalStateException("Queued critical failed to defeat the 10-HP cow");
+            studio(client);
+            setting("criticals", "mode", "Wait");
+            spawnCriticalCow(client);
+        });
+        then(24, () -> {
+            criticalFixture = findCriticalCow(client);
+            if (criticalFixture == null) throw new IllegalStateException("Criticals wait fixture missing");
+            JilatonClient.moduleManager().get("criticals").setEnabled(true);
+            client.gameMode.attack(client.player, criticalFixture);
+            boolean queued = ((dev.jilaton.client.module.impl.CriticalsModule) JilatonClient.moduleManager().get("criticals")).hasPendingAttack();
+            setting("criticals", "players_only", true); // Must invalidate this queued cow attack.
+            LOGGER.info("[JilatonVerify] criticals wait queued={}", queued);
+            if (!queued) throw new IllegalStateException("Criticals Wait did not queue the real attack");
+        });
+        then(3, () -> {
+            boolean cleared = !((dev.jilaton.client.module.impl.CriticalsModule) JilatonClient.moduleManager().get("criticals")).hasPendingAttack();
+            float health = criticalFixture == null ? -1 : criticalFixture.getHealth();
+            LOGGER.info("[JilatonVerify] criticals filter-change cleared={} cow-health={}", cleared, health);
+            JilatonClient.moduleManager().get("criticals").setEnabled(criticalsBefore);
+            JilatonClient.moduleManager().get("criticals").resetSettings();
+            JilatonClient.moduleManager().get("sprint").setEnabled(sprintBefore);
+            client.options.keyUp.setDown(false);
+            command(client, "kill " + criticalFixtureId);
+            command(client, "gamemode creative @p");
+            if (!cleared || health != 10) throw new IllegalStateException("Criticals replay ignored changed target settings");
         });
 
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
@@ -1678,6 +1753,20 @@ public final class VisualVerifier {
         ClientModule module = JilatonClient.moduleManager().get(moduleId);
         if (module == null) return null;
         for (Setting setting : module.settings()) if (setting.id().equals(settingId)) return setting;
+        return null;
+    }
+
+    private void spawnCriticalCow(Minecraft client) {
+        criticalFixtureId = java.util.UUID.randomUUID();
+        long high = criticalFixtureId.getMostSignificantBits(), low = criticalFixtureId.getLeastSignificantBits();
+        command(client, "summon minecraft:cow " + studioX + " " + studioY + " " + (studioZ + 2.4)
+                + " {NoAI:1b,PersistenceRequired:1b,Silent:1b,UUID:[I;" + (int)(high >>> 32) + "," + (int)high
+                + "," + (int)(low >>> 32) + "," + (int)low + "]}");
+    }
+
+    private LivingEntity findCriticalCow(Minecraft client) {
+        for (Entity entity : client.level.entitiesForRendering())
+            if (entity instanceof LivingEntity living && living.getUUID().equals(criticalFixtureId)) return living;
         return null;
     }
 

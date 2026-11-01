@@ -312,3 +312,9 @@ All other agent branches are merged into `jilaton/2026-10-31-work`.
 - Anubis ports TimeChanger/Spider/Sneak/SpeedMine: scene 43 verified time=6000, crouch, spider +3.8 blocks. Sneak Packet mode and SpeedMine are boot-verified only (mixins apply), not behaviour-verified.
 - Anubis porting PAUSED by the user (2026-11-01); remaining candidates: StorageESP/Waypoints/AutoWalk upgrades, Trajectories, HoleESP, Jesus, ElytraSwap, FastUse, LowHealthWarning.
 - Theme: GUI size (70-100%, applied by the shared Canvas to every redesigned screen) and Transition speed (0.5-2x entrance speed); persisted ui.gui_scale / ui.transition_speed; harness shot 17b.
+
+### 2026-11-01 Redesign (editorial direction after zaber.tech, shaders after React Bits)
+- `gui/design/ShaderBackdrop` + `shaders/core/ui_backdrop.fsh`: GPU backgrounds (Dark Veil, Aurora, Threads, Beams, Galaxy, Liquid Chrome) via a custom GUI pipeline; per-frame time/cursor/accent/mode/quality/aspect go through a 4x1 data texture (GUI blits have no uniforms). Config: `ui.menu_background`, `ui.shader_intensity`, `ui.full_effects`.
+- `gui/design/Kit`: tokens (pure neutral greys — a test enforces it), spring motion, enter(), borderSweep light, icons, controls. `Ui` tokens/toggles/buttons remapped onto Kit.
+- Rebuilt: home (editorial layout, sliding pill nav, kinetic wordmark, magnetic I.–IV. columns, marquee, FULL EFFECTS switch), pause (real GPU blur), servers/worlds base, ClickGUI chrome (numbered sidebar, sliding indicator, card light sweep), loading (grid, assembling J, progress rings, segment digits — no fonts at that stage).
+- Harness scenes 49 (loading), 50–50e (home per shader), 51 pause, 52/53 lists. Next: settings/theme page presets, HUD + editor, Appearance Studio, Music, notifications/tooltips, screen transitions.
