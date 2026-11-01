@@ -68,6 +68,14 @@ A green unit test never proves a mixin applies; `BUILD SUCCESSFUL` never proves 
   stride over the whole arc instead of truncated (max settings + 3 hits previously drew only one third of
   the arc). Bands that fit, including scene 28, skip the counting pass and render exactly as before.
 
+- **Terrain wave scan cost** (`b9c8c8e`): rows walk only the annulus (≈2–4k cells at radius 64, was 17.7k);
+  a brute-force reference test proves identical cell selection.
+- **Pinned target card** (`b1137d9`, user request with reference clips): default `target_placement` is now
+  "Follow target"; the card sits left of the opponent at chest height, clears the projected body width, and
+  has its own `target_follow_scale` (default 0.6). Runtime-verified in new harness scenes 33 (3.9 m) and 33b
+  (1.6 m). Saved configs keep their old value; the dev profile `run/config` was switched to Follow target.
+  Mob targets show an empty head tile (pre-existing, players only get a face).
+
 ### Implemented and covered by tests (history)
 
 - **Terrain shockwave legibility.** The wave *was* being submitted; at the captured age its alpha was
@@ -133,15 +141,24 @@ view-model and first-person hand stages, ambience sky tint (observed, precedence
    0..8 to menu slots 36..44, so hotbar pieces equip through the container path. A second select/use
    path would add an unverified server interaction — do not add it without live inventory testing.
 5. **Spatial / Sky Lyrics.** Blocked offline; needs authorized lyrics metadata.
-6. **Ambience vs CustomSky precedence** is untested.
+6. **Ambience vs CustomSky.** Colour precedence is correct at runtime (harness log, after the `{06X}` log
+   fix: `29-theme accent=#A98CFF owners=none`, `29b-sky accent=#9AA8FB owners=custom_sky`). **Open defect:**
+   in 29b the ambience dots disappear from the screenshot (bluish pixels below the horizon 409 → 1) although
+   ambience still submits ~1,610 quads that frame and runs before `custom_sky` (only +96 quads, so not the
+   24k cap). Draw path (`EntityOverlayRenderer.draw`, sky pipeline LEQUAL + screen blend) does not explain
+   it yet. A probe showed the nearest ambience quad coloured `f2f2f2` rather than the theme accent — check
+   whether a different style/colour path runs, then instrument per-pipeline. Investigation parked for the
+   target-card request.
 7. ~~**Terrain wave budget guard.**~~ Integrated as stride thinning. Branch `worktree-agent-general-purpose-74df511a` (`3084354`) holds
    an unverified `TerrainWaveBudgetTest` plus edits to `TerrainWave`/`HitEffectsModule`. Review before
    merging; it overlaps task 1.
 
 ### Low priority
 
-8. **Hot-path allocations (P5).** `HitEffectsModule` per-block allocation and the 1400-cell grid vs the
-   240/frame cap; `SpatialLyricsModule` per-frame allocations.
+8. **Hot-path allocations (P5).** HitEffects per-block allocation was already gone (reused probe/buffer,
+   mutable cursor) and the scan grid is fixed (`b9c8c8e`). Remaining: `HitEffectsModule.onTick` allocates a
+   boxed `HashMap` per tick (20 Hz, minor); `SpatialLyricsModule` allocates run lists/lambdas per frame but
+   cannot be exercised offline (lyrics blocked).
 9. **Unused primitive.** `FxShapes.softRing` is no longer called by production code (the halo path
    replaced it) but is covered by `FxShapesRingTest`. Keep or remove deliberately, with the test.
 10. **ClickGUI polish** items from the backlog (status labels, blur, slider/dropdown behaviour).
@@ -240,6 +257,7 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 - Pre-merge head `bbc1f53`: 206 / 958 / 0 / 0 / 0.
 - Harness on `bbc1f53`: exit 0, `BUILD SUCCESSFUL in 3m 35s`, clean boot, screenshots at 06:33.
 - `8f6aa87`: 207 / 965 / 0 / 0 / 0 (forced rerun); harness exit 0, `BUILD SUCCESSFUL in 3m 35s`.
+- After `b1137d9`: **209 / 978 / 0 / 0 / 0**; harness exit 0 with 98 screenshots (scenes 33/33b added).
 - After `356d346`: **209 / 976 / 0 / 0 / 0**. Harness not re-run (changes are GUI input and an over-budget
   path the scenes do not reach).
 
@@ -250,8 +268,8 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 1. **Read first:** this file, then `git log --oneline -25`, then `JilatonClient/development/BACKLOG.md`
    for item wording. Do not re-derive state from the older `development/*.md` status files.
 2. **First action:** run the gate (command in §G); run the harness if you touch rendering.
-3. **Priorities:** §D 4 (AutoArmor, needs live inventory testing), 6 (Ambience/CustomSky precedence), then
-   P5 allocations (§D 8 — note `SpatialLyricsModule`). Lyrics (§D 5) stay blocked.
+3. **Priorities:** §D 6 (ambience dots vanish under CustomSky — real, reproducible in scene 29b), §D 4
+   (AutoArmor, needs live inventory testing), then §D 8 leftovers. Lyrics (§D 5) stay blocked.
 4. **Do not rewrite:** `EffectBatch`/`FxFrame`/`FxShapes` API, the module contract, `ClientConfig`
    persistence format, or the `HotbarSlotRestore`/hold-key rules — all were deliberately consolidated.
 5. **Preserve:** `dev/VisualVerifier` is the only runtime oracle; keep its scene numbering stable.
