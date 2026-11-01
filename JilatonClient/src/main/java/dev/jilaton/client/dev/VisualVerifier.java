@@ -946,8 +946,9 @@ public final class VisualVerifier {
             return;
         }
         ChoiceSetting mode = choice("ambience", "color_mode");
-        LOGGER.info("[JilatonVerify] ambience {}: mode={} accent=#{06X} owners={}", label,
-                mode == null ? "?" : mode.value(), ambience.resolvedAccent(0xA98CFF), ownerList());
+        // SLF4J has no format specifiers, so the hex is formatted here; the accent and owners stay separate fields.
+        LOGGER.info("[JilatonVerify] ambience {}: mode={} accent=#{} owners={}", label,
+                mode == null ? "?" : mode.value(), String.format("%06X", ambience.resolvedAccent(0xA98CFF)), ownerList());
     }
 
     private static String ownerList() {
