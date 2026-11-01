@@ -205,8 +205,7 @@ public final class JilatonClickGui extends Screen {
         List<ClientModule> out = new ArrayList<>();
         for (ClientModule module : allModules) {
             if (!inCategory(module, category) || (enabledOnly && !module.enabled())) continue;
-            if (!query.isEmpty() && !module.name().toLowerCase(Locale.ROOT).contains(query)
-                    && !module.description().toLowerCase(Locale.ROOT).contains(query)) continue;
+            if (!query.isEmpty() && !ModuleSearch.matches(module, query)) continue;
             out.add(module);
         }
         List<String> order = visualPage() && !config.visualOrder().isEmpty() ? config.visualOrder() : config.moduleOrder();
