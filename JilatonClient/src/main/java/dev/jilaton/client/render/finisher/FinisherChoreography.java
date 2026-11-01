@@ -22,17 +22,27 @@ public final class FinisherChoreography {
     public enum Variant {
         GROUND_SLAM("Ground slam", 1.02F, 2.25F),
         RISING_UPPERCUT("Rising uppercut", 0.86F, 2.1F),
-        SPIN_KICK("Spin kick", 0.94F, 2.15F);
+        SPIN_KICK("Spin kick", 0.94F, 2.15F),
+        /** Tung Tung Tung Sahur: three bat knocks on the body, then a jump and a heavy final slam. */
+        TUNG_BONK("Tung tung bonk", 1.72F, 2.75F, 0.62F, 0.98F, 1.34F);
 
         public final String label;
         /** Seconds from start to the hit, where particles, sound and shake fire. */
         public final float impact;
         public final float length;
+        /** Lighter hits before the main impact (seconds); each gets a knock sound and a few sparks. */
+        public final float[] knocks;
 
-        Variant(String label, float impact, float length) {
+        Variant(String label, float impact, float length, float... knocks) {
             this.label = label;
             this.impact = impact;
             this.length = length;
+            this.knocks = knocks;
+        }
+
+        /** The character this move is always performed by, or null to use the selected one. */
+        public String character() {
+            return this == TUNG_BONK ? "Tung Tung Tung Sahur" : null;
         }
 
         public static Variant byLabel(String label) {
@@ -41,7 +51,7 @@ public final class FinisherChoreography {
         }
     }
 
-    public static final List<String> LABELS = List.of("Ground slam", "Rising uppercut", "Spin kick", "Random");
+    public static final List<String> LABELS = List.of("Ground slam", "Rising uppercut", "Spin kick", "Tung tung bonk", "Random");
 
     private static final float[] REST = pose(
             0, 0, 0,
@@ -81,6 +91,31 @@ public final class FinisherChoreography {
             key(2.1F, REST, 0.55F),
     };
 
+    private static final float[] BONK_UP = pose(
+            -0.25F, 0, 0, -0.18F, 0, 0, -2.7F, 0, -0.15F, -0.4F, 0, -0.2F, -0.2F, 0, 0, 0.25F, 0, 0,
+            0.4F, 0, 0);
+    private static final float[] BONK_DOWN = pose(
+            0.35F, 0, 0, 0.4F, 0, 0, -0.55F, 0, -0.08F, -0.3F, 0, -0.2F, -0.45F, 0, 0, 0.4F, 0, 0,
+            0.52F, -0.03F, 0);
+
+    private static final float[][] BONK_KEYS = {
+            key(0F, REST),
+            key(0.3F, BONK_UP),
+            key(0.62F, BONK_DOWN),
+            key(0.8F, BONK_UP),
+            key(0.98F, BONK_DOWN),
+            key(1.16F, BONK_UP),
+            key(1.34F, BONK_DOWN),
+            // Jump with the bat high, then the heavy slam.
+            key(1.5F, pose(-0.35F, 0, 0, -0.3F, 0, 0, -2.75F, 0, -0.15F, -2.2F, 0, 0.15F, 0.4F, 0, 0, -0.3F, 0, 0,
+                    0.55F, 0.35F, 0)),
+            key(1.72F, pose(0.55F, 0, 0, 0.62F, 0, 0, -0.6F, 0, -0.1F, -0.6F, 0, 0.1F, -0.8F, 0, 0.1F, 0.55F, 0, -0.1F,
+                    0.62F, 0F, 0)),
+            key(2.2F, pose(0.4F, 0, 0, 0.45F, 0, 0, -0.5F, 0, -0.1F, -0.5F, 0, 0.1F, -0.7F, 0, 0.1F, 0.45F, 0, -0.08F,
+                    0.62F, 0F, 0)),
+            key(2.75F, REST, 0.5F),
+    };
+
     private static final float TURN = (float) (Math.PI * 2);
 
     private static final float[][] SPIN_KEYS = {
@@ -105,6 +140,7 @@ public final class FinisherChoreography {
             case GROUND_SLAM -> SLAM_KEYS;
             case RISING_UPPERCUT -> UPPERCUT_KEYS;
             case SPIN_KICK -> SPIN_KEYS;
+            case TUNG_BONK -> BONK_KEYS;
         };
     }
 

@@ -69,6 +69,10 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     private final NumberSetting shakeStrength = addSetting(new NumberSetting("shake_strength", "Shake strength", 0, 1, 0.05, 0.45));
 
     private final List<Finisher> active = new ArrayList<>();
+    private final BooleanSetting keepBody = addSetting(new BooleanSetting("keep_body", "Keep the body visible", true));
+    /** Entity id -> removal the server asked for, held until that body's finisher ends. */
+    private final java.util.Map<Integer, net.minecraft.world.entity.Entity.RemovalReason> heldRemovals = new java.util.HashMap<>();
+    private boolean releasing;
     private final List<Running> effects = new ArrayList<>();
     private final float[] crowdPose = new float[FinisherChoreography.SPIN + 1];
     private final FinisherGate gate = new FinisherGate();
@@ -98,6 +102,39 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         }
     }
 
+    /**
+     * Removal hook: true (and the removal is postponed) while a finisher is playing on that entity, so the body
+     * stays where it fell until the move ends. Only the client copy is kept; the server already removed it.
+     */
+    public static boolean holdRemoval(int entityId, net.minecraft.world.entity.Entity.RemovalReason reason) {
+        if (JilatonClient.moduleManager() == null
+                || !(JilatonClient.moduleManager().get("finisher") instanceof FinisherModule module) || !module.enabled()
+                || module.releasing || !module.keepBody.value()) return false;
+        for (Finisher f : module.active) {
+            if (f.entity != null && f.entity.getId() == entityId) {
+                module.heldRemovals.put(entityId, reason);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void releaseHeld(ClientLevel level, Integer onlyId) {
+        if (heldRemovals.isEmpty() || level == null) return;
+        releasing = true;
+        try {
+            var it = heldRemovals.entrySet().iterator();
+            while (it.hasNext()) {
+                var e = it.next();
+                if (onlyId != null && !onlyId.equals(e.getKey())) continue;
+                level.removeEntity(e.getKey(), e.getValue());
+                it.remove();
+            }
+        } finally {
+            releasing = false;
+        }
+    }
+
     /** Camera offset for this frame's hit kick, in blocks; zero when nothing is landing. */
     public static Vec3 cameraShake() {
         if (JilatonClient.moduleManager() == null
@@ -115,6 +152,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
 
     @Override
     protected void onDisable(Minecraft client) {
+        releaseHeld(client.level, null);
         active.clear();
         effects.clear();
         gate.clear();
@@ -124,6 +162,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
     @Override
     protected void onTick(Minecraft client) {
         if (client.level != boundLevel) {
+            heldRemovals.clear();
             boundLevel = client.level;
             active.clear();
             gate.clear();
@@ -131,6 +170,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         if (!character.value().equals(prepared)) {
             prepared = character.value();
             FinisherFigure.prepare(prepared);
+            FinisherFigure.prepare("Tung Tung Tung Sahur");
             // Bake the whole roster in the background so crowd members show their own model, not a stand-in.
             for (String name : FinisherFigure.characters()) FinisherFigure.prepare(name);
         }
@@ -265,6 +305,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
             float t = (float) ((now - f.started) / 1e9 * speed.value());
             if (t >= f.variant.length) {
                 active.remove(i);
+                if (f.entity != null) releaseHeld(client.level, f.entity.getId());
                 continue;
             }
             follow(client.level, f, now);
@@ -278,10 +319,14 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
             float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz)) + (float) Math.toDegrees(pose[FinisherChoreography.SPIN]);
             float alpha = FinisherChoreography.alpha(f.variant, t);
             int light = LevelRenderer.getLightColor(client.level, BlockPos.containing(px, py + 0.5, pz));
-            FinisherFigure.draw(stack, context.consumers(), character.value(),
+            FinisherFigure.draw(stack, context.consumers(), f.variant.character() != null ? f.variant.character() : character.value(),
                     px - camera.x, py - camera.y, pz - camera.z, yaw, pose,
                     FinisherChoreography.scale(f.variant, t), alpha, light);
             drawCrowd(stack, context, client.level, camera, f, t);
+            while (f.knocked < f.variant.knocks.length && t >= f.variant.knocks[f.knocked]) {
+                knock(client.level, f);
+                f.knocked++;
+            }
             if (!f.landed && t >= f.variant.impact) {
                 f.landed = true;
                 impact(client.level, f, px, pz);
@@ -386,6 +431,24 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         }
     }
 
+    /** A lighter hit before the main impact: a hollow wood knock, a few sparks and a small kick. */
+    private void knock(ClientLevel level, Finisher f) {
+        double x = f.corpseX, y = f.y + 0.4, z = f.corpseZ;
+        if (sounds.value() && volume.value() > 0) {
+            float v = (float) volume.value();
+            sound(level, x, y, z, SoundEvents.NOTE_BLOCK_BASEDRUM.value(), v, 0.55F + 0.1F * f.knocked);
+            sound(level, x, y, z, SoundEvents.WOOD_HIT, v * 0.9F, 0.7F);
+        }
+        if (particles.value()) {
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            for (int i = 0; i < 8; i++) {
+                level.addParticle(ParticleTypes.CRIT, x, y + 0.3, z, (random.nextDouble() - 0.5) * 0.6,
+                        0.2 + random.nextDouble() * 0.3, (random.nextDouble() - 0.5) * 0.6);
+            }
+            level.addParticle(ParticleTypes.SWEEP_ATTACK, x, y + 0.5, z, 0, 0, 0);
+        }
+    }
+
     private static void sound(ClientLevel level, double x, double y, double z, SoundEvent event, float volume, float pitch) {
         level.playLocalSound(x, y, z, event, SoundSource.PLAYERS, volume, pitch, false);
     }
@@ -436,6 +499,7 @@ public final class FinisherModule extends ClientModule implements FxEmitter {
         double impactX, impactY, impactZ;
         long impactAt, lastNanos;
         boolean landed;
+        int knocked;
         double crowdAngle;
         int crowdSeed;
 

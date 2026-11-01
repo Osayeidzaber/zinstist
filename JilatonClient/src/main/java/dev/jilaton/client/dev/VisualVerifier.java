@@ -851,7 +851,7 @@ public final class VisualVerifier {
         shot(6, "38-finisher-impact");
         then(30, () -> {
             client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-            setting("finisher", "move", "Spin kick");
+            setting("finisher", "move", "Tung tung bonk");
             setting("finisher", "kill_effect", "Black hole");
             summonAhead(client, "zombie", 3.5);
         });
@@ -860,8 +860,8 @@ public final class VisualVerifier {
             if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
             command(client, "kill @e[type=minecraft:zombie]");
         });
-        shot(19, "38-finisher-spin");
-        shot(10, "38-finisher-crowd");
+        shot(27, "38-finisher-tung-knock");
+        shot(8, "38-finisher-tung-slam");
         then(40, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
             disable("finisher");
