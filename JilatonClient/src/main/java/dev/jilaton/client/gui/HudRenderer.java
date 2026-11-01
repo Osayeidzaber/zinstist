@@ -673,9 +673,18 @@ public final class HudRenderer {
         int headX = x + card.headX(), headY = y + card.headY(), headSize = card.headSize();
         JilatonUi.fillRounded(graphics, headX, headY, headSize, headSize, 6, 0xFF101010);
         JilatonUi.strokeRounded(graphics, headX, headY, headSize, headSize, 6, recentlyAttacked ? 0xFFFFFFFF : 0x30FFFFFF);
+        // The entity preview is a picture-in-picture drawn in absolute screen pixels, so the tile is mapped
+        // through the current pose; the pinned card draws at local (0, 0) under a translate + scale.
+        org.joml.Vector2f tileMin = graphics.pose().transformPosition(headX, headY, new org.joml.Vector2f());
+        org.joml.Vector2f tileMax = graphics.pose().transformPosition(headX + headSize, headY + headSize, new org.joml.Vector2f());
+        float tileScale = (tileMax.x - tileMin.x) / headSize;
+        graphics.pose().pushMatrix();
+        graphics.pose().identity();
         InventoryScreen.renderEntityInInventoryFollowsMouse(graphics,
-                headX, headY, headX + headSize, headY + headSize, 20, 0.0625F,
-                headX + headSize * 0.5F, headY + headSize * 0.55F, target);
+                Math.round(tileMin.x), Math.round(tileMin.y), Math.round(tileMax.x), Math.round(tileMax.y),
+                Math.max(1, Math.round(20 * tileScale)), 0.0625F,
+                (tileMin.x + tileMax.x) * 0.5F, tileMin.y + (tileMax.y - tileMin.y) * 0.55F, target);
+        graphics.pose().popMatrix();
 
         int contentX = x + card.contentX();
         HudNumberPainter painter = numbers(font);
