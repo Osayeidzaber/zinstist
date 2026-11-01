@@ -35,6 +35,53 @@ public final class FxShapes {
         }
     }
 
+    /**
+     * Camera-facing soft ring: zero alpha on both the inner and the outer rim, peaking on the ring itself.
+     * A glow anchored on this ring keeps its bright part outside the entity silhouette, unlike a filled
+     * ellipse whose centre the entity's own body always occludes.
+     */
+    public static void softRing(FxFrame f, double x, double y, double z, double halfWidth, double halfHeight,
+                                double band, int rgb, double alpha, boolean walls) {
+        if (halfWidth <= 0 || halfHeight <= 0 || band <= 0 || alpha <= 0.004) return;
+        int sides = ringSides(f.quality);
+        double[] radii = bandRadii(halfWidth, halfHeight, band);
+        double innerW = radii[0], innerH = radii[1], outerW = radii[4], outerH = radii[5];
+        double cx = x - f.camX, cy = y - f.camY, cz = z - f.camZ;
+        int rim = argb(rgb, 0), peak = argb(rgb, alpha);
+        for (int i = 0; i < sides; i++) {
+            double a = i * Math.PI * 2 / sides, b = (i + 1) * Math.PI * 2 / sides;
+            double ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+            double aix = ca * innerW, aiy = sa * innerH, bix = cb * innerW, biy = sb * innerH;
+            double amx = ca * halfWidth, amy = sa * halfHeight, bmx = cb * halfWidth, bmy = sb * halfHeight;
+            double aox = ca * outerW, aoy = sa * outerH, box = cb * outerW, boy = sb * outerH;
+            f.batch.quad(
+                    cx + f.rightX * aix + f.upX * aiy, cy + f.rightY * aix + f.upY * aiy, cz + f.rightZ * aix + f.upZ * aiy,
+                    cx + f.rightX * bix + f.upX * biy, cy + f.rightY * bix + f.upY * biy, cz + f.rightZ * bix + f.upZ * biy,
+                    cx + f.rightX * bmx + f.upX * bmy, cy + f.rightY * bmx + f.upY * bmy, cz + f.rightZ * bmx + f.upZ * bmy,
+                    cx + f.rightX * amx + f.upX * amy, cy + f.rightY * amx + f.upY * amy, cz + f.rightZ * amx + f.upZ * amy,
+                    rim, rim, peak, peak, walls);
+            f.batch.quad(
+                    cx + f.rightX * amx + f.upX * amy, cy + f.rightY * amx + f.upY * amy, cz + f.rightZ * amx + f.upZ * amy,
+                    cx + f.rightX * bmx + f.upX * bmy, cy + f.rightY * bmx + f.upY * bmy, cz + f.rightZ * bmx + f.upZ * bmy,
+                    cx + f.rightX * box + f.upX * boy, cy + f.rightY * box + f.upY * boy, cz + f.rightZ * box + f.upZ * boy,
+                    cx + f.rightX * aox + f.upX * aoy, cy + f.rightY * aox + f.upY * aoy, cz + f.rightZ * aox + f.upZ * aoy,
+                    peak, peak, rim, rim, walls);
+        }
+    }
+
+    /** Inner, peak and outer extents of a feathered band, ordered and clamped at zero. */
+    static double[] bandRadii(double halfWidth, double halfHeight, double band) {
+        double core = Math.max(0, band);
+        return new double[]{
+                Math.max(0, halfWidth - core), Math.max(0, halfHeight - core),
+                halfWidth, halfHeight,
+                halfWidth + core, halfHeight + core
+        };
+    }
+
+    /** Segment count for a full ring; finer than the old fan so the band's edges stay round. */
+    static int ringSides(VisualQuality quality) { return Math.max(12, quality.circleSegments() / 2); }
+
     /** Dot with a crisp core plus a wide faint halo, used where the user enables glow. */
     public static void glowDot(FxFrame f, double x, double y, double z, double radius, int rgb, double alpha, boolean glow, boolean walls) {
         if (glow) softDot(f, x, y, z, radius * 3.2, rgb, alpha * 0.22, walls);
