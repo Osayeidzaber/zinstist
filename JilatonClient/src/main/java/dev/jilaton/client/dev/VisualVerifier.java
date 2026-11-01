@@ -917,6 +917,38 @@ public final class VisualVerifier {
             studio(client);
         });
 
+        // ChestStealer: open a real chest holding diamonds and junk; the diamonds move over, the junk stays,
+        // the screen closes. AutoRespawn: die and come back without touching the death screen.
+        then(2, () -> {
+            studio(client);
+            command(client, at("setblock", 0, 0, 2) + " minecraft:chest{Items:[{Slot:0b,id:\"minecraft:diamond\",count:5},"
+                    + "{Slot:1b,id:\"minecraft:rotten_flesh\",count:3}]}");
+            setting("inventory_cleaner", "when", "Inventory open");
+            enable("chest_stealer");
+            enable("auto_respawn");
+        });
+        then(10, () -> {
+            net.minecraft.core.BlockPos chest = net.minecraft.core.BlockPos.containing(studioX, studioY, studioZ + 2);
+            client.gameMode.useItemOn(client.player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(chest),
+                            net.minecraft.core.Direction.UP, chest, false));
+        });
+        then(30, () -> {
+            int diamonds = client.player.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND);
+            LOGGER.info("[JilatonVerify] stealer diamonds={} screen={}", diamonds,
+                    client.screen == null ? "closed" : client.screen.getClass().getSimpleName());
+            command(client, "kill @p");
+        });
+        then(40, () -> {
+            LOGGER.info("[JilatonVerify] respawn alive={} screen={}", client.player != null && client.player.isAlive(),
+                    client.screen == null ? "none" : client.screen.getClass().getSimpleName());
+            disable("chest_stealer");
+            disable("auto_respawn");
+            command(client, at("setblock", 0, 0, 2) + " minecraft:air");
+            command(client, "clear @p minecraft:diamond");
+            studio(client);
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {
