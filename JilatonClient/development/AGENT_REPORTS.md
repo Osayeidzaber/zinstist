@@ -1,12 +1,15 @@
 # Jilaton — Agent Progress
 
 Compact per-agent records. History lives in Git; status in `PROJECT_STATUS.md`; work queue in
-`BACKLOG.md`. All four lanes are merged into `e6c5179`; no agent is running right now.
+`BACKLOG.md`. Lanes 1–4 are merged into `486c138` (the current head, gated at 202 suites / 947 tests).
+Two lanes are running right now: Agent 1 `module-gap-batch` and Agent 2 Radiance amplitude. Neither is
+merged; the Master reads both diffs first.
 
 ## Agent 1 — Core modules, mixins, source integration
 
 ### Active Task
-None. P1-1 is integrated and runtime-verified within harness scope; P2-1/P2-3 remain the next queue item.
+`module-gap-batch` lane running (unmerged): hold-module restart persistence, AutoHead/AutoSoup onto
+`HotbarSlotRestore`, randomised Velocity ranges, AutoArmor hotbar equip.
 
 ### Completed
 - P0-3 — `LightTextureFullbrightMixin` corrected (`remap = false`, `require = 1`); boot-proven.
@@ -25,7 +28,8 @@ None. P1-1 is integrated and runtime-verified within harness scope; P2-1/P2-3 re
   `ReachMath.java`, `AutoClickerModule.java`, `AutoClickerPolicy.java`, `HoldKeyPolicyTest.java`
 
 ### Verification
-- Automated: lane gate 196/910 green; merged gate 200 suites / 935 tests / 0 failures on `e6c5179`.
+- Automated: lane gate 196/910 green; merged gate 202 suites / 947 tests / 0 failures on `486c138`
+  (lane 1's `HotbarSlotRestoreTest` 4 + `HoldKeyPolicyTest` 7 are in that count).
 - Runtime: `verify-32-freelook-killaura.png` — FreeLook stays enabled for all 24 telemetry ticks,
   `bodyYaw` driven −24 → −90 while `cameraYaw=0.0`, and **no** `module free_look disabled itself` ERROR.
 
@@ -40,8 +44,9 @@ P2-1 reference inventory sweep, then P2-3 module registry/lifecycle completeness
 ## Agent 2 — World rendering and visual effects
 
 ### Active Task
-P3-9 — shockwave renders no geometry at runtime; P1-11 Radiance shows no radial glow. Diagnosis only,
-no lane branch open.
+P1-11 — Radiance amplitude/occlusion lane running (unmerged). P3-9 shockwave render-path trace is still
+owed. Two earlier hypotheses are settled and must not be re-litigated: `NumberSetting` ranges are correct
+(`(id,label,min,max,step,default)`), and `EffectBatch.withAlpha` converts 0..1 → 0..255 correctly.
 
 ### Completed
 - P3-8 wave lifetime: `TerrainWave.impactLife(life) = max(life*1.2, 1.6 s)` so a wave survives its whole
@@ -57,10 +62,13 @@ no lane branch open.
 - Lane-side test classes `WaveLifetimeTest`, `RadianceAuraTest`
 
 ### Verification
-- Automated: lane gate 196/912 green; merged gate 200/935 on `e6c5179`.
+- Automated: lane gate 196/912 green; merged gate 202/947 on `486c138`.
 - Runtime: `verify-28` and `verify-28b` (radius 21, capture moved to `shot(4)`) still show an empty plaza
   with only brown impact debris — **no wavefront**. `verify-23-radiance.png` no longer shows the
-  translucent rectangle, but no radial glow is discernible either.
+  translucent rectangle, but no radial glow is discernible either. The `486c138` log has
+  `enabled radiance -> true` and zero `World effect .* failed` lines, and the per-emitter loop has no extra
+  gate (`EntityOverlayRenderer.java:148`, `:170-178`), so `emit()` runs every frame — amplitude, not
+  reachability, is the leading explanation.
 
 ### Blockers
 - Both defects now look like "the effect does not reach the frame at all" rather than wrong parameters.
@@ -92,7 +100,7 @@ None running. P3-5 (ViewModel/SwingAnimation coordination) and P3-8 attachment r
 - `FirstPersonTransformCoordinationTest` (5), `EffectFrameOrientationTest` (6)
 
 ### Verification
-- Automated: lane gate 197/917 green; merged gate 200/935 on `e6c5179`.
+- Automated: lane gate 197/917 green; merged gate 202/947 on `486c138`.
 - Runtime: cosmetic scenes recaptured in this run; not re-judged individually.
 
 ### Blockers
@@ -106,7 +114,8 @@ P3-5 remainder (the two bypassing mixins), then P3-8 cosmetic attachment review.
 ## Agent 4 — GUI, HUD and music
 
 ### Active Task
-P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla hotbar.
+P1-9 — ClickGUI persistence acceptance: restart round trip for page/category/module/expanded/scroll/order
+and a card-body click that opens settings instead of toggling.
 
 ### Completed
 - P1-2 (JA-009) — HUD right column: module list → potion effects → CPS form one column, bottom-right
@@ -114,6 +123,9 @@ P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla ho
 - P1-6 — media bridge opt-in (`MediaBridgePolicy`, `desktopMediaBridge` default false).
 - P1-7 — Spotify token hardening (`SpotifyTokenPolicy`, no value logging, delete on disconnect).
 - Screenshot Copy runtime-verified; `ScreenshotReveal` added for the Open path.
+- P1-12 — target card now defaults to `HudDesign.aboveHotbarTop(guiHeight, scaledHeight)` so its bottom edge
+  holds an 8 px gap above the hotbar and the chip row grows upward; the saved-`HudPosition` branch is
+  untouched. Integrated in `486c138`, runtime-verified in scenes 19/20.
 
 ### Changed Files
 - `gui/HudRenderer.java`, `gui/HudDesign.java`, `gui/HudPreset.java`
@@ -123,10 +135,11 @@ P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla ho
 - `HudColumnStackTest`, rewritten `MusicHudOverlapTest`, privacy/screenshot test classes
 
 ### Verification
-- Automated: merged gate 200/935 on `e6c5179`.
-- Runtime: `verify-19-hud-minimal.png` and `verify-20-hud-full.png` show the module list ending ≈y205
-  and `POTION EFFECTS` starting ≈y232 — P1-2 fixed. The same frames also show the chip row sitting on
-  the hotbar (P1-12). Log has `[CHAT] Copied screenshot` for scene 31.
+- Automated: merged gate 202/947 on `486c138`, including `TargetCardAnchorTest` (6 tests: 4 chip/held
+  combos × 5 scales × 8 GUI heights).
+- Runtime: `verify-19-hud-minimal.png` and `verify-20-hud-full.png` show the module list ending ≈y205,
+  `POTION EFFECTS` starting ≈y232 (P1-2), and the whole target card — chip row included — above a fully
+  visible hotbar (P1-12). Log has `[CHAT] Copied screenshot` for scene 31.
 
 ### Blockers
 - Lyrics unresolved offline (`lines=0`), so spatial/Sky Lyrics remain source-reviewed only.
@@ -138,10 +151,9 @@ P1-12 — target card chip row (`FALL / ARMOR / ABSORB`) overlaps the vanilla ho
   missing is evidence, not a schema: nothing has restart-tested the round trip.
 
 ### Next
-Fix P1-12 (default Y must account for the chip-row height at `HudRenderer.java:634-635`); then P1-9's
-remaining acceptance — a restart round trip for category/module/expanded/scroll/order, the card-body
-click opening settings instead of toggling, and the `1/6 ON` status label; then P3-6 drag/scale
-persistence and P3-7 music HUD polish.
+P1-9's remaining acceptance — a restart round trip for category/module/expanded/scroll/order and the
+card-body click opening settings instead of toggling; then P3-6 drag/scale persistence and P3-7 music HUD
+polish.
 
 ## Agent 5 — Visual reference intelligence
 
