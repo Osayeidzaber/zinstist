@@ -19,17 +19,14 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A soft, blurred glow around nearby players, mobs and items. Two camera-facing elliptical rings hug the
- * body: a tight bloom plus a wider, fainter halo. The rings peak on the body silhouette instead of at the
- * body centre, because a filled gradient's bright middle is always hidden behind the entity itself and only
- * its faded rim would show. Rings also avoid the straight edges of an AABB, so the result reads as a ghostly
- * aura instead of a translucent ESP box. Geometry goes through the shared
+ * A soft, blurred glow around nearby players, mobs and items. Two camera-facing halo bands hug the body: a
+ * bright ring at the silhouette fading outward plus a wider, fainter one. Filled gradients cannot show the
+ * straight edges of an AABB, and a centre-peaked bloom is hidden by the model itself, so the alpha peaks on
+ * the silhouette and feathers away from it. Geometry goes through the shared
  * {@link dev.jilaton.client.render.EffectBatch}, not the ESP box path.
  */
 public final class RadianceModule extends ClientModule implements FxEmitter {
     private static final double TAU = Math.PI * 2;
-    /** Distance between the body silhouette and the brightest part of the aura, in blocks. */
-    private static final double AURA_GAP = 0.05;
 
     private final ChoiceSetting colorMode = addSetting(EffectPalette.modeSetting("color_mode", "Color"));
     private final TextSetting color = addSetting(EffectPalette.hexSetting("color", "Custom RGB hex", "A98CFF"));
@@ -42,7 +39,7 @@ public final class RadianceModule extends ClientModule implements FxEmitter {
     private final BooleanSetting pulse = addSetting(new BooleanSetting("pulse", "Breathe", true));
     private final NumberSetting pulseSpeed = addSetting(new NumberSetting("pulse_speed", "Breath speed", 0, 2, 0.05, 0.55));
 
-    private final double[] aura = new double[6];
+    private final double[] aura = new double[4];
 
     public RadianceModule() {
         super("radiance", "Radiance", "Soft blurred glow around players, mobs and items; a ghostly aura, not a box.", ModuleCategory.RENDER);
@@ -72,14 +69,33 @@ public final class RadianceModule extends ClientModule implements FxEmitter {
             if (alpha <= 0.004) continue;
             Vec3 offset = entity.getPosition(f.partial).subtract(entity.position());
             AABB box = entity.getBoundingBox().move(offset).inflate(0.015);
-            // Peak on the silhouette, not at the body centre: the entity's own depth always hides a gradient's
-            // bright middle, so a centred ellipse only ever showed its faded rim. The aura is drawn over the
-            // world (walls) because it is a glow, and otherwise the body in front of it would eat the band.
+            // A filled radial gradient has no straight edges, and a bloom centred on the model is hidden by
+            // it: two halos, brightest at the silhouette and fading outward, read as a glow around the body
+            // where six face strips read as a drawn box and overlap into a column.
             Vec3 center = box.getCenter();
-            auraRings(box.getXsize(), box.getZsize(), box.getYsize(), thickness.value(), aura);
-            FxShapes.softRing(f, center.x, center.y, center.z, aura[0], aura[1], aura[2], rgb, alpha, true);
-            FxShapes.softRing(f, center.x, center.y, center.z, aura[3], aura[4], aura[5], rgb, alpha * 0.45, true);
+            emitAura(f, center.x, center.y, center.z, box.getXsize(), box.getZsize(), box.getYsize(),
+                    thickness.value(), rgb, alpha, aura);
         }
+    }
+
+    /**
+     * Emits the two aura layers around a body box. Kept static and free of Minecraft state so the geometry can
+     * be asserted in a unit test; the caller reuses {@code aura} so no per-entity buffer is allocated.
+     *
+     * <p>The layers are halos, not filled blooms: the aura is drawn into the depth-tested pass after the
+     * entities, so the body rejects everything inside its silhouette. A centre-peaked ellipse therefore only
+     * ever showed its near-transparent rim outside the model; these are brightest at the silhouette edge and
+     * fade outward, which is where the glow is actually visible.</p>
+     */
+    static void emitAura(FxFrame f, double x, double y, double z, double width, double depth, double height,
+                         double glowThickness, int rgb, double alpha, double[] aura) {
+        auraExtents(width, depth, height, glowThickness, aura);
+        double feather = aura[2] - aura[0];
+        // aura extents already include the 0.10 hug margin around the box; the inner edge of the first halo
+        // sits on it so the bright ring hugs the silhouette instead of being buried under the model.
+        double hugW = aura[0] - feather * 0.5, hugH = aura[1] - feather * 0.5;
+        FxShapes.softHalo(f, x, y, z, hugW, hugH, aura[0], aura[1], rgb, alpha * 0.55, false);
+        FxShapes.softHalo(f, x, y, z, aura[0], aura[1], aura[2], aura[3], rgb, alpha * 0.25, false);
     }
 
     /** Feather width of the two aura layers for a glow-thickness setting. */
@@ -88,23 +104,19 @@ public final class RadianceModule extends ClientModule implements FxEmitter {
     }
 
     /**
-     * Writes the two feathered rings around a body box as
-     * {core width, core height, core band, halo width, halo height, halo band}. Each width/height is the
-     * radius of the band's brightest circle, anchored just outside the silhouette; the band is how far the
-     * gradient fades inward and outward from there. The larger horizontal extent drives the width, so wide
-     * mobs get a wide glow rather than a narrow column. Callers reuse one buffer.
+     * Writes the half-width/half-height of the two feathered layers around a body box as
+     * {inner width, inner height, outer width, outer height}. The larger horizontal extent drives the
+     * width, so wide mobs get a wide glow rather than a narrow column. Callers reuse one buffer.
      */
-    static void auraRings(double width, double depth, double height, double glowThickness, double[] out) {
-        if (out == null || out.length < 6) throw new IllegalArgumentException("aura buffer needs 6 entries");
+    static void auraExtents(double width, double depth, double height, double glowThickness, double[] out) {
+        if (out == null || out.length < 4) throw new IllegalArgumentException("aura buffer needs 4 entries");
         double feather = auraFeather(glowThickness);
-        double coreWidth = Math.max(0, Math.max(width, depth)) * 0.5 + AURA_GAP;
-        double coreHeight = Math.max(0, height) * 0.5 + AURA_GAP;
-        out[0] = coreWidth;
-        out[1] = coreHeight;
-        out[2] = feather;
-        out[3] = coreWidth + feather * 0.6;
-        out[4] = coreHeight + feather * 0.6;
-        out[5] = feather * 1.1;
+        double halfWidth = Math.max(0, Math.max(width, depth)) * 0.5 + 0.10;
+        double halfHeight = Math.max(0, height) * 0.5 + 0.10;
+        out[0] = halfWidth + feather * 0.5;
+        out[1] = halfHeight + feather * 0.5;
+        out[2] = halfWidth + feather;
+        out[3] = halfHeight + feather;
     }
 
     private boolean selected(Entity entity) {

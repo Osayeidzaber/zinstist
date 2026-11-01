@@ -2,7 +2,6 @@ package dev.jilaton.client.module.impl;
 
 import dev.jilaton.client.module.ClientModule;
 import dev.jilaton.client.module.ModuleCategory;
-import dev.jilaton.client.render.EffectBatch;
 import dev.jilaton.client.render.EffectPalette;
 import dev.jilaton.client.render.fx.FxEmitter;
 import dev.jilaton.client.render.fx.FxFrame;
@@ -96,6 +95,8 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     private int waveBudget;
     /** Scratch corners reused for every block top of the wave, so the hot scan never allocates. */
     private final double[] waveTop = new double[12];
+    /** Reused height probe the wave scan reads through; its column reference is set per wave. */
+    private final SurfaceProbe probe = new SurfaceProbe();
 
     public HitEffectsModule() {
         super("hit_effects", "HitEffects", "World-space impact effects: sparks, ripples, shockwaves, ink splashes, rings and combos.", ModuleCategory.RENDER);
@@ -281,53 +282,22 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     }
 
     /**
-     * One large terrain-following wavefront: every sampled block under the front gets a glowing top face
-     * and outline, joined by a faint ring. Sampling is capped per frame and per wave, and blocks behind the
-     * camera are culled before the column lookup, so a 64-block wave stays a handful of hundred reads.
-     * Returns the number of block tops emitted so the caller can keep the frame-wide budget exact.
+     * One large terrain-following wavefront: every sampled block under the front gets a glowing top face and
+     * a bright leading-edge outline. Sampling is capped per frame and per wave, and blocks behind the camera
+     * are culled before the column lookup, so a 64-block wave stays a handful of hundred reads. The scan
+     * itself lives in {@link TerrainWave#emitBand} so it can be driven from a unit test. Returns the number of
+     * block tops emitted so the caller can keep the frame-wide budget exact.
      */
     private int worldWave(FxFrame f, Impact impact, double age, int rgb, double alphaScale, int budget) {
         if (f.client.level == null || budget <= 0) return 0;
         double progress = TerrainWave.progress(age, TerrainWave.MAX_LIFE_SECONDS);
         if (progress >= 1) return 0;
         double radius = TerrainWave.radius(progress, worldWaveRadius.value());
-        double alpha = alphaScale * TerrainWave.alpha(progress);
-        if (radius < 0.5 || alpha < 0.01) return 0;
-        double thickness = worldWaveThickness.value();
-        int bright = EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.45);
-        int cx = (int) Math.floor(impact.x), cz = (int) Math.floor(impact.z);
-        int span = (int) Math.ceil(radius + TerrainWave.LEADING_EDGE) + 1;
-        net.minecraft.world.level.Level level = f.client.level;
-        int used = 0;
-        for (int dx = -span; dx <= span && used < budget; dx++) {
-            for (int dz = -span; dz <= span && used < budget; dz++) {
-                int bx = cx + dx, bz = cz + dz;
-                double ox = bx + 0.5 - impact.x, oz = bz + 0.5 - impact.z;
-                double distance = Math.sqrt(ox * ox + oz * oz);
-                if (!TerrainWave.selectsCell(ox, oz, distance, radius, thickness, f.forwardX, f.forwardZ)) continue;
-                double glow = TerrainWave.frontGlow(distance, radius, thickness) * alpha;
-                if (glow < 0.02) continue;
-                double ground = surface(level, bx + 0.5, impact.floorY, bz + 0.5);
-                if (!Double.isFinite(ground)) continue;
-                used++;
-                TerrainWave.blockTop(bx + 0.5, bz + 0.5, ground, waveTop);
-                int fill = FxShapes.argb(EffectBatch.mixRgb(rgb, 0xFFFFFF, 0.25 * glow), Math.min(1, 0.85 * glow));
-                // blockTop winds clockwise seen from above; reversed so the face points up and survives culling.
-                f.batch.quad(waveTop[0] - f.camX, waveTop[1] - f.camY, waveTop[2] - f.camZ,
-                        waveTop[9] - f.camX, waveTop[10] - f.camY, waveTop[11] - f.camZ,
-                        waveTop[6] - f.camX, waveTop[7] - f.camY, waveTop[8] - f.camZ,
-                        waveTop[3] - f.camX, waveTop[4] - f.camY, waveTop[5] - f.camZ, fill, fill, fill, fill, false);
-                if (glow / alpha > 0.35) {
-                    int edge = FxShapes.argb(bright, glow);
-                    for (int e = 0; e < 4; e++) {
-                        int p = e * 3, q = ((e + 1) % 4) * 3;
-                        f.batch.glowLine(waveTop[p] - f.camX, waveTop[p + 1] - f.camY, waveTop[p + 2] - f.camZ,
-                                waveTop[q] - f.camX, waveTop[q + 1] - f.camY, waveTop[q + 2] - f.camZ, edge, 1.2F, false);
-                    }
-                }
-            }
-        }
-        return used;
+        probe.level = f.client.level;
+        probe.nearY = impact.floorY;
+        return TerrainWave.emitBand(f.batch, probe, impact.x, impact.z, f.camX, f.camY, f.camZ,
+                radius, worldWaveThickness.value(), alphaScale * TerrainWave.alpha(progress), rgb,
+                f.forwardX, f.forwardZ, budget, waveTop);
     }
 
     /** Walkable surface of a column near {@code nearY}; falls back to the heightmap for cliffs and platforms. */
@@ -495,6 +465,17 @@ public final class HitEffectsModule extends ClientModule implements FxEmitter {
     static Set<Style> presetStyles(String preset) { return PRESETS.get(preset); }
 
     int activeImpacts() { return impacts.size(); }
+
+    /** Reusable column lookup for the wave scan, so the hot path never allocates a lambda or probe. */
+    private static final class SurfaceProbe implements TerrainWave.HeightSampler {
+        net.minecraft.world.level.Level level;
+        double nearY;
+
+        @Override
+        public double surfaceY(double x, double z) {
+            return surface(level, x, nearY, z);
+        }
+    }
 
     private static final class Impact {
         final double x, y, z, floorY;
