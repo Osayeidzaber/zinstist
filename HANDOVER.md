@@ -79,7 +79,7 @@ A green unit test never proves a mixin applies; `BUILD SUCCESSFUL` never proves 
   "Follow target"; the card sits left of the opponent at chest height, clears the projected body width, and
   has its own `target_follow_scale` (default 0.6). Runtime-verified in new harness scenes 33 (3.9 m) and 33b
   (1.6 m). Saved configs keep their old value; the dev profile `run/config` was switched to Follow target.
-  Mob targets show an empty head tile (pre-existing, players only get a face).
+  Its preview tile now renders the target (was drawn at the screen's top-left under the pinned pose).
 
 ### Implemented and covered by tests (history)
 
@@ -133,12 +133,13 @@ unused `FxShapes.softRing`, pinned target card.
 
 1. **Spatial / Sky Lyrics — blocked.** No lyrics resolve offline (`lines=0`); needs an authorized lyrics
    metadata source or user-provided synchronized lyrics. Do not scrape or invent metadata.
-2. **ClickGUI click-through at runtime.** Card-body-opens-settings / only-switch-toggles is covered by
-   `ClickGuiClickTargetTest` (pure hit-box maths) but the harness does not inject mouse events. Needs a
-   person clicking, or harness support for `MouseButtonEvent` against the live card layout.
-3. **`SpatialLyricsModule` per-frame allocations** (run lists, lambdas). Untouched on purpose: the module
-   cannot be exercised offline (item 1), so a change could not be verified.
-4. **Mob head tile on the target card** is an empty square (players get a face). Cosmetic, pre-existing.
+2. **`SpatialLyricsModule` per-frame allocations** (run lists, lambdas). Untouched on purpose: the module
+   cannot be exercised offline (item 1), so a change could not be verified. Do it together with item 1.
+
+Also closed after the first handover pass: ClickGUI click-through is runtime-verified by the existing
+scenes 18b/18c (real `mouseClicked` events: the switch toggled exactly one module, the card body toggled
+nothing and opened the AntiBot drawer); the pinned card's empty preview tile was a picture-in-picture
+coordinate bug, fixed in the commit after `0c7a2f2`.
 
 ---
 
@@ -247,8 +248,7 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 1. **Read first:** this file, then `git log --oneline -25`, then `JilatonClient/development/BACKLOG.md`
    for item wording. Do not re-derive state from the older `development/*.md` status files.
 2. **First action:** run the gate (command in §G); run the harness if you touch rendering.
-3. **Priorities:** §D is short — runtime ClickGUI click-through (§D 2) is the only unblocked verification
-   gap. Lyrics stay blocked. New harness scenes 33/33b (pinned card), 34-style AutoArmor log and the
+3. **Priorities:** nothing unblocked is left in §D. Lyrics stay blocked. New harness scenes 33/33b (pinned card), 34-style AutoArmor log and the
    `gui-restore` lines are part of the baseline now.
 4. **Do not rewrite:** `EffectBatch`/`FxFrame`/`FxShapes` API, the module contract, `ClientConfig`
    persistence format, or the `HotbarSlotRestore`/hold-key rules — all were deliberately consolidated.
