@@ -1059,6 +1059,17 @@ public final class VisualVerifier {
             command(client, "item replace entity @p weapon.mainhand with minecraft:diamond_sword");
         });
 
+        // Tooltip sprites: an item tooltip drawn over a plain screen.
+        then(2, () -> client.setScreen(new net.minecraft.client.gui.screens.Screen(net.minecraft.network.chat.Component.literal("tip")) {
+            @Override
+            public void render(net.minecraft.client.gui.GuiGraphics graphics, int mx, int my, float partial) {
+                graphics.setTooltipForNextFrame(font, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_SWORD),
+                        width / 2 - 40, height / 2);
+            }
+        }));
+        shot(6, "45-tooltip");
+        then(2, () -> client.setScreen(null));
+
         // Redesign tour: full-screen menus captured over the live world.
         then(2, () -> {
             JilatonClient.clientConfig().setMenuBackground("Dark Veil");
