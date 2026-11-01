@@ -748,6 +748,26 @@ public final class VisualVerifier {
             command(client, "kill @e[type=minecraft:zombie]");
         });
 
+        // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
+        // like a main-inventory piece, and the server must agree (items are read back after the round trip).
+        then(2, () -> {
+            command(client, "item replace entity @p armor.chest with minecraft:air");
+            command(client, "item replace entity @p armor.feet with minecraft:air");
+            command(client, "item replace entity @p hotbar.3 with minecraft:diamond_chestplate");
+            command(client, "item replace entity @p inventory.11 with minecraft:iron_boots");
+        });
+        then(5, () -> enable("auto_armor"));
+        then(30, () -> {
+            LOGGER.info("[JilatonVerify] auto_armor chest={} feet={} hotbar3={} inv20={}",
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(client.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem()),
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(client.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET).getItem()),
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(client.player.getInventory().getItem(3).getItem()),
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(client.player.getInventory().getItem(20).getItem()));
+            disable("auto_armor");
+            command(client, "item replace entity @p armor.chest with minecraft:air");
+            command(client, "item replace entity @p armor.feet with minecraft:air");
+        });
+
         then(5, () -> {
             preset(hudPresetBefore);
             client.options.hideGui = false;
