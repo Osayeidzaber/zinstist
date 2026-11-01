@@ -25,5 +25,7 @@ public abstract class SmoothCameraMixin {
     private void jilaton$smooth(CallbackInfo ci) {
         Vec3 next = SmoothCameraModule.follow(position(), isDetached());
         if (next != null) setPosition(next);
+        Vec3 shake = dev.jilaton.client.module.impl.FinisherModule.cameraShake();
+        if (shake != null) setPosition(position().add(shake));
     }
 }

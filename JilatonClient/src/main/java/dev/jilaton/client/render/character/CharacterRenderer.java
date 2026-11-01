@@ -324,7 +324,7 @@ final class CharacterRenderer {
       };
    }
 
-   private static void emit(
+   static void emit(
       Pose pose,
       VertexConsumer out,
       Surface s,

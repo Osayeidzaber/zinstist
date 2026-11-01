@@ -819,6 +819,40 @@ public final class VisualVerifier {
             command(client, "kill @e[type=minecraft:zombie]");
         });
 
+        // Finisher: a zombie you hit dies, a 3D character appears beside it and lands a ground slam (first person),
+        // then a second kill gets a spin kick seen from third person.
+        then(2, () -> {
+            client.player.setYRot(0);
+            client.player.setXRot(15);
+            enable("finisher");
+            setting("finisher", "move", "Ground slam");
+            enable("fullbright");
+            summonAhead(client, "zombie", 3.5);
+        });
+        then(30, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
+            command(client, "kill @e[type=minecraft:zombie]");
+        });
+        shot(14, "38-finisher-leap");
+        shot(6, "38-finisher-impact");
+        then(30, () -> {
+            client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+            setting("finisher", "move", "Spin kick");
+            summonAhead(client, "zombie", 3.5);
+        });
+        then(30, () -> {
+            LivingEntity zombie = nearestZombie(client);
+            if (zombie != null) CombatTargetTracker.record(zombie, System.nanoTime());
+            command(client, "kill @e[type=minecraft:zombie]");
+        });
+        shot(19, "38-finisher-spin");
+        then(40, () -> {
+            client.options.setCameraType(CameraType.FIRST_PERSON);
+            disable("finisher");
+            disable("fullbright");
+        });
+
         // AutoArmor from the hotbar: a hotbar chestplate must equip through the inventory container path just
         // like a main-inventory piece, and the server must agree (items are read back after the round trip).
         then(2, () -> {

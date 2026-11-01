@@ -131,6 +131,7 @@ public final class ModuleManager {
         register(new SwingAnimationsModule());
         register(new NoBobModule());
         register(new SmoothCameraModule());
+        register(new dev.jilaton.client.module.impl.FinisherModule());
         register(new dev.jilaton.client.module.impl.ZoomModule());
         register(new dev.jilaton.client.module.impl.FreecamModule());
         register(new dev.jilaton.client.module.impl.FreeLookModule());

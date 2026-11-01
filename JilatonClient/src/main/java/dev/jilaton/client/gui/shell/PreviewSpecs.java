@@ -65,6 +65,7 @@ public final class PreviewSpecs {
             Map.entry("freecam", PreviewSpec.Motif.CAMERA),
             Map.entry("free_look", PreviewSpec.Motif.CAMERA),
             Map.entry("smooth_camera", PreviewSpec.Motif.CAMERA),
+            Map.entry("finisher", PreviewSpec.Motif.FIGURE),
             Map.entry("pearl_trajectory", PreviewSpec.Motif.PEARL),
             Map.entry("explosive_highlights", PreviewSpec.Motif.CORE),
             Map.entry("wings", PreviewSpec.Motif.WINGS),
@@ -122,6 +123,7 @@ public final class PreviewSpecs {
             case "freecam" -> freecam(module, accent);
             case "free_look" -> freeLook(module, accent);
             case "smooth_camera" -> smoothCamera(module, accent);
+            case "finisher" -> finisher(module, accent);
             case "pearl_trajectory" -> pearl(module, accent);
             case "explosive_highlights" -> core(module, accent);
             case "wings" -> wings(module, accent);
@@ -728,6 +730,18 @@ public final class PreviewSpecs {
                 front ? 1 : 0.3,
                 flag(module, "limit_pitch", true) ? 1 : 0.6,
                 detail);
+    }
+
+    private static PreviewSpec finisher(ClientModule module, int accent) {
+        return new PreviewSpec(PreviewSpec.Motif.FIGURE, Math.min(31, choiceIndex(module, "character")),
+                accent, 0xFFFFFF, accent,
+                unit(num(module, "speed", 1.0), 0.6, 1.6),
+                unit(choiceIndex(module, "move"), 0, 3),
+                unit(num(module, "volume", 0.7), 0, 1),
+                unit(num(module, "shake_strength", 0.45), 0, 1),
+                0.5,
+                0.85,
+                0);
     }
 
     private static PreviewSpec smoothCamera(ClientModule module, int accent) {
