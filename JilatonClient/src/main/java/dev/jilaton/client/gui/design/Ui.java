@@ -139,7 +139,9 @@ public final class Ui {
         float k = h - 4;
         float kx = x + 2 + (float) ((w - k - 4) * t);
         round(g, kx, y + 3, k, k, k / 2, alpha(0xFF000000, 0.28));
-        round(g, kx, y + 2, k, k, k / 2, mix(0xFFE8E8E8, JilatonUi.onColor(accent) == 0xFF000000 ? 0xFF0A0A0A : 0xFFFFFFFF, t));
+        int r = (accent >> 16) & 255, gr = (accent >> 8) & 255, b = accent & 255;
+        boolean lightTrack = (0.2126 * r + 0.7152 * gr + 0.0722 * b) / 255.0 > 0.6;
+        round(g, kx, y + 2, k, k, k / 2, mix(0xFFE8E8E8, lightTrack ? 0xFF0A0A0A : 0xFFFFFFFF, t));
     }
 
     /** Small toggle for drawers: 32x18. */

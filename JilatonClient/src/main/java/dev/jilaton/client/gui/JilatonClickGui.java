@@ -261,7 +261,7 @@ public final class JilatonClickGui extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (minecraft.level == null) graphics.fill(0, 0, width, height, Ui.BACKDROP);
+        if (minecraft.level == null) dev.jilaton.client.gui.design.Backdrops.drawScreen(graphics, width, height, partialTick);
         else {
             if (config.backdropBlur()) renderBlurredBackground(graphics);
             graphics.fill(0, 0, width, height, Ui.alpha(0xFF050505, config.backdropOpacity()));
@@ -280,8 +280,15 @@ public final class JilatonClickGui extends Screen {
         place();
 
         canvas.begin(graphics);
-        Ui.round(graphics, PX - 6, PY + 2, PW + 12, PH + 12, 18, Ui.alpha(0xFF000000, 0.35));
-        Ui.card(graphics, PX, PY, PW, PH, 14, Ui.PANEL, Ui.STROKE);
+        dev.jilaton.client.gui.design.Kit.shadow(graphics, PX, PY, PW, PH, 8, 0.9);
+        Ui.round(graphics, PX, PY, PW, PH, 8, Ui.alpha(0xFF070707, 0.94));
+        dev.jilaton.client.gui.design.Paint.outline(graphics, PX, PY, PW, PH, 8, 0, Ui.alpha(0xFFFFFFFF, 0.10));
+        // Corner ticks: small technical marks at two panel corners.
+        int tick = Ui.alpha(0xFFFFFFFF, 0.35);
+        Ui.rect(graphics, PX - 6, PY - 6, 10, 1, tick);
+        Ui.rect(graphics, PX - 6, PY - 6, 1, 10, tick);
+        Ui.rect(graphics, PX + PW - 4, PY + PH + 5, 10, 1, tick);
+        Ui.rect(graphics, PX + PW + 5, PY + PH - 4, 1, 10, tick);
         renderSidebar(graphics, mx, my, accent);
         renderHeader(graphics, mx, my, accent, now);
         switch (page) {
@@ -299,16 +306,16 @@ public final class JilatonClickGui extends Screen {
     }
 
     private void renderSidebar(GuiGraphics g, double mx, double my, int accent) {
-        Ui.round(g, PX + 1, PY + 1, SIDE - 1, PH - 2, 13, Ui.SIDEBAR);
-        Ui.rect(g, PX + SIDE, PY + 1, 1, PH - 2, Ui.STROKE);
+        Ui.rect(g, PX + SIDE, PY + 18, 1, PH - 36, Ui.alpha(0xFFFFFFFF, 0.08));
         float x = PX + 14;
-        Ui.card(g, x + 6, PY + 20, 34, 34, 10, Ui.CARD, Ui.STROKE);
-        Ui.mark(g, x + 14, PY + 28, 18, Ui.TEXT);
-        Ui.spaced(g, "JILATON", x + 50, PY + 30, 14, 3.2F, JilatonType.Face.BOLD, Ui.TEXT);
-        Ui.textRight(g, "0.1", PX + SIDE - 20, PY + 32, 10, JilatonType.Face.MONO, Ui.TEXT_3);
+        Ui.mark(g, x + 8, PY + 26, 20, Ui.TEXT);
+        Ui.spaced(g, "JILATON", x + 38, PY + 31, 13, 4F, JilatonType.Face.BOLD, Ui.TEXT);
+        Ui.spaced(g, "VOL. 01", x + 8, PY + 58, 9, 1.6F, JilatonType.Face.MONO, Ui.TEXT_3);
 
-        Ui.spaced(g, "MODULES", x + 8, PY + 76, 10, 1, JilatonType.Face.MEDIUM, Ui.TEXT_3);
-        float y = PY + 92;
+        Ui.spaced(g, "MODULES", x + 8, PY + 82, 9, 1.8F, JilatonType.Face.MONO, Ui.TEXT_3);
+        float y = PY + 96;
+        int row = 0;
+        float activeY = -1;
         for (String c : CATEGORIES) {
             int on = 0, total = 0;
             for (ClientModule module : allModules) {
@@ -317,60 +324,72 @@ public final class JilatonClickGui extends Screen {
                 if (module.enabled()) on++;
             }
             boolean active = page == Page.MODULES && c.equals(category);
-            sideRow(g, c, on + " of " + total, x, y, active, mx, my, accent);
+            if (active) activeY = y;
+            sideRow(g, String.format(java.util.Locale.ROOT, "%02d", ++row), c, on + "/" + total, x, y, active, mx, my, accent);
             y += 44;
         }
-        Ui.spaced(g, "GENERAL", x + 8, y + 12, 10, 1, JilatonType.Face.MEDIUM, Ui.TEXT_3);
+        Ui.spaced(g, "GENERAL", x + 8, y + 12, 9, 1.8F, JilatonType.Face.MONO, Ui.TEXT_3);
         y += 30;
         for (int i = 0; i < GENERAL.length; i++) {
             boolean active = page.ordinal() == i + 1;
-            sideRow(g, GENERAL[i], null, x, y, active, mx, my, accent);
+            if (active) activeY = y;
+            sideRow(g, String.format(java.util.Locale.ROOT, "%02d", ++row), GENERAL[i], null, x, y, active, mx, my, accent);
             y += 44;
+        }
+        // The selection indicator slides between rows instead of jumping.
+        if (activeY >= 0) {
+            double iy = dev.jilaton.client.gui.design.Kit.spring("cg:sideY", activeY);
+            Ui.rect(g, PX + 1, (float) iy + 10, 2, 20, accent);
         }
         // Who is playing, where.
         float uy = PY + PH - 62;
-        Ui.hline(g, x, uy, SIDE - 28, Ui.STROKE);
+        Ui.rect(g, x, uy, SIDE - 28, 1, Ui.alpha(0xFFFFFFFF, 0.08));
         Ui.face(g, x + 8, uy + 14, 28);
         Ui.text(g, Ui.fit(minecraft.getUser().getName(), 110, 12, JilatonType.Face.SEMIBOLD), x + 46, uy + 14, 12,
                 JilatonType.Face.SEMIBOLD, Ui.TEXT);
-        String where = minecraft.level == null ? "Main menu" : minecraft.hasSingleplayerServer() ? "Singleplayer" : "Multiplayer";
-        Ui.text(g, where, x + 46, uy + 31, 11, Ui.TEXT_3);
+        String where = minecraft.level == null ? "MAIN MENU" : minecraft.hasSingleplayerServer() ? "SINGLEPLAYER" : "MULTIPLAYER";
+        Ui.spaced(g, where, x + 46, uy + 32, 9, 1.4F, JilatonType.Face.MONO, Ui.TEXT_3);
         Ui.circle(g, PX + SIDE - 24, uy + 28, 3.5F, Ui.ONLINE);
     }
 
-    private void sideRow(GuiGraphics g, String label, String count, float x, float y, boolean active, double mx, double my, int accent) {
-        double t = Ui.ease("cg:side:" + label, Ui.inside(mx, my, x, y, SIDE - 28, 40));
-        if (active) Ui.round(g, x, y, SIDE - 28, 40, 8, Ui.alpha(accent, 0.08));
-        else if (t > 0.01) Ui.round(g, x, y, SIDE - 28, 40, 8, Ui.alpha(Ui.RAISED, t));
-        Ui.text(g, label, x + 8, y + 13, 13, active ? JilatonType.Face.SEMIBOLD : JilatonType.Face.REGULAR,
-                active ? accent : Ui.mix(Ui.TEXT_2, Ui.TEXT, t));
-        if (count != null) Ui.textRight(g, count, x + SIDE - 36, y + 14, 11, JilatonType.Face.MONO, active ? accent : Ui.TEXT_3);
+    private void sideRow(GuiGraphics g, String number, String label, String count, float x, float y, boolean active,
+                         double mx, double my, int accent) {
+        double t = dev.jilaton.client.gui.design.Kit.spring("cg:side:" + label, Ui.inside(mx, my, x, y, SIDE - 28, 40));
+        double a = dev.jilaton.client.gui.design.Kit.spring("cg:sidea:" + label, active);
+        if (a > 0.01) Ui.round(g, x, y + 2, SIDE - 28, 36, 6, Ui.alpha(0xFFFFFFFF, 0.06 * a));
+        Ui.spaced(g, number, x + 8, y + 15, 9, 1.2F, JilatonType.Face.MONO, Ui.mix(Ui.TEXT_3, accent, a));
+        float shift = (float) (4 * Math.max(t, a));
+        Ui.text(g, label, x + 32 + shift, y + 13, 13, a > 0.5 ? JilatonType.Face.SEMIBOLD : JilatonType.Face.REGULAR,
+                Ui.mix(Ui.mix(Ui.TEXT_2, Ui.TEXT, t), Ui.TEXT, a));
+        if (count != null) Ui.textRight(g, count, x + SIDE - 36, y + 15, 10, JilatonType.Face.MONO, Ui.mix(Ui.TEXT_3, Ui.TEXT_2, a));
     }
 
     private void renderHeader(GuiGraphics g, double mx, double my, int accent, long now) {
         float right = mainRight();
         float y = HEADER_Y;
         float hx = MAIN_X;
-        Ui.text(g, "Hello, ", hx, y + 17, 15, JilatonType.Face.MEDIUM, Ui.TEXT);
-        float nx = hx + Ui.width("Hello, ", 15, JilatonType.Face.MEDIUM);
-        String name = minecraft.getUser().getName();
-        Ui.text(g, name, nx, y + 17, 15, JilatonType.Face.MEDIUM, accent);
-        float after = nx + Ui.width(name, 15, JilatonType.Face.MEDIUM) + 16;
+        // Editorial section line: "02 — MODULES / COMBAT", the page number following the sidebar order.
+        int number = page == Page.MODULES ? java.util.Arrays.asList(CATEGORIES).indexOf(category) + 1
+                : CATEGORIES.length + page.ordinal();
+        String where = page == Page.MODULES ? "MODULES / " + category.toUpperCase(java.util.Locale.ROOT)
+                : page.name();
+        Ui.spaced(g, String.format(java.util.Locale.ROOT, "%02d \u2014 %s", number, where), hx, y + 20, 10, 1.8F,
+                JilatonType.Face.MONO, Ui.TEXT_2);
         double since = (now - openedAt) / 1e9;
         if (resumed && since < 4) {
             double fade = since < 3 ? 1 : 1 - (since - 3);
-            String chip = "Resumed where you left off";
-            float cw = Ui.width(chip, 11, JilatonType.Face.REGULAR) + 30;
-            if (after + cw < right - 330) {
-                Ui.card(g, after, y + 12, cw, 24, 12, Ui.alpha(Ui.CARD, fade), Ui.alpha(Ui.STROKE, fade));
-                Ui.ring(g, after + 13, y + 24, 4, 1.2F, Ui.alpha(Ui.TEXT_2, fade));
-                Ui.text(g, chip, after + 22, y + 18, 11, Ui.alpha(Ui.TEXT_2, fade));
-            }
+            String chip = "RESUMED";
+            float cx = hx + Ui.spacedWidth(String.format(java.util.Locale.ROOT, "%02d \u2014 %s", number, where), 10, 1.8F,
+                    JilatonType.Face.MONO) + 16;
+            Ui.circle(g, cx + 3, y + 25, 3, Ui.alpha(accent, fade));
+            Ui.spaced(g, chip, cx + 12, y + 20, 10, 1.8F, JilatonType.Face.MONO, Ui.alpha(Ui.TEXT_3, fade));
         }
         String clock = LocalTime.now().format(CLOCK);
         Ui.textRight(g, clock, right - 260 - 16, y + 18, 12, JilatonType.Face.MONO, Ui.TEXT_2);
         boolean focus = search.isFocused();
-        Ui.card(g, right - 260, y + 7, 260, 34, 9, Ui.CARD, focus ? Ui.alpha(accent, 0.55) : Ui.STROKE);
+        Ui.round(g, right - 260, y + 7, 260, 34, 6, Ui.mix(0xFF0F0F0F, 0xFF151515, focus ? 1 : 0));
+        dev.jilaton.client.gui.design.Paint.outline(g, right - 260, y + 7, 260, 34, 6, 0,
+                focus ? Ui.alpha(accent, 0.6) : Ui.alpha(0xFFFFFFFF, 0.1));
         Ui.ring(g, right - 260 + 15, y + 23, 4.2F, 1.4F, Ui.TEXT_3);
         Ui.rect(g, right - 260 + 18, y + 26, 3, 1.4F, Ui.TEXT_3);
         Ui.textRight(g, "Ctrl F", right - 12, y + 19, 10, JilatonType.Face.MONO, Ui.TEXT_3);
@@ -378,8 +397,8 @@ public final class JilatonClickGui extends Screen {
 
     private void renderTitle(GuiGraphics g, String title, String subtitle, String right, double mx, double my, int accent) {
         float r = mainRight();
-        Ui.text(g, title, MAIN_X, TITLE_Y, 24, JilatonType.Face.SEMIBOLD, Ui.TEXT);
-        float tx = MAIN_X + Ui.width(title, 24, JilatonType.Face.SEMIBOLD) + 12;
+        Ui.text(g, title, MAIN_X, TITLE_Y - 6, 32, JilatonType.Face.BOLD, Ui.TEXT);
+        float tx = MAIN_X + Ui.width(title, 32, JilatonType.Face.BOLD) + 14;
         float rightW = right == null ? 0 : Ui.width(right, 12, JilatonType.Face.REGULAR) + 14;
         float filterW = page == Page.MODULES ? Ui.width("Enabled only", 12, JilatonType.Face.MEDIUM) + 34 : 0;
         float room = r - tx - rightW - filterW - 24;
@@ -449,12 +468,8 @@ public final class JilatonClickGui extends Screen {
     }
 
     private void moduleCard(GuiGraphics g, ClientModule module, float x, float y, float w, float h, boolean over, int accent) {
-        boolean open = module.id().equals(drawerId);
         double t = Ui.ease("cg:card:" + module.id(), over);
-        Ui.round(g, x, y, w, h, 12, Ui.mix(Ui.CARD, Ui.RAISED, t * 0.7));
-        if (open) Ui.glowRing(g, x, y, w, h, 12, accent, 1);
-        else Ui.outline(g, x, y, w, h, 12, Ui.mix(Ui.STROKE, Ui.FAINT, t));
-        if (module.id().equals(dragCard)) Ui.outline(g, x, y, w, h, 12, accent);
+        y = cardSurface(g, module, x, y, w, h, t, accent);
         drawGrip(g, module, x, y, h, accent);
         float textW = w - 32 - 40 - 12;
         Ui.text(g, Ui.fit(module.name(), textW, 13, JilatonType.Face.SEMIBOLD), x + 16, y + 15, 13, JilatonType.Face.SEMIBOLD, Ui.TEXT);
@@ -467,12 +482,8 @@ public final class JilatonClickGui extends Screen {
 
     private void visualCard(GuiGraphics g, ClientModule module, float x, float y, float w, float h, boolean over, int accent,
                             long now, boolean reduced) {
-        boolean open = module.id().equals(drawerId);
         double t = Ui.ease("cg:card:" + module.id(), over);
-        Ui.round(g, x, y, w, h, 12, Ui.mix(Ui.CARD, Ui.RAISED, t * 0.7));
-        if (open) Ui.glowRing(g, x, y, w, h, 12, accent, 1);
-        else Ui.outline(g, x, y, w, h, 12, Ui.mix(Ui.STROKE, Ui.FAINT, t));
-        if (module.id().equals(dragCard)) Ui.outline(g, x, y, w, h, 12, accent);
+        y = cardSurface(g, module, x, y, w, h, t, accent);
         drawGrip(g, module, x, y, h, accent);
         float textW = w - 28 - 32 - 10;
         Ui.text(g, Ui.fit(module.name(), textW, 13, JilatonType.Face.SEMIBOLD), x + 14, y + 13, 13, JilatonType.Face.SEMIBOLD, Ui.TEXT);
@@ -482,6 +493,27 @@ public final class JilatonClickGui extends Screen {
         Ui.text(g, Ui.fit(summary, w - 28, 11, JilatonType.Face.REGULAR), x + 14, y + 32, 11, Ui.TEXT_2);
         int px = Math.round(x + 14), py = Math.round(y + 52), pw = Math.round(w - 28), ph = Math.round(h - 52 - 12);
         preview.render(g, font, px, py, pw, ph, 8, module.id(), PreviewSpecs.of(module, accent), module.enabled(), t, reduced, now);
+    }
+
+    /**
+     * Shared card surface: near-black sheet with a hairline; hover lifts it 2 px and runs a light around the border;
+     * an enabled module gets an accent bar that grows down the left edge; the open module keeps a steady accent
+     * hairline. Returns the lifted y.
+     */
+    private float cardSurface(GuiGraphics g, ClientModule module, float x, float y, float w, float h, double hover, int accent) {
+        boolean open = module.id().equals(drawerId);
+        double on = dev.jilaton.client.gui.design.Kit.spring("cg:on:" + module.id(), module.enabled());
+        y -= (float) (2 * hover);
+        Ui.round(g, x, y, w, h, 6, Ui.mix(0xFF0F0F0F, 0xFF171717, hover));
+        dev.jilaton.client.gui.design.Paint.outline(g, x, y, w, h, 6, 0,
+                open ? Ui.alpha(accent, 0.6) : Ui.alpha(0xFFFFFFFF, 0.07 + 0.08 * hover));
+        if (hover > 0.01) {
+            double phase = (dev.jilaton.client.gui.design.Kit.clock() * 0.45 + (module.id().hashCode() & 255) / 255.0) % 1.0;
+            dev.jilaton.client.gui.design.Kit.borderSweep(g, x, y, w, h, phase, 0xFFFFFFFF, 0.55 * hover);
+        }
+        if (on > 0.01) Ui.rect(g, x, y + 8, 2, (float) ((h - 16) * on), accent);
+        if (module.id().equals(dragCard)) Ui.outline(g, x, y, w, h, 6, accent);
+        return y;
     }
 
     /** Three dots in the card's left gutter: press here to drag the card, never to toggle or open it. */

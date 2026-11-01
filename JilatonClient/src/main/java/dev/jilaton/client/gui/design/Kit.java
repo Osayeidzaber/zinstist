@@ -183,6 +183,39 @@ public final class Kit {
         Ui.text(g, s, x, y, LARGE, JilatonType.Face.BOLD, color);
     }
 
+    /**
+     * A light travelling around a rectangle border: a bright head with a fading tail. {@code phase} 0..1 is the
+     * head position along the perimeter, {@code amount} 0..1 its strength. Used for hovered and selected surfaces.
+     */
+    public static void borderSweep(GuiGraphics g, float x, float y, float w, float h, double phase, int color, double amount) {
+        if (amount <= 0.01) return;
+        float per = 2 * (w + h);
+        float tail = Math.min(per * 0.28F, 220);
+        int steps = 36;
+        for (int i = 0; i < steps; i++) {
+            float k = i / (float) steps;
+            float d = (float) (((phase * per - k * tail) % per + per) % per);
+            float[] p = perimeter(x, y, w, h, d);
+            float a = (1 - k) * (1 - k);
+            Ui.rect(g, p[0] - 1, p[1] - 1, 2, 2, a(color, a * amount));
+        }
+    }
+
+    private static float[] perimeter(float x, float y, float w, float h, float d) {
+        if (d < w) return new float[]{x + d, y};
+        d -= w;
+        if (d < h) return new float[]{x + w, y + d};
+        d -= h;
+        if (d < w) return new float[]{x + w - d, y + h};
+        d -= w;
+        return new float[]{x, y + h - d};
+    }
+
+    /** Seconds since start, frozen with reduced motion; the shared clock for continuous UI motion. */
+    public static double clock() {
+        return reduced() ? 0 : System.nanoTime() / 1e9;
+    }
+
     // ---------------------------------------------------------------- controls
 
     /**
@@ -201,7 +234,7 @@ public final class Kit {
 
     /** The knob stays light unless the track is light too (white accent), then it turns dark for contrast. */
     private static int onAccentKnob(int accent) {
-        return JilatonUi.onColor(accent) == 0xFF000000 || luminance(accent) > 0.7 ? 0xFF0A0A0A : 0xFFFFFFFF;
+        return luminance(accent) > 0.6 ? 0xFF0A0A0A : 0xFFFFFFFF;
     }
 
     private static double luminance(int argb) {
