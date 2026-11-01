@@ -252,7 +252,7 @@ print(len(glob.glob('.isolated-build-o/root/test-results/test/TEST-*.xml')), t, 
 1. **Read first:** this file, then `git log --oneline -25`, then `JilatonClient/development/BACKLOG.md`
    for item wording. Do not re-derive state from the older `development/*.md` status files.
 2. **First action:** run the gate (command in §G); run the harness if you touch rendering.
-3. **Priorities:** §D is empty. Start new work from user requests; keep running the gate and the harness. Lyrics stay blocked. New harness scenes 33/33b (pinned card), 34-style AutoArmor log and the
+3. **Priorities:** §D is empty. Start new work from user requests; keep running the gate and the harness. New harness scenes 33/33b (pinned card), 35/35b/35c (local lyrics), the AutoArmor log and the
    `gui-restore` lines are part of the baseline now.
 4. **Do not rewrite:** `EffectBatch`/`FxFrame`/`FxShapes` API, the module contract, `ClientConfig`
    persistence format, or the `HotbarSlotRestore`/hold-key rules — all were deliberately consolidated.
