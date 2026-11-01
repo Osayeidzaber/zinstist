@@ -103,6 +103,7 @@ public final class JilatonClickGui extends Screen {
         enabledOnly = config.guiEnabledOnly();
         restoredQuery = config.guiSearchQuery();
         scroll = targetScroll = config.categoryScroll(category);
+        drawerScroll = drawerId == null ? 0 : config.guiDrawerScroll();
         selectedProfile = config.guiSelectedProfile().isEmpty() ? null : config.guiSelectedProfile();
         resumed = page != Page.MODULES || !category.equals("All") || drawerId != null || !restoredQuery.isEmpty();
     }
@@ -154,6 +155,7 @@ public final class JilatonClickGui extends Screen {
         config.setGuiPage(page.name());
         config.setGuiCategory(category);
         config.setGuiExpandedModule(drawerId == null ? "" : drawerId);
+        config.setGuiDrawerScroll(drawerId == null ? 0 : drawerScroll);
         config.setGuiSelectedModule(drawerId == null ? "" : drawerId);
         config.setGuiEnabledOnly(enabledOnly);
         config.setGuiSearchQuery(search == null ? restoredQuery : search.getValue());

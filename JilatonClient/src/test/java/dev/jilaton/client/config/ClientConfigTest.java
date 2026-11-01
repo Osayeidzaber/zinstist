@@ -410,6 +410,7 @@ class ClientConfigTest {
         config.setGuiCategory("Visuals");
         config.setGuiSelectedModule("target_esp");
         config.setGuiExpandedModule("target_esp");
+        config.setGuiDrawerScroll(148.0);
         config.setGuiEnabledOnly(true);
         config.setGuiSearchQuery("esp");
         config.setGuiSelectedProfile("ranked_1");
@@ -426,6 +427,7 @@ class ClientConfigTest {
         assertEquals("Visuals", restored.guiCategory());
         assertEquals("target_esp", restored.guiSelectedModule());
         assertEquals("target_esp", restored.guiExpandedModule());
+        assertEquals(148.0, restored.guiDrawerScroll());
         assertTrue(restored.guiEnabledOnly());
         assertEquals("esp", restored.guiSearchQuery());
         assertEquals("ranked_1", restored.guiSelectedProfile());

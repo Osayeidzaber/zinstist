@@ -64,6 +64,7 @@ public final class ClientConfig {
     private String guiSearchQuery = "";
     private String guiSelectedProfile = "";
     private double guiScroll;
+    private double guiDrawerScroll;
     private final Map<String, Double> categoryScrolls = new HashMap<>();
 
     public List<String> visualOrder() { return List.copyOf(visualOrder); }
@@ -123,6 +124,12 @@ public final class ClientConfig {
     public String guiSelectedProfile() { return guiSelectedProfile; }
     public void setGuiSelectedProfile(String profile) {
         this.guiSelectedProfile = isValidProfileName(profile) ? profile : "";
+    }
+
+    /** Scroll offset inside the open settings drawer, so reopening lands on the same setting. */
+    public double guiDrawerScroll() { return guiDrawerScroll; }
+    public void setGuiDrawerScroll(double scroll) {
+        this.guiDrawerScroll = Double.isFinite(scroll) ? Math.max(0.0, scroll) : 0.0;
     }
 
     public double guiScroll() { return guiScroll; }
@@ -288,6 +295,7 @@ public final class ClientConfig {
         setGuiSelectedProfile(values.getProperty("ui.selected_profile", ""));
         try {
             setGuiScroll(Double.parseDouble(values.getProperty("ui.scroll", "0.0")));
+            setGuiDrawerScroll(Double.parseDouble(values.getProperty("ui.drawer_scroll", "0.0")));
         } catch (NumberFormatException exception) {
             guiScroll = 0.0;
         }
@@ -440,6 +448,7 @@ public final class ClientConfig {
         values.setProperty("ui.search_query", guiSearchQuery);
         values.setProperty("ui.selected_profile", guiSelectedProfile);
         values.setProperty("ui.scroll", Double.toString(guiScroll));
+        values.setProperty("ui.drawer_scroll", Double.toString(guiDrawerScroll));
         for (String category : GUI_CATEGORIES) {
             double catScroll = categoryScroll(category);
             if (catScroll > 0.0) {
