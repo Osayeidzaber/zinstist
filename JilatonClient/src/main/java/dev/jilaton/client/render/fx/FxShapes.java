@@ -35,6 +35,46 @@ public final class FxShapes {
         }
     }
 
+    /**
+     * Camera-facing halo between two concentric ellipses: full alpha at the inner edge, 55% on the middle
+     * ring and zero at the outer rim. Aura-style glows are drawn after the entities into the depth-tested
+     * pass, so anything the body covers is rejected; a centre-peaked ellipse therefore only ever shows its
+     * almost transparent rim, while a halo puts the bright geometry exactly where it stays visible.
+     */
+    public static void softHalo(FxFrame f, double x, double y, double z,
+                                double innerHalfWidth, double innerHalfHeight,
+                                double outerHalfWidth, double outerHalfHeight,
+                                int rgb, double alpha, boolean walls) {
+        if (innerHalfWidth <= 0 || innerHalfHeight <= 0 || alpha <= 0.004) return;
+        if (outerHalfWidth <= innerHalfWidth * 1.02 || outerHalfHeight <= innerHalfHeight * 1.02) return;
+        int sides = f.quality.ordinal() >= 2 ? 10 : 7;
+        double cx = x - f.camX, cy = y - f.camY, cz = z - f.camZ;
+        int inner = argb(rgb, alpha), mid = argb(rgb, alpha * 0.55), rim = argb(rgb, 0);
+        double midW = innerHalfWidth + (outerHalfWidth - innerHalfWidth) * 0.55;
+        double midH = innerHalfHeight + (outerHalfHeight - innerHalfHeight) * 0.55;
+        for (int i = 0; i < sides; i++) {
+            double a = i * Math.PI * 2 / sides, b = (i + 1) * Math.PI * 2 / sides;
+            double ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+            double iax = ca * innerHalfWidth, iay = sa * innerHalfHeight;
+            double ibx = cb * innerHalfWidth, iby = sb * innerHalfHeight;
+            double max = ca * midW, may = sa * midH, mbx = cb * midW, mby = sb * midH;
+            double oax = ca * outerHalfWidth, oay = sa * outerHalfHeight;
+            double obx = cb * outerHalfWidth, oby = sb * outerHalfHeight;
+            f.batch.quad(
+                    cx + f.rightX * iax + f.upX * iay, cy + f.rightY * iax + f.upY * iay, cz + f.rightZ * iax + f.upZ * iay,
+                    cx + f.rightX * ibx + f.upX * iby, cy + f.rightY * ibx + f.upY * iby, cz + f.rightZ * ibx + f.upZ * iby,
+                    cx + f.rightX * mbx + f.upX * mby, cy + f.rightY * mbx + f.upY * mby, cz + f.rightZ * mbx + f.upZ * mby,
+                    cx + f.rightX * max + f.upX * may, cy + f.rightY * max + f.upY * may, cz + f.rightZ * max + f.upZ * may,
+                    inner, inner, mid, mid, walls);
+            f.batch.quad(
+                    cx + f.rightX * max + f.upX * may, cy + f.rightY * max + f.upY * may, cz + f.rightZ * max + f.upZ * may,
+                    cx + f.rightX * mbx + f.upX * mby, cy + f.rightY * mbx + f.upY * mby, cz + f.rightZ * mbx + f.upZ * mby,
+                    cx + f.rightX * obx + f.upX * oby, cy + f.rightY * obx + f.upY * oby, cz + f.rightZ * obx + f.upZ * oby,
+                    cx + f.rightX * oax + f.upX * oay, cy + f.rightY * oax + f.upY * oay, cz + f.rightZ * oax + f.upZ * oay,
+                    mid, mid, rim, rim, walls);
+        }
+    }
+
     /** Dot with a crisp core plus a wide faint halo, used where the user enables glow. */
     public static void glowDot(FxFrame f, double x, double y, double z, double radius, int rgb, double alpha, boolean glow, boolean walls) {
         if (glow) softDot(f, x, y, z, radius * 3.2, rgb, alpha * 0.22, walls);

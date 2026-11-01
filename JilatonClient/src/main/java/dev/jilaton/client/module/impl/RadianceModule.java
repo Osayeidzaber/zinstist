@@ -19,10 +19,11 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A soft, blurred glow around nearby players, mobs and items. Two camera-facing elliptical layers with a
- * radial alpha falloff hug the body: a tight bloom plus a wider, fainter halo. Filled gradients cannot show
- * the straight edges of an AABB, so the result reads as a ghostly aura instead of a translucent ESP box.
- * Geometry goes through the shared {@link dev.jilaton.client.render.EffectBatch}, not the ESP box path.
+ * A soft, blurred glow around nearby players, mobs and items. Two camera-facing halo bands hug the body: a
+ * bright ring at the silhouette fading outward plus a wider, fainter one. Filled gradients cannot show the
+ * straight edges of an AABB, and a centre-peaked bloom is hidden by the model itself, so the alpha peaks on
+ * the silhouette and feathers away from it. Geometry goes through the shared
+ * {@link dev.jilaton.client.render.EffectBatch}, not the ESP box path.
  */
 public final class RadianceModule extends ClientModule implements FxEmitter {
     private static final double TAU = Math.PI * 2;
@@ -68,13 +69,33 @@ public final class RadianceModule extends ClientModule implements FxEmitter {
             if (alpha <= 0.004) continue;
             Vec3 offset = entity.getPosition(f.partial).subtract(entity.position());
             AABB box = entity.getBoundingBox().move(offset).inflate(0.015);
-            // A filled radial gradient has no straight edges: a tight bloom plus a wide halo reads as a glow
-            // around the silhouette, where six face strips read as a drawn box and overlap into a column.
+            // A filled radial gradient has no straight edges, and a bloom centred on the model is hidden by
+            // it: two halos, brightest at the silhouette and fading outward, read as a glow around the body
+            // where six face strips read as a drawn box and overlap into a column.
             Vec3 center = box.getCenter();
-            auraExtents(box.getXsize(), box.getZsize(), box.getYsize(), thickness.value(), aura);
-            FxShapes.softEllipse(f, center.x, center.y, center.z, aura[0], aura[1], rgb, alpha * 0.55, false);
-            FxShapes.softEllipse(f, center.x, center.y, center.z, aura[2], aura[3], rgb, alpha * 0.22, false);
+            emitAura(f, center.x, center.y, center.z, box.getXsize(), box.getZsize(), box.getYsize(),
+                    thickness.value(), rgb, alpha, aura);
         }
+    }
+
+    /**
+     * Emits the two aura layers around a body box. Kept static and free of Minecraft state so the geometry can
+     * be asserted in a unit test; the caller reuses {@code aura} so no per-entity buffer is allocated.
+     *
+     * <p>The layers are halos, not filled blooms: the aura is drawn into the depth-tested pass after the
+     * entities, so the body rejects everything inside its silhouette. A centre-peaked ellipse therefore only
+     * ever showed its near-transparent rim outside the model; these are brightest at the silhouette edge and
+     * fade outward, which is where the glow is actually visible.</p>
+     */
+    static void emitAura(FxFrame f, double x, double y, double z, double width, double depth, double height,
+                         double glowThickness, int rgb, double alpha, double[] aura) {
+        auraExtents(width, depth, height, glowThickness, aura);
+        double feather = aura[2] - aura[0];
+        // aura extents already include the 0.10 hug margin around the box; the inner edge of the first halo
+        // sits on it so the bright ring hugs the silhouette instead of being buried under the model.
+        double hugW = aura[0] - feather * 0.5, hugH = aura[1] - feather * 0.5;
+        FxShapes.softHalo(f, x, y, z, hugW, hugH, aura[0], aura[1], rgb, alpha * 0.55, false);
+        FxShapes.softHalo(f, x, y, z, aura[0], aura[1], aura[2], aura[3], rgb, alpha * 0.25, false);
     }
 
     /** Feather width of the two aura layers for a glow-thickness setting. */
