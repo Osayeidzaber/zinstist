@@ -92,6 +92,7 @@
     "CustomCloudMixin",
     "CustomFogColorMixin",
     "ServerListRedirectMixin",
+    "ScreenRedirectMixin",
     "WorldListRedirectMixin",
     "LowFireMixin",
     "LightTextureFullbrightMixin",
