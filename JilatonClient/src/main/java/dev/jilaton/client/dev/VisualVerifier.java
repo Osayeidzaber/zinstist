@@ -620,9 +620,13 @@ public final class VisualVerifier {
         then(5, () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
             command(client, "time set 13000");
-            setting("ambience", "style", "Dust");
-            setting("ambience", "density", 0.8);
-            setting("ambience", "radius", 20.0);
+            // Fireflies glow and are drawn large: dim Dust in the near-white client accent barely shows on the dark
+            // plaza, so the colour hand-over to the sky accent could not be judged from the screenshots.
+            setting("ambience", "style", "Fireflies");
+            setting("ambience", "density", 1.0);
+            setting("ambience", "radius", 10.0);
+            setting("ambience", "size", 2.5);
+            setting("ambience", "opacity", 1.0);
             setting("ambience", "color_mode", "Theme");
             disable("custom_sky");
             enable("ambience");
