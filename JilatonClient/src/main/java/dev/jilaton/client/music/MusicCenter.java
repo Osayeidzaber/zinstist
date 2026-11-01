@@ -23,6 +23,8 @@ public final class MusicCenter {
     private final SpotifyConnect spotify;
     private final MediaSessionSource desktop;
     private final OnlineLyrics onlineLyrics;
+    /** Polled sources only; the local player reports its exact position. */
+    private final PlaybackClock clock = new PlaybackClock();
     /** Third-party lookups stay off until the user's explicit opt-in reaches {@link #setFetchLyrics}. */
     private boolean fetchLyrics;
     /** Persisted desktop-bridge opt-in; replaced by {@link #attachConfig} at client start. */
@@ -131,8 +133,8 @@ public final class MusicCenter {
 
     public NowPlaying nowPlaying() {
         return switch (source) {
-            case SPOTIFY -> spotify.state();
-            case DESKTOP -> desktop.state();
+            case SPOTIFY -> clock.smooth(spotify.state(), System.nanoTime());
+            case DESKTOP -> clock.smooth(desktop.state(), System.nanoTime());
             case OFF -> NowPlaying.idle("Off", "Music source off");
             case LOCAL -> {
                 LocalLibrary.Track track = player.current();

@@ -167,6 +167,9 @@ public final class MusicVisualsModule extends ClientModule implements FxEmitter 
         double angle = viewYaw + Math.toRadians(panelAngle.value());
         double px = player.getX() - Math.sin(angle) * 1.9, pz = player.getZ() + Math.cos(angle) * 1.9;
         double py = player.getY() + player.getEyeHeight() * 0.85 + Math.sin(t * 0.9) * 0.05;
+        // In third person the panel can land over the crosshair; it gives way like the lyrics do.
+        a *= SpatialLyricsModule.clearance(f, px, py, pz);
+        if (a < 0.02) return;
         if (albumPanel.value()) {
             double fade = Math.min(1, (f.now - artChangedAt) / 4e8);
             float size = (float) panelSize.value();

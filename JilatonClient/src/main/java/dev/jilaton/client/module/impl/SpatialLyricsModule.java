@@ -252,6 +252,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             double maxD = maxDistance.value();
             if (distance > maxD) continue;
             alpha *= Math.min(1, Math.max(0, (maxD - distance) / (maxD * 0.3)));
+            alpha *= clearance(f, x, y, z);
             if (alpha < 0.02) continue;
             if (slot == 0) {
                 boolean timed = active != null && active.timedWords() && lineIndex == index
@@ -294,15 +295,18 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             if (text != null && !text.isEmpty()) {
                 double reach = LyricLayout.effectiveRadius(radius.value(), f.firstPerson) + 0.6;
                 Vec3 eye = new Vec3(f.camX, f.camY, f.camZ);
-                Vec3 end = eye.add(f.forwardX * reach, f.forwardY * reach, f.forwardZ * reach);
+                double[] ray = LyricLayout.turned(f.forwardX, f.forwardY, f.forwardZ, side.value());
+                Vec3 end = eye.add(ray[0] * reach, ray[1] * reach, ray[2] * reach);
                 double hit = -1;
                 if (f.client.level != null) {
                     var result = f.client.level.clip(new ClipContext(eye, end, ClipContext.Block.VISUAL,
                             ClipContext.Fluid.NONE, player));
                     if (result.getType() != HitResult.Type.MISS) hit = result.getLocation().distanceTo(eye);
                 }
+                // Beside the gaze by the side angle, never on the crosshair where it would cover the fight.
+                double[] dir = LyricLayout.turned(f.forwardX, f.forwardY, f.forwardZ, side.value());
                 LyricTrail.Entry placed = trail.place(text, index, eye.x, eye.y + height.value() * 0.25, eye.z,
-                        f.forwardX, f.forwardY, f.forwardZ, LyricTrail.placementDistance(reach, hit), f.now,
+                        dir[0], dir[1], dir[2], LyricTrail.placementDistance(reach, hit), f.now,
                         (int) trailLines.value());
                 if (accents.value()) spawnTrailAccents(f, placed);
             }
@@ -324,6 +328,7 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             double distance = Math.sqrt(f.distanceSqr(e.x, y, e.z));
             if (distance > maxD) continue;
             alpha *= Math.min(1, Math.max(0, (maxD - distance) / (maxD * 0.3)));
+            alpha *= clearance(f, e.x, y, e.z);
             if (alpha < 0.02) continue;
             double appear = f.reducedMotion ? 1 : LyricTrail.appear(e, f.now);
             y -= 0.12 * (1 - appear);
@@ -397,6 +402,12 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
             boolean isActive = e == current;
             double alpha = opacity.value() * f.intensity * LyricSky.alpha(e, f.now, linger.value(), isActive)
                     * (isActive ? 1 : dim.value());
+            // Sky lines are scenery, so they only give way to the crosshair during a fight.
+            if (dev.jilaton.client.render.CombatTargetTracker.targetId() >= 0) {
+                double h = Math.cos(e.elevation);
+                alpha *= LyricLayout.centerClearance(-Math.sin(e.azimuth) * h, Math.sin(e.elevation),
+                        Math.cos(e.azimuth) * h, f.forwardX, f.forwardY, f.forwardZ, true);
+            }
             if (alpha < 0.02) continue;
             double appear = f.reducedMotion ? 1 : LyricSky.appear(e, f.now);
             List<TextRaster.Run> runs = skyRuns;
@@ -462,6 +473,12 @@ public final class SpatialLyricsModule extends ClientModule implements FxEmitter
      * World-space home for a stack in front of the player's gaze, lifted above whatever terrain is under it.
      * First person never lets the arc come closer than {@link LyricLayout#MIN_FIRST_PERSON_RADIUS} to the eye.
      */
+    /** Fades text that sits on the crosshair; the clear zone widens while you are in a fight. */
+    static double clearance(FxFrame f, double x, double y, double z) {
+        return LyricLayout.centerClearance(x - f.camX, y - f.camY, z - f.camZ, f.forwardX, f.forwardY, f.forwardZ,
+                dev.jilaton.client.render.CombatTargetTracker.targetId() >= 0);
+    }
+
     private Vec3 anchorPoint(Player player, FxFrame f, double yaw, boolean firstPerson) {
         double r = LyricLayout.effectiveRadius(radius.value(), firstPerson);
         double x = player.getX() - Math.sin(yaw) * r;

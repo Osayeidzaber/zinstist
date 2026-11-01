@@ -281,6 +281,7 @@ public final class MediaSessionSource {
                     ? (filter.isEmpty() ? "No media is playing" : "Spotify is not open — press Play to launch it") : error);
             return;
         }
+        // Stamp the position with when its line arrived; the artwork lookup below can take a network round trip.
         String title = str(json, "title"), artist = str(json, "artist"), album = str(json, "album");
         String art = str(json, "art");
         String key = title + "|" + artist;
@@ -300,7 +301,7 @@ public final class MediaSessionSource {
         String app = str(json, "app");
         String device = app.toLowerCase(Locale.ROOT).contains("spotify") ? "Spotify · This PC" : app.replace(".exe", "");
         state = new NowPlaying("Spotify", title, artist, album, json.get("positionMs").getAsLong(), json.get("durationMs").getAsLong(),
-                playing, Artwork.get("media:" + key), device, playing ? "Playing" : str(json, "status"), true, true, false, System.nanoTime());
+                playing, Artwork.get("media:" + key), device, playing ? "Playing" : str(json, "status"), true, true, false, lastLineNanos);
     }
 
     private void refreshArtwork() {

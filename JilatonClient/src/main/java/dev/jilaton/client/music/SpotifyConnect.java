@@ -230,6 +230,8 @@ public final class SpotifyConnect {
             if (code == 401) { accessToken = null; schedule(1); return; }
             if (code >= 300) { schedule(idleSeconds * 2); state = withStatus("Spotify error " + code); return; }
             JsonObject json = JsonParser.parseString(read(connection.getInputStream())).getAsJsonObject();
+            // progress_ms is true when the response arrives, not after the artwork download below.
+            long receivedNanos = System.nanoTime();
             boolean playing = json.has("is_playing") && json.get("is_playing").getAsBoolean();
             long progress = json.has("progress_ms") && !json.get("progress_ms").isJsonNull() ? json.get("progress_ms").getAsLong() : 0;
             String device = "";
@@ -263,7 +265,7 @@ public final class SpotifyConnect {
                 try { Artwork.load(url, download(url)); } catch (IOException ignored) { }
             }
             state = new NowPlaying("Spotify", title, artist, album, progress, duration, playing,
-                    art == null ? null : Artwork.get(art), device, playing ? "Playing" : "Paused", true, false, false, System.nanoTime());
+                    art == null ? null : Artwork.get(art), device, playing ? "Playing" : "Paused", true, false, false, receivedNanos);
             if (art != null && state.artwork() == null) schedule(0.6);
             else schedule(playing ? activeSeconds : idleSeconds);
         } catch (IOException exception) {
