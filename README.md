@@ -1,168 +1,83 @@
 <div align="center">
 
-# Jilaton Client
+# Jilaton
 
-**A configurable Minecraft Java client built with Fabric.**
+**A Fabric client for Minecraft 1.21.11: an editorial, shader-driven interface, 118 modules, and 3D cosmetics.**
 
-Combat and movement modules, a searchable ClickGUI, and a customizable HUD — built in Java with an original dark interface.
+![Minecraft 1.21.11](https://img.shields.io/badge/Minecraft-1.21.11-111111?style=flat-square)
+![Fabric](https://img.shields.io/badge/Fabric-0.20.1-111111?style=flat-square)
+![Java 21](https://img.shields.io/badge/Java-21-111111?style=flat-square)
+![License GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-111111?style=flat-square)
 
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-62b47a?style=flat-square)
-![Java](https://img.shields.io/badge/Java-21-e89b43?style=flat-square)
-![Fabric](https://img.shields.io/badge/Fabric-0.20.1-dbd0b4?style=flat-square)
-![Status](https://img.shields.io/badge/Status-In%20development-818cf8?style=flat-square)
-
-[Get started](#get-started) · [Features](#features) · [Controls](#controls) · [Development status](#development-status) · [Documentation](#documentation)
+<img src="docs/screenshots/home.jpg" alt="Jilaton home screen" width="100%">
 
 </div>
 
 ---
 
-Jilaton brings module settings, profiles, keybinds, theme controls, and HUD editing into one client interface. The project targets **Minecraft 1.21.11** and is under active development. Feature coverage and testing vary by module; the engineering checkpoint records what has actually been verified.
+## Overview
+
+Jilaton is a personal project: a complete Minecraft client built as a Fabric mod. The whole interface was
+redesigned from scratch in an editorial style (big display type, italic serif accents, monospace section labels,
+hairline rules) running on real GPU shader backgrounds, and every screen shares one design system for colour,
+type and motion.
+
+## Interface
+
+| | |
+|---|---|
+| <img src="docs/screenshots/home-threads.jpg" alt="Home with the Threads shader"> | <img src="docs/screenshots/loading.jpg" alt="Loading screen"> |
+| **Home** with a live shader background, kinetic wordmark and sliding navigation | **Loading** driven by real resource-loading progress |
+| <img src="docs/screenshots/clickgui.jpg" alt="ClickGUI"> | <img src="docs/screenshots/clickgui-settings.jpg" alt="Module settings drawer"> |
+| **ClickGUI**: numbered categories, live module previews, light sweeps on hover | **Settings drawer**: only the switch toggles a module, the card opens its settings |
+| <img src="docs/screenshots/theme.jpg" alt="Theme page"> | <img src="docs/screenshots/pause.jpg" alt="Pause menu"> |
+| **Theme**: presets, accent, motion, blur, GUI size and background | **Pause** over a real GPU blur, with a live session panel |
+| <img src="docs/screenshots/hud.jpg" alt="HUD"> | <img src="docs/screenshots/music.jpg" alt="Music center"> |
+| **HUD** widgets with a drag-and-snap editor | **Music** center with synced lyrics |
+
+## Gameplay and visuals
+
+| | |
+|---|---|
+| <img src="docs/screenshots/finisher.jpg" alt="Finisher"> | <img src="docs/screenshots/xray.jpg" alt="XRay"> |
+| **Finisher**: a 3D character performs a finishing move on what you defeat, with kill effects and a crowd | **XRay** fades the terrain so ores show through |
+| <img src="docs/screenshots/storage-esp.jpg" alt="StorageESP and Breadcrumbs"> | <img src="docs/screenshots/waypoints.jpg" alt="Waypoints"> |
+| **StorageESP** and **Breadcrumbs** | **Waypoints** with beams and distance labels |
 
 ## Features
 
-### Make the interface yours
+- **Shader backgrounds**: Dark Veil, Aurora, Threads, Beams, Galaxy and Liquid Chrome, written in GLSL for
+  Minecraft's GUI pipeline and reacting to the cursor.
+- **Customization**: seven interface presets (Jilaton, Editorial, Cyber, Monochrome, Glass, Cinematic,
+  Performance), accent colours, fonts, GUI size, transition speed, blur, transparency and a Full Effects switch.
+- **Configs**: profiles, clipboard import/export, per-module reset, and search that matches setting names.
+- **Modules** across Combat, Movement, Player, Visuals and Client, including AutoTool, AutoFish,
+  InventoryCleaner, ChestStealer, ChestCleaner, AutoWalk, AutoReconnect, Notifier, Macros, Trajectories,
+  StorageESP, BlockESP, Waypoints, Breadcrumbs, XRay, NoRender, Time Changer and more.
+- **3D cosmetics**: built-in 3D characters, wings, halos, knives, swing animations and a view-model editor.
+- **Finisher**: Ground slam, Rising uppercut, Spin kick and Tung tung bonk, with twelve kill effects.
 
-- **Searchable ClickGUI** with categories, expandable settings, configurable keybinds, and saved profiles.
-- **Custom title screen** with a dark theme, animated backdrop, and original vector J mark.
-- **HUD editor** with draggable widgets and saved scale, alignment, accent, panel opacity, and visibility.
-- **Optional video-inspired presentation:** set NameTags → Presentation to **Compact**; set HUD → Target card style to **Compact** and Target card position to **Follow target**. Equipment nametags and the saved HUD layout remain available. These new native modes are build-tested and await in-game appearance checks.
-- **Gameplay widgets** for FPS/ping, coordinates, keystrokes, CPS, armor, potion effects, module activity, and target information.
-- **Zoom** with hold/toggle activation, smoothing, scroll adjustment, and proportional mouse sensitivity.
-- **FreeLook**, independent hand transforms, custom crosshair, floating health-change text and nine-type attack particles are implemented in source. Their automated checks pass; detailed in-game behavior remains unverified.
+## Install
 
-### Configure how you play
+1. Install [Fabric Loader](https://fabricmc.net/use/) **0.20.1 or newer** for Minecraft **1.21.11**.
+2. Put [Fabric API](https://modrinth.com/mod/fabric-api) and the Jilaton jar in your `mods` folder.
+3. Launch with Java 21. Open the client menu with **Right Shift**.
 
-| Area | Selected modules in the source |
-| --- | --- |
-| Combat and targeting | AimAssist, KillAura, BowAim, AutoShoot, Triggerbot, Criticals, CrystalAura, AutoAnchor, AnchorAura |
-| Inventory and survival | AutoTotem, AutoArmor, AutoReplenish, AutoEat, AutoPot, AutoRod, AutoWeapon, AutoLeave |
-| Movement | Sprint, Strafe, Speed, Step, SafeWalk, InventoryMove, HighJump, LongJump, Flight, NoSlow, FastFall |
-| Visuals and client | Fullbright, Zoom, FreeLook, CustomFOV, NameTags, PlayerESP, ItemESP, Tracers, ViewModel, CustomCrosshair, HitParticles, DamageParticles, SwingAnimations, HUD |
+> Some modules change gameplay and may be against the rules of multiplayer servers. Use them where they are
+> allowed.
 
-These are source features, not a promise of complete mode parity or verified multiplayer behavior. See the [implementation inventory](JilatonClient/IMPLEMENTATION_INVENTORY.md) for behavior, dependencies, and remaining work.
+## Build
 
-### Keep your setup
-
-Settings, module states, profiles, and friend names persist locally. With the Friends module enabled, middle-clicking a targeted player toggles their friend status. Friends receive a blue overhead hat marker and are excluded from combat targeting.
-
-## Get started
-
-### Requirements
-
-- A **Java 21 JDK**, with `JAVA_HOME` set to its installation.
-- Network access for Gradle and the first dependency download.
-- Minecraft **1.21.11**, Fabric Loader, and Fabric API for running the built mod.
-
-The build pins Fabric Loader **0.20.1**, Fabric API **0.141.6+1.21.11**, Loom **1.14.10**, and Gradle **9.8.2**. The Gradle wrapper is included; downloaded toolchains and caches are not.
-
-### Clone and build
-
-```sh
-git clone https://github.com/Osayeidzaber/zinstist.git
-cd zinstist/JilatonClient
+```bash
+cd JilatonClient
+./gradlew build
 ```
 
-**Windows / PowerShell**
+The jar is written to `JilatonClient/build/libs/`. See [BUILDING.md](JilatonClient/BUILDING.md) for details.
 
-```powershell
-.\gradlew.bat test build --no-daemon
-```
+## Credits and license
 
-**Linux / macOS**
-
-```sh
-sh ./gradlew test build --no-daemon
-```
-
-Build output is written to `JilatonClient/build/libs/`. For the current version, use **`jilaton-client-0.1.0.jar`**; the `-sources.jar` contains source code.
-
-### Run the mod
-
-1. Set up a Minecraft **1.21.11** instance with Fabric Loader and the matching Fabric API.
-2. Place the built Jilaton JAR and Fabric API JAR in that instance's `mods/` directory.
-3. Launch the Fabric instance. Press **Right Shift** to open Jilaton's ClickGUI.
-
-For a development instance, run from `JilatonClient/`:
-
-```powershell
-.\gradlew.bat runClient --no-daemon
-```
-
-On Linux/macOS, use `sh ./gradlew runClient --no-daemon`. The development instance uses the local `run/` directory. An offline development profile cannot authenticate with Realms or authenticated multiplayer services.
-
-## Controls
-
-| Action | Default control or command |
-| --- | --- |
-| Open ClickGUI | **Right Shift** or `/jilaton gui` |
-| Open HUD editor | `/jilaton hud` |
-| Toggle a module | `/jilaton toggle <module_id>`; module IDs have suggestions |
-| Zoom | Hold **C** by default; configure hold/toggle behavior in settings |
-| FreeLook | Hold **Left Alt** by default; configure front/back perspective and hold/toggle behavior |
-| Toggle a friend | **Middle-click** a targeted player while Friends is enabled |
-
-In the HUD editor, drag widgets to position them. Keyboard controls:
-
-| Key | Action |
-| --- | --- |
-| **Tab** | Select a widget |
-| **[ / ]** | Adjust scale |
-| **− / =** | Adjust panel opacity |
-| **C** | Change accent |
-| **A** | Change alignment |
-| **H** | Toggle visibility |
-| **R** | Reset the selected widget |
-| **M** | Toggle reduced motion |
-
-## Development status
-
-**This is a development build.** Module parity, rendering coverage, and gameplay acceptance are still in progress.
-
-The recorded **October 30, 2026 checkpoint** reports **259 automated tests passing**, with zero failures, errors, or skips. It also records a successful launch into a local Creative world and focused checks of the title screen, ClickGUI, and HUD editor. Those results do not establish complete gameplay or multiplayer compatibility, and they are recorded results rather than a live CI status.
-
-Open work includes detailed combat and movement testing, inventory/action conflict review, Zoom behavior checks, fuller rendering coverage, and additional UI and persistence checks. Read the [checkpoint](JilatonClient/development/CHECKPOINT.md) for the exact scope and limitations.
-
-## Repository layout
-
-```text
-zinstist/
-├── README.md
-├── .gitignore
-├── SECURITY_ASSESSMENT.md
-└── JilatonClient/
-    ├── src/main/java/       # Client, modules, GUI, configuration, and Mixins
-    ├── src/main/resources/  # Fabric metadata, assets, and Mixin configuration
-    ├── src/test/java/       # Automated tests
-    ├── gradle/wrapper/      # Pinned Gradle wrapper
-    ├── development/         # Checkpoint and machine-readable inventories
-    ├── tools/               # Inventory and packaging helpers
-    ├── build.gradle
-    ├── gradle.properties
-    ├── LICENSE
-    └── ATTRIBUTION.md
-```
-
-Git excludes downloaded JDK/Gradle distributions, dependency caches, build artifacts, logs, game saves, local configurations, and reference-analysis directories. These can remain on the developer's computer without being uploaded. Reference-client JARs and recovered sources are not build dependencies.
-
-## Documentation
-
-| Document | What it covers |
-| --- | --- |
-| [Build guide](JilatonClient/BUILDING.md) | Requirements, dependency resolution, and build output |
-| [Engineering checkpoint](JilatonClient/development/CHECKPOINT.md) | Verified checks, limitations, and next steps |
-| [Implementation inventory](JilatonClient/IMPLEMENTATION_INVENTORY.md) | Module behavior and implementation depth |
-| [Integration manifest](JilatonClient/development/integration-manifest.json) | Machine-readable source and integration records |
-| [Contributor guide](JilatonClient/agent.md) | Architecture, implementation, and verification rules |
-| [Security assessment](JilatonClient/SECURITY_ASSESSMENT.md) | Artifact provenance and review boundaries |
-| [Attribution](JilatonClient/ATTRIBUTION.md) | Sources, adaptations, and licensing notices |
-
-## Contributing
-
-Keep changes focused and preserve the existing Java/Fabric architecture. Use the shared module lifecycle, configuration, input, rotation, and rendering systems. Add meaningful tests for behavior changes, run the relevant checks, and distinguish automated results from behavior observed in Minecraft.
-
-Before contributing, read the [project guide](JilatonClient/agent.md) and [current checkpoint](JilatonClient/development/CHECKPOINT.md). Include the affected module, expected behavior, actual behavior, and reproduction steps when reporting an issue.
-
-## License and credits
-
-Jilaton's Fabric metadata declares **GPL-3.0-only**; see [LICENSE](JilatonClient/LICENSE). The project credits Anubis Client by **Horcus and 4ldenz** and documents adaptations from **LiquidBounce**, including GPL-3.0-or-later obligations, in [ATTRIBUTION.md](JilatonClient/ATTRIBUTION.md). Preserve the applicable notices when modifying or redistributing the project.
+Jilaton is licensed under the [GPL-3.0](JilatonClient/LICENSE). Parts are adapted from
+[LiquidBounce](https://github.com/CCBlueX/LiquidBounce) (GPL-3.0) and the Anubis client (GPL-3.0, Horcus and
+4ldenz); see [ATTRIBUTION.md](JilatonClient/ATTRIBUTION.md) for every source. Fonts: Inter, JetBrains Mono,
+Bricolage Grotesque and Instrument Serif, all under the SIL Open Font License.

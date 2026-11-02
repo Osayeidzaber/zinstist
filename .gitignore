@@ -45,3 +45,6 @@ __pycache__/
 *.key
 *.p12
 *.jks
+
+# Local release jars
+/dist/
