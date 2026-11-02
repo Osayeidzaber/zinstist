@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="18" viewBox="0 0 1200 18">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      .run { animation: run 3.6s cubic-bezier(.6,0,.4,1) infinite; }
+      @keyframes run { 0% { transform: translateX(-260px); } 100% { transform: translateX(1460px); } }
+    </style>
+  </defs>
+  <line x1="0" y1="9" x2="1200" y2="9" stroke="#8a8a8a" stroke-opacity=".35"/>
+  <rect x="0" y="4" width="1" height="10" fill="#8a8a8a"/><rect x="1199" y="4" width="1" height="10" fill="#8a8a8a"/>
+  <rect class="run" x="0" y="8" width="240" height="2" fill="url(#g)"/>
+</svg>
